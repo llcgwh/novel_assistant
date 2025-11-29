@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小说写作辅助系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>小说写作辅助系统</h1>
+            <nav>
+                <button class="nav-btn active" data-view="timeline">时间轴</button>
+                <button class="nav-btn" data-view="characters">人物管理</button>
+                <button class="nav-btn" data-view="scenes">场景管理</button>
+                <button class="nav-btn" data-view="foreshadows">伏笔管理</button>
+                <button class="nav-btn" data-view="outlines">大纲管理</button>
+                <button class="nav-btn" data-view="map">地图系统</button>
+            </nav>
+        </header>
+
+        <main id="main-content">
+            <!-- 时间轴视图 -->
+            <div id="timeline-view" class="view active">
+                <div class="view-header">
+                    <h2>时间轴系统</h2>
+                    <button class="btn-primary" onclick="showTimelineEventModal()">添加事件</button>
+                </div>
+                <div id="timeline-list" class="timeline-container"></div>
+            </div>
+
+            <!-- 人物管理视图 -->
+            <div id="characters-view" class="view">
+                <div class="view-header">
+                    <h2>人物管理</h2>
+                    <button class="btn-primary" onclick="showCharacterModal()">添加人物</button>
+                </div>
+                <div id="characters-list" class="grid-container"></div>
+            </div>
+
+            <!-- 场景管理视图 -->
+            <div id="scenes-view" class="view">
+                <div class="view-header">
+                    <h2>场景管理</h2>
+                    <button class="btn-primary" onclick="showSceneModal()">添加场景</button>
+                </div>
+                <div id="scenes-list" class="grid-container"></div>
+            </div>
+
+            <!-- 伏笔管理视图 -->
+            <div id="foreshadows-view" class="view">
+                <div class="view-header">
+                    <h2>伏笔管理</h2>
+                    <button class="btn-primary" onclick="showForeshadowModal()">添加伏笔</button>
+                </div>
+                <div id="foreshadows-list" class="grid-container"></div>
+            </div>
+
+            <!-- 大纲管理视图 -->
+            <div id="outlines-view" class="view">
+                <div class="view-header">
+                    <h2>大纲管理</h2>
+                    <button class="btn-primary" onclick="showOutlineModal()">添加大纲</button>
+                </div>
+                <div id="outlines-list" class="grid-container"></div>
+            </div>
+
+            <!-- 地图系统视图 -->
+            <div id="map-view" class="view">
+                <div class="view-header">
+                    <h2>地图系统</h2>
+                    <button class="btn-primary" onclick="showMapLocationModal()">添加位置</button>
+                </div>
+                <div id="map-canvas-container">
+                    <canvas id="map-canvas" width="800" height="600"></canvas>
+                </div>
+                <div id="map-locations-list" class="list-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 模态框容器 -->
+    <div id="modal-container"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/characters.js"></script>
+    <script src="js/scenes.js"></script>
+    <script src="js/foreshadows.js"></script>
+    <script src="js/outlines.js"></script>
+    <script src="js/timeline.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
