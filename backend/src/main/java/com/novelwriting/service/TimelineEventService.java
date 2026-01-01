@@ -1,15 +1,7 @@
 package com.novelwriting.service;
 
-import com.novelwriting.entity.TimelineEvent;
-import com.novelwriting.entity.Character;
-import com.novelwriting.entity.Scene;
-import com.novelwriting.entity.Foreshadow;
-import com.novelwriting.entity.Outline;
-import com.novelwriting.repository.TimelineEventRepository;
-import com.novelwriting.repository.CharacterRepository;
-import com.novelwriting.repository.SceneRepository;
-import com.novelwriting.repository.ForeshadowRepository;
-import com.novelwriting.repository.OutlineRepository;
+import com.novelwriting.entity.*;
+import com.novelwriting.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -35,8 +27,15 @@ public class TimelineEventService {
     @Autowired
     private OutlineRepository outlineRepository;
 
+    @Autowired
+    private TagRepository tagRepository;
+
     public List<TimelineEvent> getAllTimelineEvents() {
         return timelineEventRepository.findAllByOrderByRealOrderAsc();
+    }
+
+    public List<TimelineEvent> getTimelineEventsByNovelId(Long novelId) {
+        return timelineEventRepository.findByNovelIdOrderByRealOrderAsc(novelId);
     }
 
     public Optional<TimelineEvent> getTimelineEventById(Long id) {
@@ -63,11 +62,15 @@ public class TimelineEventService {
         timelineEventRepository.deleteById(id);
     }
 
+    public List<TimelineEvent> searchTimelineEvents(Long novelId, String keyword) {
+        return timelineEventRepository.searchByNovelIdAndKeyword(novelId, keyword);
+    }
+
     public TimelineEvent addCharactersToEvent(Long eventId, Set<Long> characterIds) {
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
-        Set<Character> characters = characterIds.stream()
+        Set<com.novelwriting.entity.Character> characters = characterIds.stream()
                 .map(id -> characterRepository.findById(id)
                         .orElseThrow(() -> new RuntimeException("Character not found: " + id)))
                 .collect(Collectors.toSet());
@@ -112,6 +115,36 @@ public class TimelineEventService {
                 .collect(Collectors.toSet());
 
         event.getOutlines().addAll(outlines);
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent addTagToEvent(Long eventId, Long tagId) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new RuntimeException("Tag not found"));
+
+        event.getTags().add(tag);
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent removeTagFromEvent(Long eventId, Long tagId) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        event.getTags().removeIf(tag -> tag.getId().equals(tagId));
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent setEventTags(Long eventId, Set<Long> tagIds) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        Set<Tag> tags = new java.util.HashSet<>();
+        for (Long tagId : tagIds) {
+            tagRepository.findById(tagId).ifPresent(tags::add);
+        }
+        event.setTags(tags);
         return timelineEventRepository.save(event);
     }
 }

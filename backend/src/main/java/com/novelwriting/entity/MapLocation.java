@@ -3,6 +3,8 @@ package com.novelwriting.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @Entity
@@ -12,6 +14,9 @@ public class MapLocation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "novel_id")
+    private Long novelId;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -31,6 +36,17 @@ public class MapLocation {
     @ManyToOne
     @JoinColumn(name = "parent_location_id")
     private MapLocation parentLocation;
+
+    @Column(name = "location_image", length = 500)
+    private String locationImage;
+
+    @ManyToMany
+    @JoinTable(
+        name = "map_location_tags",
+        joinColumns = @JoinColumn(name = "map_location_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -3,6 +3,8 @@ package com.novelwriting.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @Entity
@@ -12,6 +14,9 @@ public class Character {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "novel_id")
+    private Long novelId;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -30,6 +35,17 @@ public class Character {
 
     @Column(length = 50)
     private String role;
+
+    @Column(name = "portrait_image", length = 500)
+    private String portraitImage;
+
+    @ManyToMany
+    @JoinTable(
+        name = "character_tags",
+        joinColumns = @JoinColumn(name = "character_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

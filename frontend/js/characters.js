@@ -21,18 +21,39 @@ function renderCharacters() {
 
     container.innerHTML = characters.map(char => `
         <div class="card" data-id="${char.id}">
+            ${char.portraitImage ? `<div class="card-image"><img src="${api.images.getFileUrl(char.portraitImage)}" alt="${char.name}"></div>` : ''}
             <h3>${char.name}</h3>
             ${char.role ? `<p><span class="label">角色定位：</span>${char.role}</p>` : ''}
             ${char.description ? `<p><span class="label">描述：</span>${char.description}</p>` : ''}
             ${char.personality ? `<p><span class="label">性格：</span>${char.personality}</p>` : ''}
             ${char.appearance ? `<p><span class="label">外貌：</span>${char.appearance}</p>` : ''}
             ${char.background ? `<p><span class="label">背景：</span>${char.background}</p>` : ''}
+            ${renderElementTags(char.tags)}
             <div class="actions">
                 <button class="btn-secondary" onclick="editCharacter(${char.id})">编辑</button>
+                <button class="btn-secondary" onclick="manageCharacterTags(${char.id})">标签</button>
                 <button class="btn-danger" onclick="deleteCharacter(${char.id})">删除</button>
             </div>
         </div>
     `).join('');
+}
+
+// 搜索人物
+let characterSearchTimeout;
+async function searchCharacters(keyword) {
+    clearTimeout(characterSearchTimeout);
+    characterSearchTimeout = setTimeout(async () => {
+        if (keyword.trim()) {
+            try {
+                characters = await api.characters.search(keyword);
+                renderCharacters();
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
+        } else {
+            await loadCharacters();
+        }
+    }, 300);
 }
 
 // 显示添加人物模态框
@@ -66,6 +87,11 @@ function showCharacterModal(characterId = null) {
                 <label>背景故事</label>
                 <textarea id="char-background">${character?.background || ''}</textarea>
             </div>
+            <div class="form-group">
+                <label>人物肖像</label>
+                <input type="file" id="char-portrait" accept="image/*">
+                ${character?.portraitImage ? '<p class="current-image">已有肖像图片</p>' : ''}
+            </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
                 <button type="submit" class="btn-primary">${isEdit ? '更新' : '创建'}</button>
@@ -81,13 +107,26 @@ function showCharacterModal(characterId = null) {
 
 // 保存人物
 async function saveCharacter(characterId) {
+    const fileInput = document.getElementById('char-portrait');
+    let portraitImage = characterId ? characters.find(c => c.id === characterId)?.portraitImage : null;
+
+    if (fileInput.files.length > 0) {
+        try {
+            const uploadedImage = await uploadImage(fileInput.files[0], 'portrait');
+            portraitImage = uploadedImage.id;
+        } catch (error) {
+            console.error('Failed to upload image:', error);
+        }
+    }
+
     const data = {
         name: document.getElementById('char-name').value,
         role: document.getElementById('char-role').value,
         description: document.getElementById('char-description').value,
         personality: document.getElementById('char-personality').value,
         appearance: document.getElementById('char-appearance').value,
-        background: document.getElementById('char-background').value
+        background: document.getElementById('char-background').value,
+        portraitImage: portraitImage
     };
 
     try {
@@ -120,4 +159,33 @@ async function deleteCharacter(id) {
         console.error('Failed to delete character:', error);
         alert('删除失败，请重试');
     }
+}
+
+// 管理人物标签
+function manageCharacterTags(characterId) {
+    const character = characters.find(c => c.id === characterId);
+    const selectedTagIds = character.tags ? character.tags.map(t => t.id) : [];
+
+    createModal('管理标签 - ' + character.name, `
+        <form id="character-tags-form">
+            ${generateTagSelector(selectedTagIds)}
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
+                <button type="submit" class="btn-primary">保存</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('character-tags-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const tagIds = getSelectedTagIds('character-tags-form');
+        try {
+            await api.characters.setTags(characterId, tagIds);
+            closeModal();
+            await loadCharacters();
+        } catch (error) {
+            console.error('Failed to update tags:', error);
+            alert('保存失败，请重试');
+        }
+    });
 }

@@ -1,5 +1,6 @@
 // 大纲管理功能
 let outlines = [];
+let currentOutlineFilter = '';
 
 // 加载所有大纲
 async function loadOutlines() {
@@ -16,20 +17,29 @@ async function loadOutlines() {
 // 渲染大纲列表
 function renderOutlines() {
     const container = document.getElementById('outlines-list');
-    if (outlines.length === 0) {
+    if (!container) return;
+
+    let filteredOutlines = outlines;
+    if (currentOutlineFilter) {
+        filteredOutlines = outlines.filter(o => o.status === currentOutlineFilter);
+    }
+
+    if (filteredOutlines.length === 0) {
         container.innerHTML = '<div class="empty-state"><h3>暂无大纲</h3><p>点击"添加大纲"按钮创建第一个大纲</p></div>';
         return;
     }
 
-    container.innerHTML = outlines.map(outline => `
+    container.innerHTML = filteredOutlines.map(outline => `
         <div class="card" data-id="${outline.id}">
             <h3>${outline.title}</h3>
             <p><span class="status-badge ${outline.status}">${getOutlineStatusText(outline.status)}</span></p>
             ${outline.chapterNumber ? `<p><span class="label">章节：</span>第 ${outline.chapterNumber} 章</p>` : ''}
             ${outline.plotOrder ? `<p><span class="label">情节顺序：</span>${outline.plotOrder}</p>` : ''}
             ${outline.content ? `<p><span class="label">内容：</span>${outline.content}</p>` : ''}
+            ${renderElementTags(outline.tags)}
             <div class="actions">
                 <button class="btn-secondary" onclick="editOutline(${outline.id})">编辑</button>
+                <button class="btn-secondary" onclick="manageOutlineTags(${outline.id})">标签</button>
                 <button class="btn-danger" onclick="deleteOutline(${outline.id})">删除</button>
             </div>
         </div>
@@ -44,6 +54,30 @@ function getOutlineStatusText(status) {
         'completed': '已完成'
     };
     return statusMap[status] || status;
+}
+
+// 搜索大纲
+let outlineSearchTimeout;
+async function searchOutlines(keyword) {
+    clearTimeout(outlineSearchTimeout);
+    outlineSearchTimeout = setTimeout(async () => {
+        if (keyword.trim()) {
+            try {
+                outlines = await api.outlines.search(keyword);
+                renderOutlines();
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
+        } else {
+            await loadOutlines();
+        }
+    }, 300);
+}
+
+// 按状态筛选大纲
+function filterOutlinesByStatus(status) {
+    currentOutlineFilter = status;
+    renderOutlines();
 }
 
 // 显示添加大纲模态框
@@ -72,7 +106,7 @@ function showOutlineModal(outlineId = null) {
             <div class="form-group">
                 <label>状态</label>
                 <select id="outline-status">
-                    <option value="planning" ${outline?.status === 'planning' ? 'selected' : ''}>规划中</option>
+                    <option value="planning" ${outline?.status === 'planning' || !outline ? 'selected' : ''}>规划中</option>
                     <option value="writing" ${outline?.status === 'writing' ? 'selected' : ''}>写作中</option>
                     <option value="completed" ${outline?.status === 'completed' ? 'selected' : ''}>已完成</option>
                 </select>
@@ -130,4 +164,33 @@ async function deleteOutline(id) {
         console.error('Failed to delete outline:', error);
         alert('删除失败，请重试');
     }
+}
+
+// 管理大纲标签
+function manageOutlineTags(outlineId) {
+    const outline = outlines.find(o => o.id === outlineId);
+    const selectedTagIds = outline.tags ? outline.tags.map(t => t.id) : [];
+
+    createModal('管理标签 - ' + outline.title, `
+        <form id="outline-tags-form">
+            ${generateTagSelector(selectedTagIds)}
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
+                <button type="submit" class="btn-primary">保存</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('outline-tags-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const tagIds = getSelectedTagIds('outline-tags-form');
+        try {
+            await api.outlines.setTags(outlineId, tagIds);
+            closeModal();
+            await loadOutlines();
+        } catch (error) {
+            console.error('Failed to update tags:', error);
+            alert('保存失败，请重试');
+        }
+    });
 }

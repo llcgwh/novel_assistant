@@ -15,6 +15,9 @@ public class TimelineEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "novel_id")
+    private Long novelId;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -64,6 +67,14 @@ public class TimelineEvent {
         inverseJoinColumns = @JoinColumn(name = "outline_id")
     )
     private Set<Outline> outlines = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+        name = "timeline_event_tags",
+        joinColumns = @JoinColumn(name = "timeline_event_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
 
     @PrePersist
     protected void onCreate() {

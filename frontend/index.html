@@ -8,88 +8,195 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>小说写作辅助系统</h1>
-            <nav>
-                <button class="nav-btn active" data-view="timeline">时间轴</button>
-                <button class="nav-btn" data-view="characters">人物管理</button>
-                <button class="nav-btn" data-view="scenes">场景管理</button>
-                <button class="nav-btn" data-view="foreshadows">伏笔管理</button>
-                <button class="nav-btn" data-view="outlines">大纲管理</button>
-                <button class="nav-btn" data-view="map">地图系统</button>
-            </nav>
-        </header>
-
-        <main id="main-content">
-            <!-- 时间轴视图 -->
-            <div id="timeline-view" class="view active">
-                <div class="view-header">
-                    <h2>时间轴系统</h2>
-                    <button class="btn-primary" onclick="showTimelineEventModal()">添加事件</button>
-                </div>
-                <div id="timeline-list" class="timeline-container"></div>
+        <!-- 小说选择页面 -->
+        <div id="novel-selector" class="novel-selector">
+            <div class="novel-selector-header">
+                <h1>小说写作辅助系统</h1>
+                <p>选择一部小说开始创作，或创建新的小说项目</p>
             </div>
-
-            <!-- 人物管理视图 -->
-            <div id="characters-view" class="view">
-                <div class="view-header">
-                    <h2>人物管理</h2>
-                    <button class="btn-primary" onclick="showCharacterModal()">添加人物</button>
-                </div>
-                <div id="characters-list" class="grid-container"></div>
+            <div class="novel-selector-actions">
+                <button class="btn-primary" onclick="showNovelModal()">创建新小说</button>
             </div>
+            <div id="novels-list" class="novels-grid"></div>
+        </div>
 
-            <!-- 场景管理视图 -->
-            <div id="scenes-view" class="view">
-                <div class="view-header">
-                    <h2>场景管理</h2>
-                    <button class="btn-primary" onclick="showSceneModal()">添加场景</button>
+        <!-- 主应用界面 -->
+        <div id="main-app" class="main-app" style="display: none;">
+            <header>
+                <div class="header-top">
+                    <div class="header-left">
+                        <button class="btn-back" onclick="backToNovelSelector()">返回小说列表</button>
+                        <h1 id="current-novel-title">小说写作辅助系统</h1>
+                    </div>
+                    <div class="header-right">
+                        <div class="global-search">
+                            <input type="text" id="global-search-input" placeholder="全局搜索..." onkeyup="handleGlobalSearch(event)">
+                            <button class="btn-search" onclick="performGlobalSearch()">搜索</button>
+                        </div>
+                        <div class="export-dropdown">
+                            <button class="btn-secondary" onclick="toggleExportMenu()">导出</button>
+                            <div id="export-menu" class="dropdown-menu" style="display: none;">
+                                <a href="#" onclick="exportToJson()">导出为 JSON</a>
+                                <a href="#" onclick="exportToMarkdown()">导出为 Markdown</a>
+                                <a href="#" onclick="exportCharactersToMarkdown()">导出人物设定</a>
+                                <a href="#" onclick="exportOutlinesToMarkdown()">导出大纲</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="scenes-list" class="grid-container"></div>
-            </div>
+                <nav>
+                    <button class="nav-btn active" data-view="timeline">时间轴</button>
+                    <button class="nav-btn" data-view="characters">人物管理</button>
+                    <button class="nav-btn" data-view="scenes">场景管理</button>
+                    <button class="nav-btn" data-view="foreshadows">伏笔管理</button>
+                    <button class="nav-btn" data-view="outlines">大纲管理</button>
+                    <button class="nav-btn" data-view="map">地图系统</button>
+                    <button class="nav-btn" data-view="relationships">人物关系</button>
+                    <button class="nav-btn" data-view="tags">标签管理</button>
+                </nav>
+            </header>
 
-            <!-- 伏笔管理视图 -->
-            <div id="foreshadows-view" class="view">
-                <div class="view-header">
-                    <h2>伏笔管理</h2>
-                    <button class="btn-primary" onclick="showForeshadowModal()">添加伏笔</button>
+            <main id="main-content">
+                <!-- 时间轴视图 -->
+                <div id="timeline-view" class="view active">
+                    <div class="view-header">
+                        <h2>时间轴系统</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索事件..." onkeyup="searchTimelineEvents(this.value)">
+                            <button class="btn-primary" onclick="showTimelineEventModal()">添加事件</button>
+                        </div>
+                    </div>
+                    <div id="timeline-list" class="timeline-container"></div>
                 </div>
-                <div id="foreshadows-list" class="grid-container"></div>
-            </div>
 
-            <!-- 大纲管理视图 -->
-            <div id="outlines-view" class="view">
-                <div class="view-header">
-                    <h2>大纲管理</h2>
-                    <button class="btn-primary" onclick="showOutlineModal()">添加大纲</button>
+                <!-- 人物管理视图 -->
+                <div id="characters-view" class="view">
+                    <div class="view-header">
+                        <h2>人物管理</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索人物..." onkeyup="searchCharacters(this.value)">
+                            <button class="btn-primary" onclick="showCharacterModal()">添加人物</button>
+                        </div>
+                    </div>
+                    <div id="characters-list" class="grid-container"></div>
                 </div>
-                <div id="outlines-list" class="grid-container"></div>
-            </div>
 
-            <!-- 地图系统视图 -->
-            <div id="map-view" class="view">
-                <div class="view-header">
-                    <h2>地图系统</h2>
-                    <button class="btn-primary" onclick="showMapLocationModal()">添加位置</button>
+                <!-- 场景管理视图 -->
+                <div id="scenes-view" class="view">
+                    <div class="view-header">
+                        <h2>场景管理</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索场景..." onkeyup="searchScenes(this.value)">
+                            <button class="btn-primary" onclick="showSceneModal()">添加场景</button>
+                        </div>
+                    </div>
+                    <div id="scenes-list" class="grid-container"></div>
                 </div>
-                <div id="map-canvas-container">
-                    <canvas id="map-canvas" width="800" height="600"></canvas>
+
+                <!-- 伏笔管理视图 -->
+                <div id="foreshadows-view" class="view">
+                    <div class="view-header">
+                        <h2>伏笔管理</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索伏笔..." onkeyup="searchForeshadows(this.value)">
+                            <select class="filter-select" onchange="filterForeshadowsByStatus(this.value)">
+                                <option value="">全部状态</option>
+                                <option value="pending">未揭示</option>
+                                <option value="revealed">已揭示</option>
+                                <option value="abandoned">已废弃</option>
+                            </select>
+                            <button class="btn-primary" onclick="showForeshadowModal()">添加伏笔</button>
+                        </div>
+                    </div>
+                    <div id="foreshadows-list" class="grid-container"></div>
                 </div>
-                <div id="map-locations-list" class="list-container"></div>
-            </div>
-        </main>
+
+                <!-- 大纲管理视图 -->
+                <div id="outlines-view" class="view">
+                    <div class="view-header">
+                        <h2>大纲管理</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索大纲..." onkeyup="searchOutlines(this.value)">
+                            <select class="filter-select" onchange="filterOutlinesByStatus(this.value)">
+                                <option value="">全部状态</option>
+                                <option value="planning">规划中</option>
+                                <option value="writing">写作中</option>
+                                <option value="completed">已完成</option>
+                            </select>
+                            <button class="btn-primary" onclick="showOutlineModal()">添加大纲</button>
+                        </div>
+                    </div>
+                    <div id="outlines-list" class="grid-container"></div>
+                </div>
+
+                <!-- 地图系统视图 -->
+                <div id="map-view" class="view">
+                    <div class="view-header">
+                        <h2>地图系统</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索位置..." onkeyup="searchMapLocations(this.value)">
+                            <button class="btn-primary" onclick="showMapLocationModal()">添加位置</button>
+                        </div>
+                    </div>
+                    <div id="map-canvas-container">
+                        <canvas id="map-canvas" width="800" height="600"></canvas>
+                    </div>
+                    <div id="map-locations-list" class="list-container"></div>
+                </div>
+
+                <!-- 人物关系视图 -->
+                <div id="relationships-view" class="view">
+                    <div class="view-header">
+                        <h2>人物关系图谱</h2>
+                        <div class="view-actions">
+                            <button class="btn-primary" onclick="showRelationshipModal()">添加关系</button>
+                        </div>
+                    </div>
+                    <div id="relationship-canvas-container">
+                        <canvas id="relationship-canvas" width="900" height="600"></canvas>
+                    </div>
+                    <div id="relationships-list" class="list-container"></div>
+                </div>
+
+                <!-- 标签管理视图 -->
+                <div id="tags-view" class="view">
+                    <div class="view-header">
+                        <h2>标签管理</h2>
+                        <div class="view-actions">
+                            <input type="text" class="search-input" placeholder="搜索标签..." onkeyup="searchTags(this.value)">
+                            <button class="btn-primary" onclick="showTagModal()">添加标签</button>
+                        </div>
+                    </div>
+                    <div id="tags-list" class="tags-grid"></div>
+                </div>
+
+                <!-- 全局搜索结果视图 -->
+                <div id="search-results-view" class="view">
+                    <div class="view-header">
+                        <h2>搜索结果</h2>
+                        <button class="btn-secondary" onclick="closeSearchResults()">关闭</button>
+                    </div>
+                    <div id="search-results" class="search-results-container"></div>
+                </div>
+            </main>
+        </div>
     </div>
 
     <!-- 模态框容器 -->
     <div id="modal-container"></div>
 
     <script src="js/api.js"></script>
+    <script src="js/novels.js"></script>
+    <script src="js/tags.js"></script>
     <script src="js/characters.js"></script>
     <script src="js/scenes.js"></script>
     <script src="js/foreshadows.js"></script>
     <script src="js/outlines.js"></script>
     <script src="js/timeline.js"></script>
     <script src="js/map.js"></script>
+    <script src="js/relationships.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/export.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

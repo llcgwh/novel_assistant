@@ -3,6 +3,8 @@ package com.novelwriting.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @Entity
@@ -12,6 +14,9 @@ public class Foreshadow {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "novel_id")
+    private Long novelId;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -27,6 +32,14 @@ public class Foreshadow {
 
     @Column(length = 20)
     private String status = "pending";
+
+    @ManyToMany
+    @JoinTable(
+        name = "foreshadow_tags",
+        joinColumns = @JoinColumn(name = "foreshadow_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

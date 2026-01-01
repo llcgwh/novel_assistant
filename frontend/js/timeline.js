@@ -14,6 +14,8 @@ async function loadTimelineEvents() {
 // 渲染时间轴事件列表
 function renderTimelineEvents() {
     const container = document.getElementById('timeline-list');
+    if (!container) return;
+
     if (timelineEvents.length === 0) {
         container.innerHTML = '<div class="empty-state"><h3>暂无时间轴事件</h3><p>点击"添加事件"按钮创建第一个事件</p></div>';
         return;
@@ -64,13 +66,34 @@ function renderTimelineEvents() {
                 </div>
             ` : ''}
 
+            ${renderElementTags(event.tags)}
+
             <div class="actions">
                 <button class="btn-secondary" onclick="editTimelineEvent(${event.id})">编辑</button>
                 <button class="btn-secondary" onclick="manageEventRelations(${event.id})">管理关联</button>
+                <button class="btn-secondary" onclick="manageTimelineEventTags(${event.id})">标签</button>
                 <button class="btn-danger" onclick="deleteTimelineEvent(${event.id})">删除</button>
             </div>
         </div>
     `).join('');
+}
+
+// 搜索时间轴事件
+let timelineSearchTimeout;
+async function searchTimelineEvents(keyword) {
+    clearTimeout(timelineSearchTimeout);
+    timelineSearchTimeout = setTimeout(async () => {
+        if (keyword.trim()) {
+            try {
+                timelineEvents = await api.timelineEvents.search(keyword);
+                renderTimelineEvents();
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
+        } else {
+            await loadTimelineEvents();
+        }
+    }, 300);
 }
 
 // 显示添加/编辑事件模态框
@@ -225,20 +248,13 @@ async function saveEventRelations(eventId) {
         .map(cb => parseInt(cb.value));
 
     try {
-        // 更新事件关联（简化版本：直接替换）
-        // 注意：这里假设后端支持批量替换，实际可能需要先删除再添加
-        if (selectedCharacterIds.length > 0) {
-            await api.timelineEvents.addCharacters(eventId, selectedCharacterIds);
-        }
-        if (selectedSceneIds.length > 0) {
-            await api.timelineEvents.addScenes(eventId, selectedSceneIds);
-        }
-        if (selectedForeshadowIds.length > 0) {
-            await api.timelineEvents.addForeshadows(eventId, selectedForeshadowIds);
-        }
-        if (selectedOutlineIds.length > 0) {
-            await api.timelineEvents.addOutlines(eventId, selectedOutlineIds);
-        }
+        // 更新事件关联
+        await api.timelineEvents.setRelations(eventId, {
+            characterIds: selectedCharacterIds,
+            sceneIds: selectedSceneIds,
+            foreshadowIds: selectedForeshadowIds,
+            outlineIds: selectedOutlineIds
+        });
 
         closeModal();
         await loadTimelineEvents();
@@ -264,4 +280,33 @@ async function deleteTimelineEvent(id) {
         console.error('Failed to delete timeline event:', error);
         alert('删除失败，请重试');
     }
+}
+
+// 管理时间轴事件标签
+function manageTimelineEventTags(eventId) {
+    const event = timelineEvents.find(e => e.id === eventId);
+    const selectedTagIds = event.tags ? event.tags.map(t => t.id) : [];
+
+    createModal('管理标签 - ' + event.title, `
+        <form id="timeline-event-tags-form">
+            ${generateTagSelector(selectedTagIds)}
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
+                <button type="submit" class="btn-primary">保存</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('timeline-event-tags-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const tagIds = getSelectedTagIds('timeline-event-tags-form');
+        try {
+            await api.timelineEvents.setTags(eventId, tagIds);
+            closeModal();
+            await loadTimelineEvents();
+        } catch (error) {
+            console.error('Failed to update tags:', error);
+            alert('保存失败，请重试');
+        }
+    });
 }
