@@ -100,6 +100,7 @@ async function searchTimelineEvents(keyword) {
 function showTimelineEventModal(eventId = null) {
     const event = eventId ? timelineEvents.find(e => e.id === eventId) : null;
     const isEdit = !!event;
+    const selectedTagIds = event?.tags ? event.tags.map(t => t.id) : [];
 
     createModal(isEdit ? '编辑事件' : '添加事件', `
         <form id="timeline-event-form">
@@ -118,6 +119,10 @@ function showTimelineEventModal(eventId = null) {
             <div class="form-group">
                 <label>事件描述</label>
                 <textarea id="event-description">${event?.description || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>标签</label>
+                ${generateTagSelector(selectedTagIds, 'timeline-event-form')}
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
@@ -142,11 +147,18 @@ async function saveTimelineEvent(eventId) {
     };
 
     try {
+        let savedEvent;
         if (eventId) {
-            await api.timelineEvents.update(eventId, data);
+            savedEvent = await api.timelineEvents.update(eventId, data);
         } else {
-            await api.timelineEvents.create(data);
+            savedEvent = await api.timelineEvents.create(data);
+            eventId = savedEvent.id;
         }
+
+        // 保存标签
+        const tagIds = getSelectedTagIds('timeline-event-form');
+        await api.timelineEvents.setTags(eventId, tagIds);
+
         closeModal();
         await loadTimelineEvents();
     } catch (error) {

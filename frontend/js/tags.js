@@ -119,28 +119,97 @@ async function deleteTag(id) {
     }
 }
 
-// 生成标签选择器HTML
-function generateTagSelector(selectedTagIds = []) {
-    if (tags.length === 0) {
-        return '<p class="no-tags">暂无标签，请先在标签管理中创建</p>';
-    }
+// 生成标签选择器HTML（支持内联创建新标签）
+function generateTagSelector(selectedTagIds = [], formId = '') {
+    const selectorId = formId ? `tag-selector-${formId}` : 'tag-selector';
 
     return `
-        <div class="tag-selector">
-            ${tags.map(tag => `
-                <label class="tag-checkbox" style="border-color: ${tag.color}">
-                    <input type="checkbox" value="${tag.id}" ${selectedTagIds.includes(tag.id) ? 'checked' : ''}>
-                    <span class="tag-label" style="background-color: ${tag.color}">${tag.name}</span>
-                </label>
-            `).join('')}
+        <div class="tag-selector-container" id="${selectorId}">
+            <div class="tag-input-wrapper">
+                <input type="text" class="tag-input" placeholder="输入标签名称，按回车创建" onkeydown="handleTagInput(event, '${selectorId}')">
+                <button type="button" class="btn-small btn-add-tag" onclick="addNewTagFromInput('${selectorId}')">添加</button>
+            </div>
+            <div class="tag-selector">
+                ${tags.map(tag => `
+                    <label class="tag-checkbox" style="border-color: ${tag.color}" data-tag-id="${tag.id}">
+                        <input type="checkbox" value="${tag.id}" ${selectedTagIds.includes(tag.id) ? 'checked' : ''}>
+                        <span class="tag-label" style="background-color: ${tag.color}">${tag.name}</span>
+                    </label>
+                `).join('')}
+            </div>
+            <div class="new-tags-container"></div>
         </div>
     `;
+}
+
+// 处理标签输入框的键盘事件
+function handleTagInput(event, selectorId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addNewTagFromInput(selectorId);
+    }
+}
+
+// 从输入框添加新标签
+async function addNewTagFromInput(selectorId) {
+    const container = document.getElementById(selectorId);
+    const input = container.querySelector('.tag-input');
+    const tagName = input.value.trim();
+
+    if (!tagName) return;
+
+    // 检查标签是否已存在
+    const existingTag = tags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+    if (existingTag) {
+        // 如果标签已存在，直接选中它
+        const checkbox = container.querySelector(`input[value="${existingTag.id}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+        input.value = '';
+        return;
+    }
+
+    // 创建新标签
+    try {
+        const randomColor = getRandomTagColor();
+        const newTag = await api.tags.create({ name: tagName, color: randomColor });
+
+        // 添加到全局标签列表
+        tags.push(newTag);
+
+        // 在选择器中添加新标签并选中
+        const tagSelector = container.querySelector('.tag-selector');
+        const newTagHtml = `
+            <label class="tag-checkbox" style="border-color: ${newTag.color}" data-tag-id="${newTag.id}">
+                <input type="checkbox" value="${newTag.id}" checked>
+                <span class="tag-label" style="background-color: ${newTag.color}">${newTag.name}</span>
+            </label>
+        `;
+        tagSelector.insertAdjacentHTML('beforeend', newTagHtml);
+
+        input.value = '';
+    } catch (error) {
+        console.error('Failed to create tag:', error);
+        alert('创建标签失败，请重试');
+    }
+}
+
+// 生成随机标签颜色
+function getRandomTagColor() {
+    const colors = [
+        '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+        '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b',
+        '#27ae60', '#8e44ad', '#2980b9', '#d35400', '#7f8c8d'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
 }
 
 // 获取选中的标签ID
 function getSelectedTagIds(formId) {
     const form = document.getElementById(formId);
-    const checkboxes = form.querySelectorAll('.tag-selector input[type="checkbox"]:checked');
+    const selectorContainer = form.querySelector('.tag-selector-container') || form;
+    const checkboxes = selectorContainer.querySelectorAll('.tag-selector input[type="checkbox"]:checked');
     return Array.from(checkboxes).map(cb => parseInt(cb.value));
 }
 

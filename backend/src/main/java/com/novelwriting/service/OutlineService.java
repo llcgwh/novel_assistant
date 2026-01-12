@@ -84,7 +84,9 @@ public class OutlineService {
 
         Set<Tag> tags = new java.util.HashSet<>();
         for (Long tagId : tagIds) {
-            tagRepository.findById(tagId).ifPresent(tags::add);
+            Tag tag = tagRepository.findById(tagId)
+                    .orElseThrow(() -> new RuntimeException("Tag not found: " + tagId));
+            tags.add(tag);
         }
         outline.setTags(tags);
         return outlineRepository.save(outline);

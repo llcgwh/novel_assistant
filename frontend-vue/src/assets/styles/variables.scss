@@ -1,0 +1,65 @@
+// 颜色变量
+$primary-color: #3498db;
+$primary-hover: #2980b9;
+$secondary-color: #95a5a6;
+$secondary-hover: #7f8c8d;
+$danger-color: #e74c3c;
+$danger-hover: #c0392b;
+$success-color: #27ae60;
+$success-hover: #219a52;
+
+$dark-bg: #2c3e50;
+$dark-bg-light: #34495e;
+$dark-bg-hover: #4a5f7f;
+
+$light-bg: #f5f5f5;
+$white: #ffffff;
+$border-color: #ddd;
+$border-light: #eee;
+
+$text-primary: #333;
+$text-secondary: #555;
+$text-muted: #7f8c8d;
+$text-dark: #2c3e50;
+
+// 状态颜色
+$status-planning-bg: #fff3cd;
+$status-planning-text: #856404;
+$status-writing-bg: #cfe2ff;
+$status-writing-text: #084298;
+$status-completed-bg: #d1e7dd;
+$status-completed-text: #0f5132;
+$status-pending-bg: #f8d7da;
+$status-pending-text: #842029;
+$status-abandoned-bg: #e2e3e5;
+$status-abandoned-text: #41464b;
+
+// 关联标签颜色
+$relation-character-bg: #e8f5e9;
+$relation-character-text: #2e7d32;
+$relation-scene-bg: #fff3e0;
+$relation-scene-text: #e65100;
+$relation-foreshadow-bg: #f3e5f5;
+$relation-foreshadow-text: #6a1b9a;
+$relation-outline-bg: #e3f2fd;
+$relation-outline-text: #1565c0;
+
+// 尺寸变量
+$border-radius: 4px;
+$border-radius-lg: 8px;
+$border-radius-xl: 12px;
+
+$container-max-width: 1400px;
+
+// 阴影
+$shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
+$shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+$shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.15);
+
+// 过渡
+$transition-fast: 0.2s;
+$transition-normal: 0.3s;
+
+// 断点
+$breakpoint-md: 768px;

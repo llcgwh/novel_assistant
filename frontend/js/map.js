@@ -1,6 +1,8 @@
 // 地图管理功能
 let mapLocations = [];
 let mapCanvas, mapCtx;
+let mapBackgroundImage = null;  // 地图背景图片
+let mapBackgroundImageId = null; // 背景图片ID
 
 // 初始化画布
 function initMapCanvas() {
@@ -17,6 +19,62 @@ function initMapCanvas() {
         // 预填充坐标到模态框
         showMapLocationModal(null, Math.floor(x), Math.floor(y));
     });
+
+    // 加载保存的背景图片
+    loadMapBackground();
+}
+
+// 加载地图背景图片
+async function loadMapBackground() {
+    const savedBgId = localStorage.getItem(`mapBackground_${getCurrentNovelId()}`);
+    if (savedBgId) {
+        mapBackgroundImageId = parseInt(savedBgId);
+        const img = new Image();
+        img.onload = () => {
+            mapBackgroundImage = img;
+            renderMap();
+        };
+        img.src = api.images.getFileUrl(mapBackgroundImageId);
+    }
+}
+
+// 设置地图背景图片
+async function setMapBackground() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const uploadedImage = await uploadImage(file, 'map_background');
+            mapBackgroundImageId = uploadedImage.id;
+            localStorage.setItem(`mapBackground_${getCurrentNovelId()}`, mapBackgroundImageId);
+
+            const img = new Image();
+            img.onload = () => {
+                mapBackgroundImage = img;
+                renderMap();
+            };
+            img.src = api.images.getFileUrl(mapBackgroundImageId);
+            alert('背景图片设置成功！');
+        } catch (error) {
+            console.error('Failed to upload background image:', error);
+            alert('上传背景图片失败，请重试');
+        }
+    };
+    input.click();
+}
+
+// 清除地图背景图片
+function clearMapBackground() {
+    if (!confirm('确定要清除地图背景图片吗？')) return;
+
+    mapBackgroundImage = null;
+    mapBackgroundImageId = null;
+    localStorage.removeItem(`mapBackground_${getCurrentNovelId()}`);
+    renderMap();
 }
 
 // 加载所有地图位置
@@ -41,22 +99,27 @@ function renderMap() {
     // 清空画布
     mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-    // 绘制网格
-    mapCtx.strokeStyle = '#e0e0e0';
-    mapCtx.lineWidth = 1;
+    // 绘制背景图片（如果有）
+    if (mapBackgroundImage) {
+        mapCtx.drawImage(mapBackgroundImage, 0, 0, mapCanvas.width, mapCanvas.height);
+    } else {
+        // 没有背景图片时绘制网格
+        mapCtx.strokeStyle = '#e0e0e0';
+        mapCtx.lineWidth = 1;
 
-    for (let x = 0; x <= mapCanvas.width; x += 50) {
-        mapCtx.beginPath();
-        mapCtx.moveTo(x, 0);
-        mapCtx.lineTo(x, mapCanvas.height);
-        mapCtx.stroke();
-    }
+        for (let x = 0; x <= mapCanvas.width; x += 50) {
+            mapCtx.beginPath();
+            mapCtx.moveTo(x, 0);
+            mapCtx.lineTo(x, mapCanvas.height);
+            mapCtx.stroke();
+        }
 
-    for (let y = 0; y <= mapCanvas.height; y += 50) {
-        mapCtx.beginPath();
-        mapCtx.moveTo(0, y);
-        mapCtx.lineTo(mapCanvas.width, y);
-        mapCtx.stroke();
+        for (let y = 0; y <= mapCanvas.height; y += 50) {
+            mapCtx.beginPath();
+            mapCtx.moveTo(0, y);
+            mapCtx.lineTo(mapCanvas.width, y);
+            mapCtx.stroke();
+        }
     }
 
     // 绘制位置点
@@ -151,6 +214,7 @@ async function searchMapLocations(keyword) {
 function showMapLocationModal(locationId = null, defaultX = null, defaultY = null) {
     const location = locationId ? mapLocations.find(l => l.id === locationId) : null;
     const isEdit = !!location;
+    const selectedTagIds = location?.tags ? location.tags.map(t => t.id) : [];
 
     const posX = location?.positionX ?? defaultX ?? '';
     const posY = location?.positionY ?? defaultY ?? '';
@@ -195,6 +259,10 @@ function showMapLocationModal(locationId = null, defaultX = null, defaultY = nul
                 <input type="file" id="location-image" accept="image/*">
                 ${location?.locationImage ? '<p class="current-image">已有位置图片</p>' : ''}
             </div>
+            <div class="form-group">
+                <label>标签</label>
+                ${generateTagSelector(selectedTagIds, 'map-location-form')}
+            </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
                 <button type="submit" class="btn-primary">${isEdit ? '更新' : '创建'}</button>
@@ -235,11 +303,18 @@ async function saveMapLocation(locationId) {
     };
 
     try {
+        let savedLocation;
         if (locationId) {
-            await api.mapLocations.update(locationId, data);
+            savedLocation = await api.mapLocations.update(locationId, data);
         } else {
-            await api.mapLocations.create(data);
+            savedLocation = await api.mapLocations.create(data);
+            locationId = savedLocation.id;
         }
+
+        // 保存标签
+        const tagIds = getSelectedTagIds('map-location-form');
+        await api.mapLocations.setTags(locationId, tagIds);
+
         closeModal();
         await loadMapLocations();
     } catch (error) {

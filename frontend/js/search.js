@@ -24,6 +24,183 @@ async function performGlobalSearch() {
     }
 }
 
+// 按标签名称搜索（跨所有模块）
+async function searchByTagName() {
+    const tagName = document.getElementById('tag-search-input').value.trim();
+    if (!tagName) {
+        alert('请输入标签名称');
+        return;
+    }
+
+    try {
+        const results = await api.search.byTagName(tagName);
+        displayTagSearchResults(results, tagName);
+    } catch (error) {
+        console.error('Tag search failed:', error);
+        alert('标签搜索失败，请重试');
+    }
+}
+
+// 处理标签搜索输入
+function handleTagSearch(event) {
+    if (event.key === 'Enter') {
+        searchByTagName();
+    }
+}
+
+// 显示标签搜索结果
+function displayTagSearchResults(results, tagName) {
+    // 切换到搜索结果视图
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('search-results-view').classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    const container = document.getElementById('search-results');
+
+    const totalCount = (results.characters?.length || 0) +
+                       (results.scenes?.length || 0) +
+                       (results.foreshadows?.length || 0) +
+                       (results.outlines?.length || 0) +
+                       (results.timelineEvents?.length || 0) +
+                       (results.mapLocations?.length || 0);
+
+    // 显示匹配的标签
+    let matchingTagsHtml = '';
+    if (results.matchingTags && results.matchingTags.length > 0) {
+        matchingTagsHtml = `
+            <div class="matching-tags">
+                <strong>匹配的标签：</strong>
+                ${results.matchingTags.map(tag => `
+                    <span class="element-tag" style="background-color: ${tag.color}">${tag.name}</span>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    if (totalCount === 0) {
+        container.innerHTML = `
+            ${matchingTagsHtml}
+            <div class="empty-state"><h3>未找到结果</h3><p>没有找到带有"${tagName}"标签的内容</p></div>
+        `;
+        return;
+    }
+
+    let html = `
+        ${matchingTagsHtml}
+        <p class="search-summary">找到 ${totalCount} 个带有"${tagName}"相关标签的结果</p>
+    `;
+
+    // 人物结果
+    if (results.characters && results.characters.length > 0) {
+        html += `
+            <div class="search-category">
+                <h3>人物 (${results.characters.length})</h3>
+                <div class="search-items">
+                    ${results.characters.map(char => `
+                        <div class="search-item" onclick="navigateToItem('characters', ${char.id})">
+                            <h4>${char.name}</h4>
+                            ${char.role ? `<p>角色：${char.role}</p>` : ''}
+                            ${renderElementTags(char.tags)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // 场景结果
+    if (results.scenes && results.scenes.length > 0) {
+        html += `
+            <div class="search-category">
+                <h3>场景 (${results.scenes.length})</h3>
+                <div class="search-items">
+                    ${results.scenes.map(scene => `
+                        <div class="search-item" onclick="navigateToItem('scenes', ${scene.id})">
+                            <h4>${scene.name}</h4>
+                            ${scene.location ? `<p>位置：${scene.location}</p>` : ''}
+                            ${renderElementTags(scene.tags)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // 伏笔结果
+    if (results.foreshadows && results.foreshadows.length > 0) {
+        html += `
+            <div class="search-category">
+                <h3>伏笔 (${results.foreshadows.length})</h3>
+                <div class="search-items">
+                    ${results.foreshadows.map(foreshadow => `
+                        <div class="search-item" onclick="navigateToItem('foreshadows', ${foreshadow.id})">
+                            <h4>${foreshadow.title}</h4>
+                            <span class="status-badge ${foreshadow.status}">${getStatusText(foreshadow.status)}</span>
+                            ${renderElementTags(foreshadow.tags)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // 大纲结果
+    if (results.outlines && results.outlines.length > 0) {
+        html += `
+            <div class="search-category">
+                <h3>大纲 (${results.outlines.length})</h3>
+                <div class="search-items">
+                    ${results.outlines.map(outline => `
+                        <div class="search-item" onclick="navigateToItem('outlines', ${outline.id})">
+                            <h4>${outline.title}</h4>
+                            <span class="status-badge ${outline.status}">${getOutlineStatusText(outline.status)}</span>
+                            ${renderElementTags(outline.tags)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // 时间轴事件结果
+    if (results.timelineEvents && results.timelineEvents.length > 0) {
+        html += `
+            <div class="search-category">
+                <h3>时间轴事件 (${results.timelineEvents.length})</h3>
+                <div class="search-items">
+                    ${results.timelineEvents.map(event => `
+                        <div class="search-item" onclick="navigateToItem('timeline', ${event.id})">
+                            <h4>${event.title}</h4>
+                            ${event.eventTime ? `<p>时间：${event.eventTime}</p>` : ''}
+                            ${renderElementTags(event.tags)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    // 地图位置结果
+    if (results.mapLocations && results.mapLocations.length > 0) {
+        html += `
+            <div class="search-category">
+                <h3>地图位置 (${results.mapLocations.length})</h3>
+                <div class="search-items">
+                    ${results.mapLocations.map(location => `
+                        <div class="search-item" onclick="navigateToItem('map', ${location.id})">
+                            <h4>${location.name}</h4>
+                            ${location.locationType ? `<p>类型：${location.locationType}</p>` : ''}
+                            ${renderElementTags(location.tags)}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
 // 显示搜索结果
 function displaySearchResults(results, keyword) {
     // 切换到搜索结果视图

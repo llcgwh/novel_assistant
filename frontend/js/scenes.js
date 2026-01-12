@@ -60,6 +60,7 @@ async function searchScenes(keyword) {
 function showSceneModal(sceneId = null) {
     const scene = sceneId ? scenes.find(s => s.id === sceneId) : null;
     const isEdit = !!scene;
+    const selectedTagIds = scene?.tags ? scene.tags.map(t => t.id) : [];
 
     createModal(isEdit ? '编辑场景' : '添加场景', `
         <form id="scene-form">
@@ -83,6 +84,10 @@ function showSceneModal(sceneId = null) {
                 <label>场景图片</label>
                 <input type="file" id="scene-image" accept="image/*">
                 ${scene?.sceneImage ? '<p class="current-image">已有场景图片</p>' : ''}
+            </div>
+            <div class="form-group">
+                <label>标签</label>
+                ${generateTagSelector(selectedTagIds, 'scene-form')}
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
@@ -120,11 +125,18 @@ async function saveScene(sceneId) {
     };
 
     try {
+        let savedScene;
         if (sceneId) {
-            await api.scenes.update(sceneId, data);
+            savedScene = await api.scenes.update(sceneId, data);
         } else {
-            await api.scenes.create(data);
+            savedScene = await api.scenes.create(data);
+            sceneId = savedScene.id;
         }
+
+        // 保存标签
+        const tagIds = getSelectedTagIds('scene-form');
+        await api.scenes.setTags(sceneId, tagIds);
+
         closeModal();
         await loadScenes();
     } catch (error) {

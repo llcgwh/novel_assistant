@@ -84,6 +84,7 @@ function filterOutlinesByStatus(status) {
 function showOutlineModal(outlineId = null) {
     const outline = outlineId ? outlines.find(o => o.id === outlineId) : null;
     const isEdit = !!outline;
+    const selectedTagIds = outline?.tags ? outline.tags.map(t => t.id) : [];
 
     createModal(isEdit ? '编辑大纲' : '添加大纲', `
         <form id="outline-form">
@@ -111,6 +112,10 @@ function showOutlineModal(outlineId = null) {
                     <option value="completed" ${outline?.status === 'completed' ? 'selected' : ''}>已完成</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>标签</label>
+                ${generateTagSelector(selectedTagIds, 'outline-form')}
+            </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
                 <button type="submit" class="btn-primary">${isEdit ? '更新' : '创建'}</button>
@@ -135,11 +140,18 @@ async function saveOutline(outlineId) {
     };
 
     try {
+        let savedOutline;
         if (outlineId) {
-            await api.outlines.update(outlineId, data);
+            savedOutline = await api.outlines.update(outlineId, data);
         } else {
-            await api.outlines.create(data);
+            savedOutline = await api.outlines.create(data);
+            outlineId = savedOutline.id;
         }
+
+        // 保存标签
+        const tagIds = getSelectedTagIds('outline-form');
+        await api.outlines.setTags(outlineId, tagIds);
+
         closeModal();
         await loadOutlines();
     } catch (error) {

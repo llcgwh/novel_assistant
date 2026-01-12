@@ -18,5 +18,8 @@ public interface MapLocationRepository extends JpaRepository<MapLocation, Long> 
     @Query("SELECT m FROM MapLocation m JOIN m.tags t WHERE m.novelId = :novelId AND t.id = :tagId")
     List<MapLocation> findByNovelIdAndTagId(@Param("novelId") Long novelId, @Param("tagId") Long tagId);
 
+    @Query("SELECT DISTINCT m FROM MapLocation m JOIN m.tags t WHERE m.novelId = :novelId AND t.id IN :tagIds")
+    List<MapLocation> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
+
     List<MapLocation> findByNovelIdAndLocationType(Long novelId, String locationType);
 }

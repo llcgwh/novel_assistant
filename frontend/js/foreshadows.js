@@ -82,6 +82,7 @@ function filterForeshadowsByStatus(status) {
 function showForeshadowModal(foreshadowId = null) {
     const foreshadow = foreshadowId ? foreshadows.find(f => f.id === foreshadowId) : null;
     const isEdit = !!foreshadow;
+    const selectedTagIds = foreshadow?.tags ? foreshadow.tags.map(t => t.id) : [];
 
     createModal(isEdit ? '编辑伏笔' : '添加伏笔', `
         <form id="foreshadow-form">
@@ -109,6 +110,10 @@ function showForeshadowModal(foreshadowId = null) {
                     <option value="abandoned" ${foreshadow?.status === 'abandoned' ? 'selected' : ''}>已废弃</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>标签</label>
+                ${generateTagSelector(selectedTagIds, 'foreshadow-form')}
+            </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
                 <button type="submit" class="btn-primary">${isEdit ? '更新' : '创建'}</button>
@@ -133,11 +138,18 @@ async function saveForeshadow(foreshadowId) {
     };
 
     try {
+        let savedForeshadow;
         if (foreshadowId) {
-            await api.foreshadows.update(foreshadowId, data);
+            savedForeshadow = await api.foreshadows.update(foreshadowId, data);
         } else {
-            await api.foreshadows.create(data);
+            savedForeshadow = await api.foreshadows.create(data);
+            foreshadowId = savedForeshadow.id;
         }
+
+        // 保存标签
+        const tagIds = getSelectedTagIds('foreshadow-form');
+        await api.foreshadows.setTags(foreshadowId, tagIds);
+
         closeModal();
         await loadForeshadows();
     } catch (error) {

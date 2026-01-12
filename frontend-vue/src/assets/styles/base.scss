@@ -1,0 +1,144 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+  background-color: $light-bg;
+  color: $text-primary;
+}
+
+.container {
+  max-width: $container-max-width;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+// 按钮基础样式
+.btn-primary {
+  padding: 10px 20px;
+  background-color: $primary-color;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color $transition-normal;
+
+  &:hover {
+    background-color: $primary-hover;
+  }
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  background-color: $secondary-color;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 13px;
+  margin-right: 5px;
+
+  &:hover {
+    background-color: $secondary-hover;
+  }
+}
+
+.btn-danger {
+  padding: 8px 16px;
+  background-color: $danger-color;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 13px;
+
+  &:hover {
+    background-color: $danger-hover;
+  }
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+  background-color: $secondary-color;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  margin-right: 5px;
+
+  &:hover {
+    background-color: $secondary-hover;
+  }
+
+  &.btn-danger {
+    background-color: $danger-color;
+    &:hover {
+      background-color: $danger-hover;
+    }
+  }
+}
+
+.btn-back {
+  padding: 8px 16px;
+  background-color: $dark-bg-light;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color $transition-normal;
+
+  &:hover {
+    background-color: $dark-bg-hover;
+  }
+}
+
+.btn-search {
+  padding: 8px 16px;
+  background-color: $primary-color;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 13px;
+
+  &:hover {
+    background-color: $primary-hover;
+  }
+}
+
+.btn-add-tag {
+  padding: 8px 16px;
+  background-color: $success-color;
+  color: $white;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: $success-hover;
+  }
+}
+
+// 输入框基础样式
+.search-input {
+  padding: 8px 12px;
+  border: 1px solid $border-color;
+  border-radius: $border-radius;
+  font-size: 14px;
+  width: 200px;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid $border-color;
+  border-radius: $border-radius;
+  font-size: 14px;
+}

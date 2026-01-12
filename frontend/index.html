@@ -33,6 +33,10 @@
                             <input type="text" id="global-search-input" placeholder="全局搜索..." onkeyup="handleGlobalSearch(event)">
                             <button class="btn-search" onclick="performGlobalSearch()">搜索</button>
                         </div>
+                        <div class="tag-search">
+                            <input type="text" id="tag-search-input" placeholder="按标签搜索..." onkeyup="handleTagSearch(event)">
+                            <button class="btn-search" onclick="searchByTagName()">标签搜索</button>
+                        </div>
                         <div class="export-dropdown">
                             <button class="btn-secondary" onclick="toggleExportMenu()">导出</button>
                             <div id="export-menu" class="dropdown-menu" style="display: none;">
@@ -135,6 +139,8 @@
                         <h2>地图系统</h2>
                         <div class="view-actions">
                             <input type="text" class="search-input" placeholder="搜索位置..." onkeyup="searchMapLocations(this.value)">
+                            <button class="btn-secondary" onclick="setMapBackground()">设置背景图</button>
+                            <button class="btn-secondary" onclick="clearMapBackground()">清除背景图</button>
                             <button class="btn-primary" onclick="showMapLocationModal()">添加位置</button>
                         </div>
                     </div>

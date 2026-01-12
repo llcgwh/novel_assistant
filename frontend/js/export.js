@@ -18,7 +18,7 @@ document.addEventListener('click', (e) => {
 // 导出为JSON
 async function exportToJson() {
     try {
-        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovel()}/export/json`);
+        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovelId()}/export/json`);
         if (!response.ok) throw new Error('Export failed');
 
         const data = await response.json();
@@ -34,7 +34,7 @@ async function exportToJson() {
 // 导出为Markdown
 async function exportToMarkdown() {
     try {
-        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovel()}/export/markdown`);
+        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovelId()}/export/markdown`);
         if (!response.ok) throw new Error('Export failed');
 
         const text = await response.text();
@@ -50,7 +50,7 @@ async function exportToMarkdown() {
 // 导出人物设定为Markdown
 async function exportCharactersToMarkdown() {
     try {
-        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovel()}/export/characters`);
+        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovelId()}/export/characters/markdown`);
         if (!response.ok) throw new Error('Export failed');
 
         const text = await response.text();
@@ -66,7 +66,7 @@ async function exportCharactersToMarkdown() {
 // 导出大纲为Markdown
 async function exportOutlinesToMarkdown() {
     try {
-        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovel()}/export/outlines`);
+        const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovelId()}/export/outlines/markdown`);
         if (!response.ok) throw new Error('Export failed');
 
         const text = await response.text();
@@ -92,20 +92,4 @@ function downloadFile(content, filename, mimeType) {
     URL.revokeObjectURL(url);
 }
 
-// 上传图片
-async function uploadImage(file, imageType) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('imageType', imageType);
 
-    const response = await fetch(`${api.baseUrl}/novels/${getCurrentNovel()}/images/upload`, {
-        method: 'POST',
-        body: formData
-    });
-
-    if (!response.ok) {
-        throw new Error('Image upload failed');
-    }
-
-    return await response.json();
-}

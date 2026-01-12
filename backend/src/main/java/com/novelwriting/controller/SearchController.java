@@ -26,4 +26,12 @@ public class SearchController {
             @PathVariable Long tagId) {
         return searchService.searchByTag(novelId, tagId);
     }
+
+    // 按标签名称模糊搜索（跨所有模块）
+    @GetMapping("/tag-name")
+    public Map<String, Object> searchByTagName(
+            @PathVariable Long novelId,
+            @RequestParam String tagName) {
+        return searchService.searchByTagName(novelId, tagName);
+    }
 }

@@ -60,6 +60,7 @@ async function searchCharacters(keyword) {
 function showCharacterModal(characterId = null) {
     const character = characterId ? characters.find(c => c.id === characterId) : null;
     const isEdit = !!character;
+    const selectedTagIds = character?.tags ? character.tags.map(t => t.id) : [];
 
     createModal(isEdit ? '编辑人物' : '添加人物', `
         <form id="character-form">
@@ -91,6 +92,10 @@ function showCharacterModal(characterId = null) {
                 <label>人物肖像</label>
                 <input type="file" id="char-portrait" accept="image/*">
                 ${character?.portraitImage ? '<p class="current-image">已有肖像图片</p>' : ''}
+            </div>
+            <div class="form-group">
+                <label>标签</label>
+                ${generateTagSelector(selectedTagIds, 'character-form')}
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal()">取消</button>
@@ -130,11 +135,18 @@ async function saveCharacter(characterId) {
     };
 
     try {
+        let savedCharacter;
         if (characterId) {
-            await api.characters.update(characterId, data);
+            savedCharacter = await api.characters.update(characterId, data);
         } else {
-            await api.characters.create(data);
+            savedCharacter = await api.characters.create(data);
+            characterId = savedCharacter.id;
         }
+
+        // 保存标签
+        const tagIds = getSelectedTagIds('character-form');
+        await api.characters.setTags(characterId, tagIds);
+
         closeModal();
         await loadCharacters();
     } catch (error) {

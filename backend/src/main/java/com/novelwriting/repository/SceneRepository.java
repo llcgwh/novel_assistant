@@ -17,4 +17,7 @@ public interface SceneRepository extends JpaRepository<Scene, Long> {
 
     @Query("SELECT s FROM Scene s JOIN s.tags t WHERE s.novelId = :novelId AND t.id = :tagId")
     List<Scene> findByNovelIdAndTagId(@Param("novelId") Long novelId, @Param("tagId") Long tagId);
+
+    @Query("SELECT DISTINCT s FROM Scene s JOIN s.tags t WHERE s.novelId = :novelId AND t.id IN :tagIds")
+    List<Scene> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
 }

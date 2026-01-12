@@ -72,7 +72,7 @@ public class CharacterService {
         Character character = characterRepository.findById(characterId)
                 .orElseThrow(() -> new RuntimeException("Character not found"));
 
-        character.getTags().removeIf(tag -> tag.getId().equals(tagId));
+        character.getTags().removeIf(tag -> tag != null && tag.getId().equals(tagId));
         return characterRepository.save(character);
     }
 
@@ -82,7 +82,9 @@ public class CharacterService {
 
         Set<Tag> tags = new java.util.HashSet<>();
         for (Long tagId : tagIds) {
-            tagRepository.findById(tagId).ifPresent(tags::add);
+            Tag tag = tagRepository.findById(tagId)
+                    .orElseThrow(() -> new RuntimeException("Tag not found: " + tagId));
+            tags.add(tag);
         }
         character.setTags(tags);
         return characterRepository.save(character);

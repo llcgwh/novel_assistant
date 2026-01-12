@@ -18,5 +18,8 @@ public interface ForeshadowRepository extends JpaRepository<Foreshadow, Long> {
     @Query("SELECT f FROM Foreshadow f JOIN f.tags t WHERE f.novelId = :novelId AND t.id = :tagId")
     List<Foreshadow> findByNovelIdAndTagId(@Param("novelId") Long novelId, @Param("tagId") Long tagId);
 
+    @Query("SELECT DISTINCT f FROM Foreshadow f JOIN f.tags t WHERE f.novelId = :novelId AND t.id IN :tagIds")
+    List<Foreshadow> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
+
     List<Foreshadow> findByNovelIdAndStatus(Long novelId, String status);
 }

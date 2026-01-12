@@ -7,21 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initApp() {
     initNavigation();
 
-    // 检查是否有已选择的小说
-    const savedNovelId = localStorage.getItem('currentNovelId');
-    if (savedNovelId) {
-        // 验证小说是否存在
-        try {
-            await loadNovels();
-            const novel = novels.find(n => n.id === parseInt(savedNovelId));
-            if (novel) {
-                await enterNovel(novel.id);
-                return;
-            }
-        } catch (error) {
-            console.error('Failed to restore novel:', error);
-        }
-    }
+    // 清除之前保存的小说ID，始终显示小说列表页面
+    localStorage.removeItem('currentNovelId');
+    currentNovelId = null;
 
     // 显示小说选择页面
     await loadNovels();
@@ -77,8 +65,11 @@ function switchView(viewName) {
 // 加载所有数据
 async function loadAllData() {
     try {
+        // 先加载标签，因为其他模块的表单需要用到标签数据
+        await loadTags();
+
+        // 然后并行加载其他数据
         await Promise.all([
-            loadTags(),
             loadCharacters(),
             loadScenes(),
             loadForeshadows(),
@@ -92,19 +83,9 @@ async function loadAllData() {
     }
 }
 
-// 获取当前小说ID
-function getCurrentNovel() {
-    return parseInt(localStorage.getItem('currentNovelId')) || null;
-}
 
-// 设置当前小说ID
-function setCurrentNovel(novelId) {
-    if (novelId) {
-        localStorage.setItem('currentNovelId', novelId.toString());
-    } else {
-        localStorage.removeItem('currentNovelId');
-    }
-}
+
+
 
 // 创建模态框
 function createModal(title, content) {

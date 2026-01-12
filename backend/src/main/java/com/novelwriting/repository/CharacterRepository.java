@@ -17,4 +17,7 @@ public interface CharacterRepository extends JpaRepository<Character, Long> {
 
     @Query("SELECT c FROM Character c JOIN c.tags t WHERE c.novelId = :novelId AND t.id = :tagId")
     List<Character> findByNovelIdAndTagId(@Param("novelId") Long novelId, @Param("tagId") Long tagId);
+
+    @Query("SELECT DISTINCT c FROM Character c JOIN c.tags t WHERE c.novelId = :novelId AND t.id IN :tagIds")
+    List<Character> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
 }

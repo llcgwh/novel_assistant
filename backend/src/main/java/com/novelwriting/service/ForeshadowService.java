@@ -84,7 +84,9 @@ public class ForeshadowService {
 
         Set<Tag> tags = new java.util.HashSet<>();
         for (Long tagId : tagIds) {
-            tagRepository.findById(tagId).ifPresent(tags::add);
+            Tag tag = tagRepository.findById(tagId)
+                    .orElseThrow(() -> new RuntimeException("Tag not found: " + tagId));
+            tags.add(tag);
         }
         foreshadow.setTags(tags);
         return foreshadowRepository.save(foreshadow);

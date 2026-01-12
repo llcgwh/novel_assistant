@@ -1,7 +1,25 @@
-backend/.idea/
-backend/.idea/vcs.xml
-backend/.idea/misc.xml
-backend/.idea/material_theme_project_new.xml
-backend/.idea/jarRepositories.xml
-backend/.idea/encodings.xml
-backend/.idea/compiler.xml
+# IDE
+.idea/
+*.iml
+
+# Backend
+backend/target/
+backend/uploads/
+*.class
+*.jar
+*.log
+
+# Frontend Vue
+frontend-vue/node_modules/
+frontend-vue/dist/
+
+# Temp files
+tmpclaude-*
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Error logs
+后端报错.txt
