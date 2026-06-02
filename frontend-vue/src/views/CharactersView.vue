@@ -29,7 +29,7 @@
         class="card"
       >
         <div v-if="character.portraitImage" class="card-image">
-          <img :src="getImageUrl(character.portraitImage)" alt="人物肖像" />
+          <img :src="character.portraitImage" alt="人物肖像" />
         </div>
         <h3>{{ character.name }}</h3>
         <p v-if="character.role"><span class="label">角色：</span>{{ character.role }}</p>
@@ -104,7 +104,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useCharactersStore } from '@/stores/characters'
 import { useTagsStore } from '@/stores/tags'
-import { imagesApi } from '@/api/images'
 import type { Character } from '@/types/character'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
@@ -143,10 +142,6 @@ function debouncedSearch() {
   searchTimeout = setTimeout(() => {
     charactersStore.setSearchKeyword(searchKeyword.value)
   }, 300)
-}
-
-function getImageUrl(imageId: number) {
-  return imagesApi.getFileUrl(imageId)
 }
 
 function editCharacter(character: Character) {

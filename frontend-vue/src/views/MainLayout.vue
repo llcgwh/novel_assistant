@@ -17,7 +17,7 @@
               />
               <button class="btn-search" @click="doSearch">搜索</button>
             </div>
-            <div class="export-dropdown">
+            <div ref="exportDropdownRef" class="export-dropdown">
               <button class="btn-secondary" @click="showExportMenu = !showExportMenu">
                 导出 ▼
               </button>
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
 import { exportApi } from '@/api/export'
@@ -63,6 +63,13 @@ const novelStore = useNovelStore()
 
 const searchKeyword = ref('')
 const showExportMenu = ref(false)
+const exportDropdownRef = ref<HTMLElement | null>(null)
+
+function handleClickOutside(event: MouseEvent) {
+  if (exportDropdownRef.value && !exportDropdownRef.value.contains(event.target as Node)) {
+    showExportMenu.value = false
+  }
+}
 
 const navItems = computed(() => {
   const novelId = route.params.novelId
@@ -87,6 +94,11 @@ onMounted(async () => {
       await novelStore.fetchNovels()
     }
   }
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 watch(() => route.params.novelId, (newId) => {

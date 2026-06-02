@@ -6,6 +6,24 @@
         <input type="file" ref="bgInput" accept="image/*" style="display: none" @change="uploadBackground" />
         <button class="btn-secondary" @click="($refs.bgInput as HTMLInputElement).click()">设置背景</button>
         <button v-if="mapStore.backgroundImageUrl" class="btn-secondary" @click="clearBackground">清除背景</button>
+        <select v-model="typeFilter" @change="filterByType" class="filter-select">
+          <option value="">全部</option>
+          <option value="城市">城市</option>
+          <option value="村庄">村庄</option>
+          <option value="山脉">山脉</option>
+          <option value="河流">河流</option>
+          <option value="森林">森林</option>
+          <option value="国家">国家</option>
+          <option value="__custom__">自定义</option>
+        </select>
+        <input
+          v-if="typeFilter === '__custom__'"
+          v-model="customType"
+          @input="filterByCustomType"
+          type="text"
+          placeholder="输入自定义类型..."
+          class="filter-input"
+        />
         <button class="btn-primary" @click="showCreateModal = true">+ 添加位置</button>
       </div>
     </div>
@@ -38,8 +56,10 @@
             <p v-if="location.parentLocation">父位置：{{ location.parentLocation.name }}</p>
           </div>
         </div>
+        <TagList :tags="location.tags" />
         <div class="actions">
           <button class="btn-secondary" @click="editLocation(location)">编辑</button>
+          <button class="btn-small" @click="manageTags(location)">标签</button>
           <button class="btn-danger" @click="confirmDelete(location)">删除</button>
         </div>
       </div>
@@ -83,6 +103,16 @@
       </div>
     </BaseModal>
 
+    <!-- 标签管理模态框 -->
+    <BaseModal
+      v-if="taggingLocation"
+      title="管理标签"
+      @close="taggingLocation = null"
+      @confirm="saveTags"
+    >
+      <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
+    </BaseModal>
+
     <!-- 删除确认模态框 -->
     <BaseModal
       v-if="deletingLocation"
@@ -99,19 +129,27 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMapStore } from '@/stores/map'
+import { useTagsStore } from '@/stores/tags'
 import type { MapLocation } from '@/types/map'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import TagSelector from '@/components/tags/TagSelector.vue'
+import TagList from '@/components/tags/TagList.vue'
 
 const route = useRoute()
 const mapStore = useMapStore()
+const tagsStore = useTagsStore()
 
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const bgInput = ref<HTMLInputElement | null>(null)
 const showCreateModal = ref(false)
 const editingLocation = ref<MapLocation | null>(null)
 const deletingLocation = ref<MapLocation | null>(null)
+const taggingLocation = ref<MapLocation | null>(null)
+const selectedTagIds = ref<number[]>([])
+const typeFilter = ref('')
+const customType = ref('')
 const clickedPosition = ref<{ x: number; y: number } | null>(null)
 
 const form = reactive({
@@ -127,7 +165,10 @@ const availableParents = computed(() => {
 
 onMounted(async () => {
   const novelId = Number(route.params.novelId)
-  await mapStore.fetchLocations()
+  await Promise.all([
+    mapStore.fetchLocations(),
+    tagsStore.fetchTags()
+  ])
   mapStore.loadBackgroundFromStorage(novelId)
   nextTick(() => drawMap())
 })
@@ -241,6 +282,46 @@ async function saveLocation() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  }
+}
+
+async function filterByType() {
+  try {
+    if (!typeFilter.value || typeFilter.value === '__custom__') {
+      await mapStore.fetchLocations()
+    } else {
+      await mapStore.fetchLocationsByType(typeFilter.value)
+    }
+  } catch (error) {
+    console.error('筛选失败:', error)
+  }
+}
+
+async function filterByCustomType() {
+  if (!customType.value.trim()) {
+    await mapStore.fetchLocations()
+    return
+  }
+  try {
+    await mapStore.fetchLocationsByType(customType.value.trim())
+  } catch (error) {
+    console.error('自定义筛选失败:', error)
+  }
+}
+
+function manageTags(location: MapLocation) {
+  taggingLocation.value = location
+  selectedTagIds.value = location.tags?.map(t => t.id) || []
+}
+
+async function saveTags() {
+  if (!taggingLocation.value) return
+  try {
+    await mapStore.setLocationTags(taggingLocation.value.id, selectedTagIds.value)
+    taggingLocation.value = null
+  } catch (error) {
+    console.error('保存标签失败:', error)
+    alert('保存标签失败，请重试')
   }
 }
 

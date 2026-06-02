@@ -12,9 +12,9 @@
         />
         <select v-model="statusFilter" class="filter-select" @change="onStatusChange">
           <option value="">全部状态</option>
-          <option value="PLANNING">规划中</option>
-          <option value="WRITING">写作中</option>
-          <option value="COMPLETED">已完成</option>
+          <option value="planning">规划中</option>
+          <option value="writing">写作中</option>
+          <option value="completed">已完成</option>
         </select>
         <button class="btn-primary" @click="showCreateModal = true">+ 添加大纲</button>
       </div>
@@ -33,7 +33,8 @@
         <h3>{{ outline.title }}</h3>
         <StatusBadge :status="outline.status" />
         <p v-if="outline.content" style="margin-top: 10px;">{{ outline.content }}</p>
-        <p v-if="outline.sortOrder"><span class="label">排序：</span>{{ outline.sortOrder }}</p>
+        <p v-if="outline.chapterNumber"><span class="label">章节：</span>{{ outline.chapterNumber }}</p>
+        <p v-if="outline.plotOrder"><span class="label">排序：</span>{{ outline.plotOrder }}</p>
         <TagList :tags="outline.tags" />
         <div class="actions">
           <button class="btn-secondary" @click="editOutline(outline)">编辑</button>
@@ -59,16 +60,20 @@
         <textarea v-model="form.content" placeholder="描述大纲内容"></textarea>
       </div>
       <div class="form-group">
+        <label>章节号</label>
+        <input v-model.number="form.chapterNumber" type="number" placeholder="章节序号" />
+      </div>
+      <div class="form-group">
         <label>状态</label>
         <select v-model="form.status">
-          <option value="PLANNING">规划中</option>
-          <option value="WRITING">写作中</option>
-          <option value="COMPLETED">已完成</option>
+          <option value="planning">规划中</option>
+          <option value="writing">写作中</option>
+          <option value="completed">已完成</option>
         </select>
       </div>
       <div class="form-group">
         <label>排序</label>
-        <input v-model.number="form.sortOrder" type="number" placeholder="排序序号" />
+        <input v-model.number="form.plotOrder" type="number" placeholder="排序序号" />
       </div>
       <div class="form-group">
         <label>标签</label>
@@ -125,8 +130,9 @@ const formTagIds = ref<number[]>([])
 const form = reactive({
   title: '',
   content: '',
-  status: 'PLANNING' as OutlineStatus,
-  sortOrder: 0
+  status: 'planning' as OutlineStatus,
+  chapterNumber: 0,
+  plotOrder: 0
 })
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
@@ -152,7 +158,8 @@ function editOutline(outline: Outline) {
   form.title = outline.title
   form.content = outline.content || ''
   form.status = outline.status
-  form.sortOrder = outline.sortOrder || 0
+  form.chapterNumber = outline.chapterNumber || 0
+  form.plotOrder = outline.plotOrder || 0
   formTagIds.value = outline.tags?.map(t => t.id) || []
 }
 
@@ -170,8 +177,9 @@ function closeModal() {
   editingOutline.value = null
   form.title = ''
   form.content = ''
-  form.status = 'PLANNING'
-  form.sortOrder = 0
+  form.status = 'planning'
+  form.chapterNumber = 0
+  form.plotOrder = 0
   formTagIds.value = []
 }
 

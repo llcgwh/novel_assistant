@@ -9,7 +9,7 @@ export interface Character {
   personality?: string
   appearance?: string
   background?: string
-  portraitImage?: ID
+  portraitImage?: string
   tags?: Tag[]
   createdAt?: Timestamp
   updatedAt?: Timestamp
@@ -22,7 +22,7 @@ export interface CharacterCreateDTO {
   personality?: string
   appearance?: string
   background?: string
-  portraitImage?: ID
+  portraitImage?: string
 }
 
 export interface CharacterUpdateDTO extends Partial<CharacterCreateDTO> {}

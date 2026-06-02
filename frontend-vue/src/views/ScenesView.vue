@@ -25,7 +25,7 @@
     <div v-else class="grid-container">
       <div v-for="scene in scenesStore.filteredScenes" :key="scene.id" class="card">
         <div v-if="scene.sceneImage" class="card-image">
-          <img :src="getImageUrl(scene.sceneImage)" alt="场景图片" />
+          <img :src="scene.sceneImage" alt="场景图片" />
         </div>
         <h3>{{ scene.name }}</h3>
         <p v-if="scene.location"><span class="label">位置：</span>{{ scene.location }}</p>
@@ -95,7 +95,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useScenesStore } from '@/stores/scenes'
 import { useTagsStore } from '@/stores/tags'
-import { imagesApi } from '@/api/images'
 import type { Scene } from '@/types/scene'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
@@ -126,10 +125,6 @@ onMounted(() => {
 function debouncedSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => scenesStore.setSearchKeyword(searchKeyword.value), 300)
-}
-
-function getImageUrl(imageId: number) {
-  return imagesApi.getFileUrl(imageId)
 }
 
 function editScene(scene: Scene) {

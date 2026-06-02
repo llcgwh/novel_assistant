@@ -22,4 +22,7 @@ public interface OutlineRepository extends JpaRepository<Outline, Long> {
     List<Outline> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
 
     List<Outline> findByNovelIdAndStatus(Long novelId, String status);
+
+    @Query("SELECT DISTINCT o FROM Outline o LEFT JOIN FETCH o.tags WHERE o.novelId = :novelId")
+    List<Outline> findByNovelIdWithTags(@Param("novelId") Long novelId);
 }

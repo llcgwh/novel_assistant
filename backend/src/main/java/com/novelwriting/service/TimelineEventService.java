@@ -35,7 +35,7 @@ public class TimelineEventService {
     }
 
     public List<TimelineEvent> getTimelineEventsByNovelId(Long novelId) {
-        return timelineEventRepository.findByNovelIdOrderByRealOrderAsc(novelId);
+        return timelineEventRepository.findByNovelIdWithRelations(novelId);
     }
 
     public Optional<TimelineEvent> getTimelineEventById(Long id) {
@@ -118,6 +118,38 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
+    public TimelineEvent removeCharactersFromEvent(Long eventId, Long characterId) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        event.getCharacters().removeIf(character -> character.getId().equals(characterId));
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent removeScenesFromEvent(Long eventId, Long sceneId) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        event.getScenes().removeIf(scene -> scene.getId().equals(sceneId));
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent removeForeshadowsFromEvent(Long eventId, Long foreshadowId) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        event.getForeshadows().removeIf(foreshadow -> foreshadow.getId().equals(foreshadowId));
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent removeOutlinesFromEvent(Long eventId, Long outlineId) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        event.getOutlines().removeIf(outline -> outline.getId().equals(outlineId));
+        return timelineEventRepository.save(event);
+    }
+
     public TimelineEvent addTagToEvent(Long eventId, Long tagId) {
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
@@ -145,6 +177,44 @@ public class TimelineEventService {
             tagRepository.findById(tagId).ifPresent(tags::add);
         }
         event.setTags(tags);
+        return timelineEventRepository.save(event);
+    }
+
+    public TimelineEvent updateEventRelations(Long eventId, Set<Long> characterIds,
+            Set<Long> sceneIds, Set<Long> foreshadowIds, Set<Long> outlineIds) {
+        TimelineEvent event = timelineEventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
+
+        // Clear existing relations
+        event.getCharacters().clear();
+        event.getScenes().clear();
+        event.getForeshadows().clear();
+        event.getOutlines().clear();
+
+        // Set new character relations
+        for (Long characterId : characterIds) {
+            characterRepository.findById(characterId)
+                    .ifPresent(character -> event.getCharacters().add(character));
+        }
+
+        // Set new scene relations
+        for (Long sceneId : sceneIds) {
+            sceneRepository.findById(sceneId)
+                    .ifPresent(scene -> event.getScenes().add(scene));
+        }
+
+        // Set new foreshadow relations
+        for (Long foreshadowId : foreshadowIds) {
+            foreshadowRepository.findById(foreshadowId)
+                    .ifPresent(foreshadow -> event.getForeshadows().add(foreshadow));
+        }
+
+        // Set new outline relations
+        for (Long outlineId : outlineIds) {
+            outlineRepository.findById(outlineId)
+                    .ifPresent(outline -> event.getOutlines().add(outline));
+        }
+
         return timelineEventRepository.save(event);
     }
 }

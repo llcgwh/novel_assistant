@@ -24,7 +24,7 @@ public class ForeshadowService {
     }
 
     public List<Foreshadow> getForeshadowsByNovelId(Long novelId) {
-        return foreshadowRepository.findByNovelId(novelId);
+        return foreshadowRepository.findByNovelIdWithTags(novelId);
     }
 
     public Optional<Foreshadow> getForeshadowById(Long id) {

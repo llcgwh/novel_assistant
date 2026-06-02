@@ -1,7 +1,9 @@
 package com.novelwriting.service;
 
+import com.novelwriting.entity.MapLocation;
 import com.novelwriting.entity.Scene;
 import com.novelwriting.entity.Tag;
+import com.novelwriting.repository.MapLocationRepository;
 import com.novelwriting.repository.SceneRepository;
 import com.novelwriting.repository.TagRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,12 +21,15 @@ public class SceneService {
     @Autowired
     private TagRepository tagRepository;
 
+    @Autowired
+    private MapLocationRepository mapLocationRepository;
+
     public List<Scene> getAllScenes() {
         return sceneRepository.findAll();
     }
 
     public List<Scene> getScenesByNovelId(Long novelId) {
-        return sceneRepository.findByNovelId(novelId);
+        return sceneRepository.findByNovelIdWithTags(novelId);
     }
 
     public Optional<Scene> getSceneById(Long id) {
@@ -41,7 +46,7 @@ public class SceneService {
 
         scene.setName(sceneDetails.getName());
         scene.setDescription(sceneDetails.getDescription());
-        scene.setLocation(sceneDetails.getLocation());
+        scene.setMapLocation(sceneDetails.getMapLocation());
         scene.setAtmosphere(sceneDetails.getAtmosphere());
         scene.setSceneImage(sceneDetails.getSceneImage());
 
@@ -85,6 +90,38 @@ public class SceneService {
             tags.add(tag);
         }
         scene.setTags(tags);
+        return sceneRepository.save(scene);
+    }
+
+    public Scene addMapLocationToScene(Long sceneId, Long locationId) {
+        Scene scene = sceneRepository.findById(sceneId)
+                .orElseThrow(() -> new RuntimeException("Scene not found"));
+        MapLocation location = mapLocationRepository.findById(locationId)
+                .orElseThrow(() -> new RuntimeException("MapLocation not found"));
+
+        scene.getMapLocations().add(location);
+        return sceneRepository.save(scene);
+    }
+
+    public Scene removeMapLocationFromScene(Long sceneId, Long locationId) {
+        Scene scene = sceneRepository.findById(sceneId)
+                .orElseThrow(() -> new RuntimeException("Scene not found"));
+
+        scene.getMapLocations().removeIf(loc -> loc.getId().equals(locationId));
+        return sceneRepository.save(scene);
+    }
+
+    public Scene setSceneMapLocations(Long sceneId, Set<Long> locationIds) {
+        Scene scene = sceneRepository.findById(sceneId)
+                .orElseThrow(() -> new RuntimeException("Scene not found"));
+
+        Set<MapLocation> locations = new java.util.HashSet<>();
+        for (Long locationId : locationIds) {
+            MapLocation location = mapLocationRepository.findById(locationId)
+                    .orElseThrow(() -> new RuntimeException("MapLocation not found: " + locationId));
+            locations.add(location);
+        }
+        scene.setMapLocations(locations);
         return sceneRepository.save(scene);
     }
 }

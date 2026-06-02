@@ -25,5 +25,9 @@ export const novelsApi = {
 
   search(title: string): Promise<Novel[]> {
     return request.get('/novels/search', { params: { title } })
+  },
+
+  getByStatus(status: string): Promise<Novel[]> {
+    return request.get(`/novels/status/${status}`)
   }
 }

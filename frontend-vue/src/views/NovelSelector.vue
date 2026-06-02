@@ -6,6 +6,24 @@
     </div>
 
     <div class="novel-selector-actions">
+      <div class="search-bar">
+        <input
+          v-model="searchTitle"
+          type="text"
+          placeholder="搜索小说标题..."
+          @keyup.enter="doSearch"
+        />
+        <button class="btn-search" @click="doSearch">搜索</button>
+      </div>
+      <div class="status-filter">
+        <select v-model="statusFilter" @change="filterByStatus">
+          <option value="all">全部状态</option>
+          <option value="planning">规划中</option>
+          <option value="writing">写作中</option>
+          <option value="completed">已完成</option>
+          <option value="paused">已暂停</option>
+        </select>
+      </div>
       <button class="btn-primary" @click="showCreateModal = true">+ 创建新小说</button>
     </div>
 
@@ -23,10 +41,16 @@
         class="novel-card"
       >
         <div class="novel-cover">
-          <span class="no-cover">暂无封面</span>
+          <img v-if="novel.coverImage" :src="novel.coverImage" alt="封面" class="cover-image" />
+          <span v-else class="no-cover">暂无封面</span>
         </div>
         <div class="novel-info">
-          <h3>{{ novel.title }}</h3>
+          <h3>
+            {{ novel.title }}
+            <span v-if="novel.status" :class="['status-badge', `status-${novel.status}`]">
+              {{ statusLabel(novel.status) }}
+            </span>
+          </h3>
           <p v-if="novel.author">作者：{{ novel.author }}</p>
           <p v-if="novel.genre">类型：{{ novel.genre }}</p>
           <p v-if="novel.description">{{ novel.description }}</p>
@@ -80,7 +104,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
-import type { Novel } from '@/types/novel'
+import { novelsApi } from '@/api/novels'
+import type { Novel, NovelStatus } from '@/types/novel'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 
@@ -90,6 +115,8 @@ const novelStore = useNovelStore()
 const showCreateModal = ref(false)
 const editingNovel = ref<Novel | null>(null)
 const deletingNovel = ref<Novel | null>(null)
+const searchTitle = ref('')
+const statusFilter = ref<string>('all')
 
 const form = reactive({
   title: '',
@@ -161,5 +188,47 @@ async function deleteNovel() {
     console.error('删除失败:', error)
     alert('删除失败，请重试')
   }
+}
+
+async function doSearch() {
+  if (!searchTitle.value.trim()) {
+    await novelStore.fetchNovels()
+    return
+  }
+  try {
+    novelStore.loading = true
+    novelStore.novels = await novelsApi.search(searchTitle.value.trim())
+  } catch (error) {
+    console.error('搜索失败:', error)
+    alert('搜索失败，请重试')
+  } finally {
+    novelStore.loading = false
+  }
+}
+
+async function filterByStatus() {
+  try {
+    novelStore.loading = true
+    if (statusFilter.value === 'all') {
+      await novelStore.fetchNovels()
+    } else {
+      novelStore.novels = await novelsApi.getByStatus(statusFilter.value)
+    }
+  } catch (error) {
+    console.error('筛选失败:', error)
+    alert('筛选失败，请重试')
+  } finally {
+    novelStore.loading = false
+  }
+}
+
+function statusLabel(status: NovelStatus): string {
+  const labels: Record<NovelStatus, string> = {
+    planning: '规划中',
+    writing: '写作中',
+    completed: '已完成',
+    paused: '已暂停'
+  }
+  return labels[status] || status
 }
 </script>

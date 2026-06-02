@@ -20,4 +20,14 @@ public interface TimelineEventRepository extends JpaRepository<TimelineEvent, Lo
 
     @Query("SELECT DISTINCT t FROM TimelineEvent t JOIN t.tags tag WHERE t.novelId = :novelId AND tag.id IN :tagIds")
     List<TimelineEvent> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
+
+    @Query("SELECT DISTINCT t FROM TimelineEvent t " +
+           "LEFT JOIN FETCH t.characters " +
+           "LEFT JOIN FETCH t.scenes " +
+           "LEFT JOIN FETCH t.foreshadows " +
+           "LEFT JOIN FETCH t.outlines " +
+           "LEFT JOIN FETCH t.tags " +
+           "WHERE t.novelId = :novelId " +
+           "ORDER BY t.realOrder ASC")
+    List<TimelineEvent> findByNovelIdWithRelations(@Param("novelId") Long novelId);
 }

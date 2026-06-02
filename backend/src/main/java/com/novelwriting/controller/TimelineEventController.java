@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/novels/{novelId}/timeline-events")
@@ -85,6 +87,71 @@ public class TimelineEventController {
     public ResponseEntity<TimelineEvent> addOutlinesToEvent(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> outlineIds) {
         try {
             return ResponseEntity.ok(timelineEventService.addOutlinesToEvent(id, outlineIds));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id}/characters/{characterId}")
+    public ResponseEntity<TimelineEvent> removeCharacterFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long characterId) {
+        try {
+            return ResponseEntity.ok(timelineEventService.removeCharactersFromEvent(id, characterId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id}/scenes/{sceneId}")
+    public ResponseEntity<TimelineEvent> removeSceneFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long sceneId) {
+        try {
+            return ResponseEntity.ok(timelineEventService.removeScenesFromEvent(id, sceneId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id}/foreshadows/{foreshadowId}")
+    public ResponseEntity<TimelineEvent> removeForeshadowFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long foreshadowId) {
+        try {
+            return ResponseEntity.ok(timelineEventService.removeForeshadowsFromEvent(id, foreshadowId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id}/outlines/{outlineId}")
+    public ResponseEntity<TimelineEvent> removeOutlineFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long outlineId) {
+        try {
+            return ResponseEntity.ok(timelineEventService.removeOutlinesFromEvent(id, outlineId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/{id}/relations")
+    public ResponseEntity<TimelineEvent> updateEventRelations(
+            @PathVariable Long novelId, @PathVariable Long id,
+            @RequestBody Map<String, Object> relations) {
+        try {
+            @SuppressWarnings("unchecked")
+            Set<Long> characterIds = new java.util.HashSet<>(
+                    ((java.util.List<Integer>) relations.getOrDefault("characterIds", java.util.List.of())).stream()
+                            .map(Long::valueOf).toList());
+            @SuppressWarnings("unchecked")
+            Set<Long> sceneIds = new java.util.HashSet<>(
+                    ((java.util.List<Integer>) relations.getOrDefault("sceneIds", java.util.List.of())).stream()
+                            .map(Long::valueOf).toList());
+            @SuppressWarnings("unchecked")
+            Set<Long> foreshadowIds = new java.util.HashSet<>(
+                    ((java.util.List<Integer>) relations.getOrDefault("foreshadowIds", java.util.List.of())).stream()
+                            .map(Long::valueOf).toList());
+            @SuppressWarnings("unchecked")
+            Set<Long> outlineIds = new java.util.HashSet<>(
+                    ((java.util.List<Integer>) relations.getOrDefault("outlineIds", java.util.List.of())).stream()
+                            .map(Long::valueOf).toList());
+
+            return ResponseEntity.ok(timelineEventService.updateEventRelations(
+                    id, characterIds, sceneIds, foreshadowIds, outlineIds));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

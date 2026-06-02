@@ -24,7 +24,7 @@ public class OutlineService {
     }
 
     public List<Outline> getOutlinesByNovelId(Long novelId) {
-        return outlineRepository.findByNovelIdOrderByPlotOrderAsc(novelId);
+        return outlineRepository.findByNovelIdWithTags(novelId);
     }
 
     public Optional<Outline> getOutlineById(Long id) {

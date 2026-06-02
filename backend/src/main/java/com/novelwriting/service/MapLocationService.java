@@ -24,7 +24,7 @@ public class MapLocationService {
     }
 
     public List<MapLocation> getMapLocationsByNovelId(Long novelId) {
-        return mapLocationRepository.findByNovelId(novelId);
+        return mapLocationRepository.findByNovelIdWithTags(novelId);
     }
 
     public Optional<MapLocation> getMapLocationById(Long id) {

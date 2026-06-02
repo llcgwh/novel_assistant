@@ -9,7 +9,7 @@ export interface Novel {
   genre?: string
   status?: NovelStatus
   description?: string
-  coverImage?: ID
+  coverImage?: string
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }

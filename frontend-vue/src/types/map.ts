@@ -9,7 +9,7 @@ export interface MapLocation {
   positionY?: number
   description?: string
   parentLocation?: { id: ID; name: string }
-  locationImage?: ID
+  locationImage?: string
   tags?: Tag[]
   createdAt?: Timestamp
   updatedAt?: Timestamp
@@ -22,7 +22,7 @@ export interface MapLocationCreateDTO {
   positionY?: number
   description?: string
   parentLocation?: { id: ID }
-  locationImage?: ID
+  locationImage?: string
 }
 
 export interface MapLocationUpdateDTO extends Partial<MapLocationCreateDTO> {}

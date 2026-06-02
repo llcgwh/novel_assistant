@@ -1,9 +1,10 @@
 <template>
   <router-view />
+  <Toast />
 </template>
 
 <script setup lang="ts">
-// App root component
+import Toast from '@/components/common/Toast.vue'
 </script>
 
 <style lang="scss">

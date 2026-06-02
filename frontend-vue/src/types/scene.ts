@@ -7,7 +7,7 @@ export interface Scene {
   location?: string
   description?: string
   atmosphere?: string
-  sceneImage?: ID
+  sceneImage?: string
   tags?: Tag[]
   createdAt?: Timestamp
   updatedAt?: Timestamp
@@ -18,7 +18,7 @@ export interface SceneCreateDTO {
   location?: string
   description?: string
   atmosphere?: string
-  sceneImage?: ID
+  sceneImage?: string
 }
 
 export interface SceneUpdateDTO extends Partial<SceneCreateDTO> {}

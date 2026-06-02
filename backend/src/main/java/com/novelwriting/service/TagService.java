@@ -31,6 +31,7 @@ public class TagService {
 
         tag.setName(tagDetails.getName());
         tag.setColor(tagDetails.getColor());
+        tag.setDescription(tagDetails.getDescription());
 
         return tagRepository.save(tag);
     }

@@ -24,7 +24,7 @@ public class CharacterService {
     }
 
     public List<Character> getCharactersByNovelId(Long novelId) {
-        return characterRepository.findByNovelId(novelId);
+        return characterRepository.findByNovelIdWithTags(novelId);
     }
 
     public Optional<Character> getCharacterById(Long id) {

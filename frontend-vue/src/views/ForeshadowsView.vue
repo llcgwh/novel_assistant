@@ -12,9 +12,9 @@
         />
         <select v-model="statusFilter" class="filter-select" @change="onStatusChange">
           <option value="">全部状态</option>
-          <option value="UNREVEALED">未揭示</option>
-          <option value="REVEALED">已揭示</option>
-          <option value="ABANDONED">已废弃</option>
+          <option value="pending">未揭示</option>
+          <option value="revealed">已揭示</option>
+          <option value="abandoned">已废弃</option>
         </select>
         <button class="btn-primary" @click="showCreateModal = true">+ 添加伏笔</button>
       </div>
@@ -33,8 +33,8 @@
         <h3>{{ foreshadow.title }}</h3>
         <StatusBadge :status="foreshadow.status" />
         <p v-if="foreshadow.content" style="margin-top: 10px;">{{ foreshadow.content }}</p>
-        <p v-if="foreshadow.plantedChapter"><span class="label">埋设章节：</span>{{ foreshadow.plantedChapter }}</p>
-        <p v-if="foreshadow.revealedChapter"><span class="label">揭示章节：</span>{{ foreshadow.revealedChapter }}</p>
+        <p v-if="foreshadow.laidAt"><span class="label">埋设位置：</span>{{ foreshadow.laidAt }}</p>
+        <p v-if="foreshadow.revealedAt"><span class="label">揭示位置：</span>{{ foreshadow.revealedAt }}</p>
         <TagList :tags="foreshadow.tags" />
         <div class="actions">
           <button class="btn-secondary" @click="editForeshadow(foreshadow)">编辑</button>
@@ -62,18 +62,18 @@
       <div class="form-group">
         <label>状态</label>
         <select v-model="form.status">
-          <option value="UNREVEALED">未揭示</option>
-          <option value="REVEALED">已揭示</option>
-          <option value="ABANDONED">已废弃</option>
+          <option value="pending">未揭示</option>
+          <option value="revealed">已揭示</option>
+          <option value="abandoned">已废弃</option>
         </select>
       </div>
       <div class="form-group">
         <label>埋设章节</label>
-        <input v-model="form.plantedChapter" type="text" placeholder="伏笔埋设的章节" />
+        <input v-model="form.laidAt" type="text" placeholder="伏笔埋设的章节" />
       </div>
       <div class="form-group">
         <label>揭示章节</label>
-        <input v-model="form.revealedChapter" type="text" placeholder="伏笔揭示的章节" />
+        <input v-model="form.revealedAt" type="text" placeholder="伏笔揭示的章节" />
       </div>
       <div class="form-group">
         <label>标签</label>
@@ -128,8 +128,8 @@ const selectedTagIds = ref<number[]>([])
 const formTagIds = ref<number[]>([])
 
 const form = reactive({
-  title: '', content: '', status: 'UNREVEALED' as ForeshadowStatus,
-  plantedChapter: '', revealedChapter: ''
+  title: '', content: '', status: 'pending' as ForeshadowStatus,
+  laidAt: '', revealedAt: ''
 })
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
@@ -153,8 +153,8 @@ function editForeshadow(foreshadow: Foreshadow) {
   form.title = foreshadow.title
   form.content = foreshadow.content || ''
   form.status = foreshadow.status
-  form.plantedChapter = foreshadow.plantedChapter || ''
-  form.revealedChapter = foreshadow.revealedChapter || ''
+  form.laidAt = foreshadow.laidAt || ''
+  form.revealedAt = foreshadow.revealedAt || ''
   formTagIds.value = foreshadow.tags?.map(t => t.id) || []
 }
 
@@ -170,8 +170,8 @@ function confirmDelete(foreshadow: Foreshadow) {
 function closeModal() {
   showCreateModal.value = false
   editingForeshadow.value = null
-  form.title = ''; form.content = ''; form.status = 'UNREVEALED'
-  form.plantedChapter = ''; form.revealedChapter = ''
+  form.title = ''; form.content = ''; form.status = 'pending'
+  form.laidAt = ''; form.revealedAt = ''
   formTagIds.value = []
 }
 

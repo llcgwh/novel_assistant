@@ -16,6 +16,10 @@ export const imagesApi = {
     return request.get(withNovelId(`/images/${id}`))
   },
 
+  getByType(imageType: string): Promise<UploadedImage[]> {
+    return request.get(withNovelId(`/images/type/${imageType}`))
+  },
+
   getFileUrl(id: ID): string {
     return `${getApiBaseUrl()}/novels/${getCurrentNovelId()}/images/${id}/file`
   },

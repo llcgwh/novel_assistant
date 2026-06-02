@@ -41,6 +41,14 @@ public class Scene {
     )
     private Set<Tag> tags = new HashSet<>();
 
+    @ManyToMany
+    @JoinTable(
+        name = "scene_locations",
+        joinColumns = @JoinColumn(name = "scene_id"),
+        inverseJoinColumns = @JoinColumn(name = "map_location_id")
+    )
+    private Set<MapLocation> mapLocations = new HashSet<>();
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

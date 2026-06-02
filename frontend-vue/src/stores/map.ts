@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { ID } from '@/types'
 import type { MapLocation, MapLocationCreateDTO, MapLocationUpdateDTO } from '@/types/map'
 import { mapLocationsApi } from '@/api/mapLocations'
 import { imagesApi } from '@/api/images'
@@ -14,6 +15,15 @@ export const useMapStore = defineStore('map', () => {
     loading.value = true
     try {
       locations.value = await mapLocationsApi.getAll()
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchLocationsByType(type: string) {
+    loading.value = true
+    try {
+      locations.value = await mapLocationsApi.getByType(type)
     } finally {
       loading.value = false
     }
@@ -37,6 +47,11 @@ export const useMapStore = defineStore('map', () => {
   async function deleteLocation(id: number) {
     await mapLocationsApi.delete(id)
     locations.value = locations.value.filter(l => l.id !== id)
+  }
+
+  async function setLocationTags(id: ID, tagIds: ID[]) {
+    await mapLocationsApi.setTags(id, tagIds)
+    await fetchLocations()
   }
 
   function loadBackgroundFromStorage(novelId: number) {
@@ -68,7 +83,7 @@ export const useMapStore = defineStore('map', () => {
 
   return {
     locations, loading, backgroundImageId, backgroundImageUrl,
-    fetchLocations, createLocation, updateLocation, deleteLocation,
+    fetchLocations, fetchLocationsByType, createLocation, updateLocation, deleteLocation, setLocationTags,
     loadBackgroundFromStorage, setBackground, clearBackground, $reset
   }
 })

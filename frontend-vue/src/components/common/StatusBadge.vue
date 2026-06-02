@@ -19,6 +19,9 @@ const statusLabels: Record<string, string> = {
   'planning': '规划中',
   'writing': '写作中',
   'completed': '已完成',
+  'pending': '待揭示',
+  'revealed': '已揭示',
+  'abandoned': '已废弃',
   'paused': '已暂停'
 }
 

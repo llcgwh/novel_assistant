@@ -57,5 +57,21 @@ export const timelineApi = {
 
   removeTag(id: ID, tagId: ID): Promise<void> {
     return request.delete(withNovelId(`/timeline-events/${id}/tags/${tagId}`))
+  },
+
+  removeCharacter(id: ID, characterId: ID): Promise<void> {
+    return request.delete(withNovelId(`/timeline-events/${id}/characters/${characterId}`))
+  },
+
+  removeScene(id: ID, sceneId: ID): Promise<void> {
+    return request.delete(withNovelId(`/timeline-events/${id}/scenes/${sceneId}`))
+  },
+
+  removeForeshadow(id: ID, foreshadowId: ID): Promise<void> {
+    return request.delete(withNovelId(`/timeline-events/${id}/foreshadows/${foreshadowId}`))
+  },
+
+  removeOutline(id: ID, outlineId: ID): Promise<void> {
+    return request.delete(withNovelId(`/timeline-events/${id}/outlines/${outlineId}`))
   }
 }

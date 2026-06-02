@@ -22,6 +22,9 @@ public class Tag {
     @Column(length = 20)
     private String color = "#3498db";
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

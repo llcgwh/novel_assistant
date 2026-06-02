@@ -22,4 +22,7 @@ public interface ForeshadowRepository extends JpaRepository<Foreshadow, Long> {
     List<Foreshadow> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
 
     List<Foreshadow> findByNovelIdAndStatus(Long novelId, String status);
+
+    @Query("SELECT DISTINCT f FROM Foreshadow f LEFT JOIN FETCH f.tags WHERE f.novelId = :novelId")
+    List<Foreshadow> findByNovelIdWithTags(@Param("novelId") Long novelId);
 }

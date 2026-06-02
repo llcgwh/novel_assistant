@@ -80,4 +80,31 @@ public class SceneController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @PostMapping("/{id}/locations/{locationId}")
+    public ResponseEntity<Scene> addLocationToScene(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long locationId) {
+        try {
+            return ResponseEntity.ok(sceneService.addMapLocationToScene(id, locationId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/{id}/locations/{locationId}")
+    public ResponseEntity<Scene> removeLocationFromScene(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long locationId) {
+        try {
+            return ResponseEntity.ok(sceneService.removeMapLocationFromScene(id, locationId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/{id}/locations")
+    public ResponseEntity<Scene> setSceneLocations(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> locationIds) {
+        try {
+            return ResponseEntity.ok(sceneService.setSceneMapLocations(id, locationIds));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
