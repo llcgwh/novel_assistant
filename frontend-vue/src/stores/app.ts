@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, reactive } from 'vue'
+import { ref, reactive, watch } from 'vue'
+
+export interface AppSettings {
+  backgroundImage: string   // 全局背景图片 URL
+  backgroundOpacity: number // 背景覆盖层透明度 0-1
+}
 
 export const useAppStore = defineStore('app', () => {
   // 全局加载状态
@@ -17,6 +22,26 @@ export const useAppStore = defineStore('app', () => {
     type: 'info' as 'success' | 'error' | 'info' | 'warning',
     visible: false
   })
+
+  // 全局设置 - 从 localStorage 恢复
+  const savedSettings = localStorage.getItem('app-settings')
+  const defaultSettings: AppSettings = {
+    backgroundImage: '',
+    backgroundOpacity: 0.55
+  }
+
+  const settings = reactive<AppSettings>(
+    savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings
+  )
+
+  // 持久化设置
+  watch(
+    () => ({ ...settings }),
+    (newSettings) => {
+      localStorage.setItem('app-settings', JSON.stringify(newSettings))
+    },
+    { deep: true }
+  )
 
   // Actions
   function setLoading(value: boolean) {
@@ -53,6 +78,10 @@ export const useAppStore = defineStore('app', () => {
     toast.visible = false
   }
 
+  function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    settings[key] = value
+  }
+
   return {
     loading,
     error,
@@ -60,12 +89,14 @@ export const useAppStore = defineStore('app', () => {
     modalComponent,
     modalProps,
     toast,
+    settings,
     setLoading,
     setError,
     clearError,
     openModal,
     closeModal,
     showToast,
-    hideToast
+    hideToast,
+    updateSetting
   }
 })

@@ -10,12 +10,12 @@
           placeholder="搜索大纲..."
           @input="debouncedSearch"
         />
-        <select v-model="statusFilter" class="filter-select" @change="onStatusChange">
-          <option value="">全部状态</option>
-          <option value="planning">规划中</option>
-          <option value="writing">写作中</option>
-          <option value="completed">已完成</option>
-        </select>
+        <BaseSelect
+          v-model="statusFilter"
+          :options="outlineStatusFilterOptions"
+          placeholder="全部状态"
+          @update:model-value="onStatusChange"
+        />
         <button class="btn-primary" @click="showCreateModal = true">+ 添加大纲</button>
       </div>
     </div>
@@ -37,9 +37,9 @@
         <p v-if="outline.plotOrder"><span class="label">排序：</span>{{ outline.plotOrder }}</p>
         <TagList :tags="outline.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editOutline(outline)">编辑</button>
-          <button class="btn-small" @click="manageTags(outline)">标签</button>
-          <button class="btn-danger" @click="confirmDelete(outline)">删除</button>
+          <button class="btn-secondary" @click="editOutline(outline)">✏️ 编辑</button>
+          <button class="btn-small" @click="manageTags(outline)">🏷️ 标签</button>
+          <button class="btn-danger" @click="confirmDelete(outline)">🗑️ 删除</button>
         </div>
       </div>
     </div>
@@ -65,11 +65,11 @@
       </div>
       <div class="form-group">
         <label>状态</label>
-        <select v-model="form.status">
-          <option value="planning">规划中</option>
-          <option value="writing">写作中</option>
-          <option value="completed">已完成</option>
-        </select>
+        <BaseSelect
+          v-model="form.status"
+          :options="outlineStatusOptions"
+          placeholder="请选择状态"
+        />
       </div>
       <div class="form-group">
         <label>排序</label>
@@ -104,7 +104,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useOutlinesStore } from '@/stores/outlines'
 import { useTagsStore } from '@/stores/tags'
 import type { Outline, OutlineStatus } from '@/types/outline'
@@ -114,12 +115,27 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const outlinesStore = useOutlinesStore()
 const tagsStore = useTagsStore()
+const route = useRoute()
 
 const searchKeyword = ref('')
-const statusFilter = ref<OutlineStatus | ''>('')
+const statusFilter = ref('')
+
+const outlineStatusFilterOptions = [
+  { value: '', label: '全部状态' },
+  { value: 'planning', label: '规划中' },
+  { value: 'writing', label: '写作中' },
+  { value: 'completed', label: '已完成' }
+]
+
+const outlineStatusOptions = [
+  { value: 'planning', label: '规划中' },
+  { value: 'writing', label: '写作中' },
+  { value: 'completed', label: '已完成' }
+]
 const showCreateModal = ref(false)
 const editingOutline = ref<Outline | null>(null)
 const deletingOutline = ref<Outline | null>(null)
@@ -137,10 +153,28 @@ const form = reactive({
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-onMounted(() => {
-  outlinesStore.fetchOutlines()
+onMounted(async () => {
+  await outlinesStore.fetchOutlines()
   tagsStore.fetchTags()
+  checkEditParam()
 })
+
+// 监听 ?edit=id 参数，自动打开编辑弹窗
+watch(() => route.query.edit, async () => {
+  await checkEditParam()
+})
+
+async function checkEditParam() {
+  const editId = route.query.edit
+  if (!editId) return
+  if (outlinesStore.outlines.length === 0) {
+    await outlinesStore.fetchOutlines()
+  }
+  const ol = outlinesStore.outlines.find(o => o.id === Number(editId))
+  if (ol) {
+    editOutline(ol)
+  }
+}
 
 function debouncedSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
@@ -150,7 +184,7 @@ function debouncedSearch() {
 }
 
 function onStatusChange() {
-  outlinesStore.setStatusFilter(statusFilter.value)
+  outlinesStore.setStatusFilter(statusFilter.value as OutlineStatus | '')
 }
 
 function editOutline(outline: Outline) {

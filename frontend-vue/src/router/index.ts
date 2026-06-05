@@ -8,6 +8,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresNovel: false }
   },
   {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { requiresNovel: false }
+  },
+  {
     path: '/novel/:novelId',
     component: () => import('@/views/MainLayout.vue'),
     meta: { requiresNovel: true },
@@ -60,6 +66,11 @@ const routes: RouteRecordRaw[] = [
         path: 'search',
         name: 'SearchResults',
         component: () => import('@/views/SearchResultsView.vue')
+      },
+      {
+        path: 'settings',
+        name: 'NovelSettings',
+        component: () => import('@/views/SettingsView.vue')
       }
     ]
   }

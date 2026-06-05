@@ -17,6 +17,13 @@
               />
               <button class="btn-search" @click="doSearch">搜索</button>
             </div>
+            <router-link
+              :to="`/novel/${route.params.novelId}/settings`"
+              class="btn-settings"
+              title="全局设置"
+            >
+              ⚙️ 设置
+            </router-link>
             <div ref="exportDropdownRef" class="export-dropdown">
               <button class="btn-secondary" @click="showExportMenu = !showExportMenu">
                 导出 ▼

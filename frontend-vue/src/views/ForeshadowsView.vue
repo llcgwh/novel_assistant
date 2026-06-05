@@ -10,12 +10,12 @@
           placeholder="搜索伏笔..."
           @input="debouncedSearch"
         />
-        <select v-model="statusFilter" class="filter-select" @change="onStatusChange">
-          <option value="">全部状态</option>
-          <option value="pending">未揭示</option>
-          <option value="revealed">已揭示</option>
-          <option value="abandoned">已废弃</option>
-        </select>
+        <BaseSelect
+          v-model="statusFilter"
+          :options="statusFilterOptions"
+          placeholder="全部状态"
+          @update:model-value="onStatusChange"
+        />
         <button class="btn-primary" @click="showCreateModal = true">+ 添加伏笔</button>
       </div>
     </div>
@@ -37,9 +37,9 @@
         <p v-if="foreshadow.revealedAt"><span class="label">揭示位置：</span>{{ foreshadow.revealedAt }}</p>
         <TagList :tags="foreshadow.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editForeshadow(foreshadow)">编辑</button>
-          <button class="btn-small" @click="manageTags(foreshadow)">标签</button>
-          <button class="btn-danger" @click="confirmDelete(foreshadow)">删除</button>
+          <button class="btn-secondary" @click="editForeshadow(foreshadow)">✏️ 编辑</button>
+          <button class="btn-small" @click="manageTags(foreshadow)">🏷️ 标签</button>
+          <button class="btn-danger" @click="confirmDelete(foreshadow)">🗑️ 删除</button>
         </div>
       </div>
     </div>
@@ -61,11 +61,11 @@
       </div>
       <div class="form-group">
         <label>状态</label>
-        <select v-model="form.status">
-          <option value="pending">未揭示</option>
-          <option value="revealed">已揭示</option>
-          <option value="abandoned">已废弃</option>
-        </select>
+        <BaseSelect
+          v-model="form.status"
+          :options="foreshadowStatusOptions"
+          placeholder="请选择状态"
+        />
       </div>
       <div class="form-group">
         <label>埋设章节</label>
@@ -104,7 +104,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useForeshadowsStore } from '@/stores/foreshadows'
 import { useTagsStore } from '@/stores/tags'
 import type { Foreshadow, ForeshadowStatus } from '@/types/foreshadow'
@@ -114,12 +115,27 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const foreshadowsStore = useForeshadowsStore()
 const tagsStore = useTagsStore()
+const route = useRoute()
 
 const searchKeyword = ref('')
-const statusFilter = ref<ForeshadowStatus | ''>('')
+const statusFilter = ref('')
+
+const statusFilterOptions = [
+  { value: '', label: '全部状态' },
+  { value: 'pending', label: '未揭示' },
+  { value: 'revealed', label: '已揭示' },
+  { value: 'abandoned', label: '已废弃' }
+]
+
+const foreshadowStatusOptions = [
+  { value: 'pending', label: '未揭示' },
+  { value: 'revealed', label: '已揭示' },
+  { value: 'abandoned', label: '已废弃' }
+]
 const showCreateModal = ref(false)
 const editingForeshadow = ref<Foreshadow | null>(null)
 const deletingForeshadow = ref<Foreshadow | null>(null)
@@ -134,10 +150,28 @@ const form = reactive({
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
-onMounted(() => {
-  foreshadowsStore.fetchForeshadows()
+onMounted(async () => {
+  await foreshadowsStore.fetchForeshadows()
   tagsStore.fetchTags()
+  checkEditParam()
 })
+
+// 监听 ?edit=id 参数，自动打开编辑弹窗
+watch(() => route.query.edit, async () => {
+  await checkEditParam()
+})
+
+async function checkEditParam() {
+  const editId = route.query.edit
+  if (!editId) return
+  if (foreshadowsStore.foreshadows.length === 0) {
+    await foreshadowsStore.fetchForeshadows()
+  }
+  const fs = foreshadowsStore.foreshadows.find(f => f.id === Number(editId))
+  if (fs) {
+    editForeshadow(fs)
+  }
+}
 
 function debouncedSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
@@ -145,7 +179,7 @@ function debouncedSearch() {
 }
 
 function onStatusChange() {
-  foreshadowsStore.setStatusFilter(statusFilter.value)
+  foreshadowsStore.setStatusFilter(statusFilter.value as ForeshadowStatus | '')
 }
 
 function editForeshadow(foreshadow: Foreshadow) {

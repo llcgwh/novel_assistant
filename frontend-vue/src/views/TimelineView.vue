@@ -40,31 +40,39 @@
             v-for="char in event.characters"
             :key="'c-' + char.id"
             class="relation-tag character"
+            @click.stop="navigateToEdit('characters', char.id)"
+            title="点击编辑此人物"
           >{{ char.name }}</span>
           <span
             v-for="scene in event.scenes"
             :key="'s-' + scene.id"
             class="relation-tag scene"
+            @click.stop="navigateToEdit('scenes', scene.id)"
+            title="点击编辑此场景"
           >{{ scene.name }}</span>
           <span
             v-for="fs in event.foreshadows"
             :key="'f-' + fs.id"
             class="relation-tag foreshadow"
+            @click.stop="navigateToEdit('foreshadows', fs.id)"
+            title="点击编辑此伏笔"
           >{{ fs.title }}</span>
           <span
             v-for="ol in event.outlines"
             :key="'o-' + ol.id"
             class="relation-tag outline"
+            @click.stop="navigateToEdit('outlines', ol.id)"
+            title="点击编辑此大纲"
           >{{ ol.title }}</span>
         </div>
 
         <TagList :tags="event.tags" />
 
         <div class="actions">
-          <button class="btn-secondary" @click="editEvent(event)">编辑</button>
-          <button class="btn-small" @click="manageRelations(event)">关联</button>
-          <button class="btn-small" @click="manageTags(event)">标签</button>
-          <button class="btn-danger" @click="confirmDelete(event)">删除</button>
+          <button class="btn-secondary" @click="editEvent(event)">✏️ 编辑</button>
+          <button class="btn-small" @click="manageRelations(event)">🔗 关联</button>
+          <button class="btn-small" @click="manageTags(event)">🏷️ 标签</button>
+          <button class="btn-danger" @click="confirmDelete(event)">🗑️ 删除</button>
         </div>
       </div>
     </div>
@@ -167,6 +175,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useTimelineStore } from '@/stores/timeline'
 import { useCharactersStore } from '@/stores/characters'
 import { useScenesStore } from '@/stores/scenes'
@@ -180,6 +189,8 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
 
+const router = useRouter()
+const route = useRoute()
 const timelineStore = useTimelineStore()
 const charactersStore = useCharactersStore()
 const scenesStore = useScenesStore()
@@ -223,6 +234,11 @@ function debouncedSearch() {
 function hasRelations(event: TimelineEvent) {
   return (event.characters?.length || 0) + (event.scenes?.length || 0) +
          (event.foreshadows?.length || 0) + (event.outlines?.length || 0) > 0
+}
+
+function navigateToEdit(view: string, id: number) {
+  const novelId = route.params.novelId
+  router.push({ path: `/novel/${novelId}/${view}`, query: { edit: String(id) } })
 }
 
 function editEvent(event: TimelineEvent) {

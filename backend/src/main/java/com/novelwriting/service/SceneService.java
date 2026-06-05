@@ -46,7 +46,7 @@ public class SceneService {
 
         scene.setName(sceneDetails.getName());
         scene.setDescription(sceneDetails.getDescription());
-        scene.setMapLocation(sceneDetails.getMapLocation());
+//        scene.setMapLocation(sceneDetails.getMapLocation());
         scene.setAtmosphere(sceneDetails.getAtmosphere());
         scene.setSceneImage(sceneDetails.getSceneImage());
 

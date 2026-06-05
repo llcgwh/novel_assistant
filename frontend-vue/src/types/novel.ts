@@ -20,6 +20,7 @@ export interface NovelCreateDTO {
   genre?: string
   status?: NovelStatus
   description?: string
+  coverImage?: string
 }
 
 export interface NovelUpdateDTO extends Partial<NovelCreateDTO> {}

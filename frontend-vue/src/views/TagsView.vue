@@ -20,8 +20,8 @@
         <div class="tag-color" :style="{ backgroundColor: tag.color || '#95a5a6' }"></div>
         <span class="tag-name">{{ tag.name }}</span>
         <div class="tag-actions">
-          <button class="btn-small" @click="editTag(tag)">编辑</button>
-          <button class="btn-small btn-danger" @click="confirmDelete(tag)">删除</button>
+          <button class="btn-small" @click="editTag(tag)">✏️ 编辑</button>
+          <button class="btn-small btn-danger" @click="confirmDelete(tag)">🗑️ 删除</button>
         </div>
       </div>
     </div>

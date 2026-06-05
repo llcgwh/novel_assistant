@@ -1,6 +1,7 @@
 <template>
   <Transition name="toast">
     <div v-if="appStore.toast.visible" :class="['toast', `toast-${appStore.toast.type}`]">
+      <span class="toast-icon">{{ icon }}</span>
       <span class="toast-message">{{ appStore.toast.message }}</span>
       <button class="toast-close" @click="appStore.hideToast">&times;</button>
     </div>
@@ -8,10 +9,20 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
+
+const icon = computed(() => {
+  const icons: Record<string, string> = {
+    success: '✅',
+    error: '❌',
+    info: 'ℹ️',
+    warning: '⚠️'
+  }
+  return icons[appStore.toast.type] || 'ℹ️'
+})
 
 let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -31,56 +42,65 @@ watch(
 <style scoped>
 .toast {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 24px;
+  right: 24px;
   z-index: 9999;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px;
-  border-radius: 8px;
+  padding: 14px 22px;
+  border-radius: 12px;
   font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  max-width: 420px;
+  backdrop-filter: blur(20px);
+  border: 1px solid;
+}
+
+.toast-icon {
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
 .toast-success {
-  background-color: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: rgba(0, 184, 148, 0.12);
+  color: #0f5132;
+  border-color: rgba(0, 184, 148, 0.3);
 }
 
 .toast-error {
-  background-color: #fef2f2;
+  background: rgba(231, 76, 60, 0.12);
   color: #991b1b;
-  border: 1px solid #fecaca;
+  border-color: rgba(231, 76, 60, 0.3);
 }
 
 .toast-info {
-  background-color: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: rgba(108, 92, 231, 0.12);
+  color: #1e3a8a;
+  border-color: rgba(108, 92, 231, 0.3);
 }
 
 .toast-warning {
-  background-color: #fffbeb;
+  background: rgba(243, 156, 18, 0.12);
   color: #92400e;
-  border: 1px solid #fde68a;
+  border-color: rgba(243, 156, 18, 0.3);
 }
 
 .toast-message {
   flex: 1;
+  font-weight: 500;
 }
 
 .toast-close {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 20px;
   cursor: pointer;
   color: inherit;
-  opacity: 0.6;
+  opacity: 0.5;
   padding: 0;
   line-height: 1;
+  transition: opacity 0.2s;
 }
 
 .toast-close:hover {

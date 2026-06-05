@@ -6,16 +6,12 @@
         <input type="file" ref="bgInput" accept="image/*" style="display: none" @change="uploadBackground" />
         <button class="btn-secondary" @click="($refs.bgInput as HTMLInputElement).click()">设置背景</button>
         <button v-if="mapStore.backgroundImageUrl" class="btn-secondary" @click="clearBackground">清除背景</button>
-        <select v-model="typeFilter" @change="filterByType" class="filter-select">
-          <option value="">全部</option>
-          <option value="城市">城市</option>
-          <option value="村庄">村庄</option>
-          <option value="山脉">山脉</option>
-          <option value="河流">河流</option>
-          <option value="森林">森林</option>
-          <option value="国家">国家</option>
-          <option value="__custom__">自定义</option>
-        </select>
+        <BaseSelect
+          v-model="typeFilter"
+          :options="mapTypeOptions"
+          placeholder="全部类型"
+          @update:model-value="filterByType"
+        />
         <input
           v-if="typeFilter === '__custom__'"
           v-model="customType"
@@ -58,9 +54,9 @@
         </div>
         <TagList :tags="location.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editLocation(location)">编辑</button>
-          <button class="btn-small" @click="manageTags(location)">标签</button>
-          <button class="btn-danger" @click="confirmDelete(location)">删除</button>
+          <button class="btn-secondary" @click="editLocation(location)">✏️ 编辑</button>
+          <button class="btn-small" @click="manageTags(location)">🏷️ 标签</button>
+          <button class="btn-danger" @click="confirmDelete(location)">🗑️ 删除</button>
         </div>
       </div>
     </div>
@@ -77,6 +73,15 @@
         <input v-model="form.name" type="text" placeholder="请输入位置名称" />
       </div>
       <div class="form-group">
+        <label>关联已有场景（可选）</label>
+        <BaseSelect
+          v-model="linkedSceneId"
+          :options="sceneOptions"
+          placeholder="不关联（手动填写）"
+          @update:model-value="onSceneSelect"
+        />
+      </div>
+      <div class="form-group">
         <label>位置类型</label>
         <input v-model="form.locationType" type="text" placeholder="如：城市、村庄、山脉等" />
       </div>
@@ -86,12 +91,11 @@
       </div>
       <div class="form-group">
         <label>父位置</label>
-        <select v-model="form.parentLocationId">
-          <option :value="null">无</option>
-          <option v-for="loc in availableParents" :key="loc.id" :value="loc.id">
-            {{ loc.name }}
-          </option>
-        </select>
+        <BaseSelect
+          v-model="form.parentLocationId"
+          :options="parentLocationOptions"
+          placeholder="无"
+        />
       </div>
       <div class="form-group">
         <label>坐标 X</label>
@@ -130,16 +134,19 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMapStore } from '@/stores/map'
 import { useTagsStore } from '@/stores/tags'
+import { useScenesStore } from '@/stores/scenes'
 import type { MapLocation } from '@/types/map'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const route = useRoute()
 const mapStore = useMapStore()
 const tagsStore = useTagsStore()
+const scenesStore = useScenesStore()
 
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const bgInput = ref<HTMLInputElement | null>(null)
@@ -150,13 +157,41 @@ const taggingLocation = ref<MapLocation | null>(null)
 const selectedTagIds = ref<number[]>([])
 const typeFilter = ref('')
 const customType = ref('')
+
+const mapTypeOptions = [
+  { value: '', label: '全部类型' },
+  { value: '城市', label: '城市' },
+  { value: '村庄', label: '村庄' },
+  { value: '山脉', label: '山脉' },
+  { value: '河流', label: '河流' },
+  { value: '森林', label: '森林' },
+  { value: '国家', label: '国家' },
+  { value: '__custom__', label: '自定义...' }
+]
 const clickedPosition = ref<{ x: number; y: number } | null>(null)
+const linkedSceneId = ref('')
 
 const form = reactive({
   name: '', locationType: '', description: '',
-  parentLocationId: null as number | null,
+  parentLocationId: '',
   positionX: 0, positionY: 0
 })
+
+const sceneOptions = computed(() => [
+  { value: '', label: '不关联（手动填写）' },
+  ...scenesStore.scenes.map(s => ({
+    value: String(s.id),
+    label: s.name + (s.location ? ' - ' + s.location : '')
+  }))
+])
+
+const parentLocationOptions = computed(() => [
+  { value: '', label: '无' },
+  ...availableParents.value.map(loc => ({
+    value: String(loc.id),
+    label: loc.name
+  }))
+])
 
 const availableParents = computed(() => {
   if (!editingLocation.value) return mapStore.locations
@@ -167,7 +202,8 @@ onMounted(async () => {
   const novelId = Number(route.params.novelId)
   await Promise.all([
     mapStore.fetchLocations(),
-    tagsStore.fetchTags()
+    tagsStore.fetchTags(),
+    scenesStore.fetchScenes()
   ])
   mapStore.loadBackgroundFromStorage(novelId)
   nextTick(() => drawMap())
@@ -248,7 +284,7 @@ function editLocation(location: MapLocation) {
   form.name = location.name
   form.locationType = location.locationType || ''
   form.description = location.description || ''
-  form.parentLocationId = location.parentLocation?.id || null
+  form.parentLocationId = location.parentLocation?.id ? String(location.parentLocation.id) : ''
   form.positionX = location.positionX || 0
   form.positionY = location.positionY || 0
 }
@@ -257,12 +293,23 @@ function confirmDelete(location: MapLocation) {
   deletingLocation.value = location
 }
 
+function onSceneSelect() {
+  if (!linkedSceneId.value) return
+  const scene = scenesStore.scenes.find(s => s.id === Number(linkedSceneId.value))
+  if (scene) {
+    form.name = scene.name
+    form.description = scene.description || ''
+    form.locationType = scene.location || ''
+  }
+}
+
 function closeModal() {
   showCreateModal.value = false
   editingLocation.value = null
   clickedPosition.value = null
+  linkedSceneId.value = ''
   form.name = ''; form.locationType = ''; form.description = ''
-  form.parentLocationId = null; form.positionX = 0; form.positionY = 0
+  form.parentLocationId = ''; form.positionX = 0; form.positionY = 0
 }
 
 async function saveLocation() {
@@ -271,7 +318,7 @@ async function saveLocation() {
     const data = {
       name: form.name, locationType: form.locationType, description: form.description,
       positionX: form.positionX, positionY: form.positionY,
-      parentLocation: form.parentLocationId ? { id: form.parentLocationId } : undefined
+      parentLocation: form.parentLocationId ? { id: Number(form.parentLocationId) } : undefined
     }
     if (editingLocation.value) {
       await mapStore.updateLocation(editingLocation.value.id, data)

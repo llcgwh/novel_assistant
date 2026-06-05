@@ -13,6 +13,8 @@
         id="relationship-canvas"
         width="800"
         height="600"
+        @click="onCanvasClick"
+        title="点击人物节点可编辑"
       ></canvas>
     </div>
 
@@ -32,8 +34,8 @@
           <p v-if="rel.description">{{ rel.description }}</p>
         </div>
         <div class="actions">
-          <button class="btn-secondary" @click="editRelationship(rel)">编辑</button>
-          <button class="btn-danger" @click="confirmDelete(rel)">删除</button>
+          <button class="btn-secondary" @click="editRelationship(rel)">✏️ 编辑</button>
+          <button class="btn-danger" @click="confirmDelete(rel)">🗑️ 删除</button>
         </div>
       </div>
     </div>
@@ -47,34 +49,27 @@
     >
       <div class="form-group">
         <label>人物1 *</label>
-        <select v-model="form.characterId1">
-          <option :value="0">请选择人物</option>
-          <option v-for="char in charactersStore.characters" :key="char.id" :value="char.id">
-            {{ char.name }}
-          </option>
-        </select>
+        <BaseSelect
+          v-model="form.characterId1"
+          :options="character1Options"
+          placeholder="请选择人物"
+        />
       </div>
       <div class="form-group">
         <label>人物2 *</label>
-        <select v-model="form.characterId2">
-          <option :value="0">请选择人物</option>
-          <option v-for="char in availableCharacters" :key="char.id" :value="char.id">
-            {{ char.name }}
-          </option>
-        </select>
+        <BaseSelect
+          v-model="form.characterId2"
+          :options="character2Options"
+          placeholder="请选择人物"
+        />
       </div>
       <div class="form-group">
         <label>关系类型</label>
-        <select v-model="form.relationshipType">
-          <option value="">请选择</option>
-          <option value="朋友">朋友</option>
-          <option value="敌人">敌人</option>
-          <option value="恋人">恋人</option>
-          <option value="亲属">亲属</option>
-          <option value="同事">同事</option>
-          <option value="师徒">师徒</option>
-          <option value="其他">其他</option>
-        </select>
+        <BaseSelect
+          v-model="form.relationshipType"
+          :options="relationshipTypeOptions"
+          placeholder="请选择关系类型"
+        />
       </div>
       <div class="form-group">
         <label>描述</label>
@@ -96,27 +91,53 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useRelationshipsStore } from '@/stores/relationships'
 import { useCharactersStore } from '@/stores/characters'
 import type { Relationship } from '@/types/relationship'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 
+const router = useRouter()
+const route = useRoute()
 const relationshipsStore = useRelationshipsStore()
 const charactersStore = useCharactersStore()
 
 const relationshipCanvas = ref<HTMLCanvasElement | null>(null)
+const nodePositions = ref<Record<number, { x: number; y: number }>>({})
 const showCreateModal = ref(false)
 const editingRelationship = ref<Relationship | null>(null)
 const deletingRelationship = ref<Relationship | null>(null)
 
 const form = reactive({
-  characterId1: 0, characterId2: 0, relationshipType: '', description: ''
+  characterId1: '', characterId2: '', relationshipType: '', description: ''
 })
 
+const character1Options = computed(() => [
+  { value: '', label: '请选择人物' },
+  ...charactersStore.characters.map(c => ({ value: String(c.id), label: c.name }))
+])
+
+const character2Options = computed(() => [
+  { value: '', label: '请选择人物' },
+  ...availableCharacters.value.map(c => ({ value: String(c.id), label: c.name }))
+])
+
+const relationshipTypeOptions = [
+  { value: '', label: '请选择' },
+  { value: '朋友', label: '朋友' },
+  { value: '敌人', label: '敌人' },
+  { value: '恋人', label: '恋人' },
+  { value: '亲属', label: '亲属' },
+  { value: '同事', label: '同事' },
+  { value: '师徒', label: '师徒' },
+  { value: '其他', label: '其他' }
+]
+
 const availableCharacters = computed(() => {
-  return charactersStore.characters.filter(c => c.id !== form.characterId1)
+  return charactersStore.characters.filter(c => c.id !== Number(form.characterId1))
 })
 
 onMounted(async () => {
@@ -161,6 +182,9 @@ function drawGraph() {
       y: centerY + radius * Math.sin(angle)
     }
   })
+
+  // 存储位置供点击检测
+  nodePositions.value = positions
 
   // Draw relationships (lines)
   relationshipsStore.relationships.forEach(rel => {
@@ -208,6 +232,25 @@ function drawGraph() {
   })
 }
 
+function onCanvasClick(e: MouseEvent) {
+  const canvas = relationshipCanvas.value
+  if (!canvas) return
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  const x = (e.clientX - rect.left) * scaleX
+  const y = (e.clientY - rect.top) * scaleY
+
+  for (const [id, pos] of Object.entries(nodePositions.value)) {
+    const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2)
+    if (dist <= 25) {
+      const novelId = route.params.novelId
+      router.push({ path: `/novel/${novelId}/characters`, query: { edit: id } })
+      return
+    }
+  }
+}
+
 function getRelationColor(type?: string) {
   const colors: Record<string, string> = {
     '朋友': '#27ae60', '敌人': '#e74c3c', '恋人': '#e91e63',
@@ -218,8 +261,8 @@ function getRelationColor(type?: string) {
 
 function editRelationship(rel: Relationship) {
   editingRelationship.value = rel
-  form.characterId1 = rel.characterId1
-  form.characterId2 = rel.characterId2
+  form.characterId1 = String(rel.characterId1)
+  form.characterId2 = String(rel.characterId2)
   form.relationshipType = rel.relationshipType || ''
   form.description = rel.description || ''
 }
@@ -231,7 +274,7 @@ function confirmDelete(rel: Relationship) {
 function closeModal() {
   showCreateModal.value = false
   editingRelationship.value = null
-  form.characterId1 = 0; form.characterId2 = 0
+  form.characterId1 = ''; form.characterId2 = ''
   form.relationshipType = ''; form.description = ''
 }
 
@@ -243,10 +286,16 @@ async function saveRelationship() {
     alert('请选择不同的人物'); return
   }
   try {
+    const data = {
+      characterId1: Number(form.characterId1),
+      characterId2: Number(form.characterId2),
+      relationshipType: form.relationshipType,
+      description: form.description
+    }
     if (editingRelationship.value) {
-      await relationshipsStore.updateRelationship(editingRelationship.value.id, { ...form })
+      await relationshipsStore.updateRelationship(editingRelationship.value.id, data)
     } else {
-      await relationshipsStore.createRelationship({ ...form })
+      await relationshipsStore.createRelationship(data)
     }
     closeModal()
   } catch (error) {
