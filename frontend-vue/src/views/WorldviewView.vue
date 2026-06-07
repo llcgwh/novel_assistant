@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>🌌 世界观</h2>
+      <h2>世界观</h2>
       <div class="view-actions">
         <BaseSelect
           v-model="activeCategory"

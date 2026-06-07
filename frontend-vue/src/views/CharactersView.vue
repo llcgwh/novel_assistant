@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>👤 人物管理</h2>
+      <h2>人物管理</h2>
       <div class="view-actions">
         <input
           v-model="searchKeyword"
