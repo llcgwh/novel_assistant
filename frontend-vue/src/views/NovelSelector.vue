@@ -326,6 +326,9 @@ function truncate(text: string, maxLen: number): string {
         display: inline-block;
         margin-right: 12px;
         font-size: 44px;
+        background: none;
+        -webkit-text-fill-color: initial;
+        background-clip: unset;
       }
     }
 
@@ -355,6 +358,14 @@ function truncate(text: string, maxLen: number): string {
     .status-filter-wrap {
       width: 170px;
       flex-shrink: 0;
+
+      :deep(.base-select) {
+        width: 100%;
+      }
+
+      :deep(.select-trigger) {
+        height: 42px;
+      }
     }
 
     .search-bar {
@@ -405,8 +416,11 @@ function truncate(text: string, maxLen: number): string {
     }
 
     .btn-primary {
-      padding: 12px 28px;
+      padding: 10px 28px;
+      height: 42px;
       font-size: 15px;
+      line-height: 1.4;
+      box-sizing: border-box;
       white-space: nowrap;
     }
   }
@@ -417,7 +431,8 @@ function truncate(text: string, maxLen: number): string {
   align-items: center;
   justify-content: center;
   width: 44px;
-  height: 44px;
+  height: 42px;
+  box-sizing: border-box;
   background: $glass-bg-strong;
   border: 1px solid $glass-border;
   border-radius: $border-radius;

@@ -23,4 +23,7 @@ public interface CharacterRepository extends JpaRepository<Character, Long> {
 
     @Query("SELECT DISTINCT c FROM Character c LEFT JOIN FETCH c.tags WHERE c.novelId = :novelId")
     List<Character> findByNovelIdWithTags(@Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Character c WHERE c.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

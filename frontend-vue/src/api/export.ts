@@ -17,6 +17,10 @@ export const exportApi = {
     return `${getApiBaseUrl()}/novels/${getCurrentNovelId()}/export/outlines/markdown`
   },
 
+  getWorldviewMarkdownUrl(): string {
+    return `${getApiBaseUrl()}/novels/${getCurrentNovelId()}/export/worldview/markdown`
+  },
+
   downloadJson(): void {
     window.open(this.getJsonUrl(), '_blank')
   },
@@ -31,5 +35,9 @@ export const exportApi = {
 
   downloadOutlinesMarkdown(): void {
     window.open(this.getOutlinesMarkdownUrl(), '_blank')
+  },
+
+  downloadWorldviewMarkdown(): void {
+    window.open(this.getWorldviewMarkdownUrl(), '_blank')
   }
 }

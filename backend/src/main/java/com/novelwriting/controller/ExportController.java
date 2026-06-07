@@ -77,4 +77,19 @@ public class ExportController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    @GetMapping("/worldview/markdown")
+    public ResponseEntity<byte[]> exportWorldviewToMarkdown(@PathVariable Long novelId) {
+        try {
+            byte[] data = exportService.exportWorldviewToMarkdown(novelId);
+            String filename = URLEncoder.encode("worldview_export.md", StandardCharsets.UTF_8);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_MARKDOWN)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(data);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 }

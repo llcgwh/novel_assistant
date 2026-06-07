@@ -45,6 +45,9 @@ public class ExportService {
     @Autowired
     private CharacterRelationshipRepository relationshipRepository;
 
+    @Autowired
+    private WorldviewEntryRepository worldviewEntryRepository;
+
     public byte[] exportNovelToJson(Long novelId) throws Exception {
         Map<String, Object> exportData = buildExportData(novelId);
 
@@ -208,6 +211,102 @@ public class ExportService {
             }
         }
 
+        // Add worldview entries section
+        List<WorldviewEntry> worldviewEntries = worldviewEntryRepository.findByNovelId(novelId);
+        if (!worldviewEntries.isEmpty()) {
+            writer.println("---");
+            writer.println();
+            writer.println("## 世界观设定");
+            writer.println();
+
+            // Group by category
+            Map<String, List<WorldviewEntry>> grouped = new LinkedHashMap<>();
+            for (WorldviewEntry entry : worldviewEntries) {
+                grouped.computeIfAbsent(entry.getCategory(), k -> new ArrayList<>()).add(entry);
+            }
+
+            Map<String, String> categoryLabels = new LinkedHashMap<>();
+            categoryLabels.put("geography", "地理");
+            categoryLabels.put("history", "历史");
+            categoryLabels.put("culture", "文化");
+            categoryLabels.put("magic_tech", "魔法/科技");
+            categoryLabels.put("races", "种族");
+            categoryLabels.put("politics", "政治");
+            categoryLabels.put("religion", "宗教");
+            categoryLabels.put("other", "其他");
+
+            for (Map.Entry<String, List<WorldviewEntry>> group : grouped.entrySet()) {
+                String categoryLabel = categoryLabels.getOrDefault(group.getKey(), group.getKey());
+                writer.println("### " + categoryLabel);
+                writer.println();
+                for (WorldviewEntry entry : group.getValue()) {
+                    writer.println("#### " + entry.getName());
+                    if (entry.getContent() != null) {
+                        writer.println();
+                        writer.println(entry.getContent());
+                    }
+                    if (entry.getTags() != null && !entry.getTags().isEmpty()) {
+                        writer.println();
+                        writer.print("**标签:** ");
+                        writer.println(entry.getTags().stream().map(Tag::getName).reduce((a, b) -> a + ", " + b).orElse(""));
+                    }
+                    writer.println();
+                }
+            }
+        }
+
+        writer.flush();
+        return baos.toByteArray();
+    }
+
+    public byte[] exportWorldviewToMarkdown(Long novelId) throws Exception {
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new RuntimeException("Novel not found"));
+
+        List<WorldviewEntry> entries = worldviewEntryRepository.findByNovelId(novelId);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PrintWriter writer = new PrintWriter(new OutputStreamWriter(baos, StandardCharsets.UTF_8));
+
+        writer.println("# " + novel.getTitle() + " - 世界观设定集");
+        writer.println();
+
+        Map<String, List<WorldviewEntry>> grouped = new LinkedHashMap<>();
+        Map<String, String> categoryLabels = new LinkedHashMap<>();
+        categoryLabels.put("geography", "地理");
+        categoryLabels.put("history", "历史");
+        categoryLabels.put("culture", "文化");
+        categoryLabels.put("magic_tech", "魔法/科技");
+        categoryLabels.put("races", "种族");
+        categoryLabels.put("politics", "政治");
+        categoryLabels.put("religion", "宗教");
+        categoryLabels.put("other", "其他");
+
+        for (WorldviewEntry entry : entries) {
+            grouped.computeIfAbsent(entry.getCategory(), k -> new ArrayList<>()).add(entry);
+        }
+
+        for (Map.Entry<String, List<WorldviewEntry>> group : grouped.entrySet()) {
+            String categoryLabel = categoryLabels.getOrDefault(group.getKey(), group.getKey());
+            writer.println("## " + categoryLabel);
+            writer.println();
+            for (WorldviewEntry entry : group.getValue()) {
+                writer.println("### " + entry.getName());
+                writer.println();
+                if (entry.getContent() != null) {
+                    writer.println(entry.getContent());
+                    writer.println();
+                }
+                if (entry.getTags() != null && !entry.getTags().isEmpty()) {
+                    writer.print("**标签:** ");
+                    writer.println(entry.getTags().stream().map(Tag::getName).reduce((a, b) -> a + ", " + b).orElse(""));
+                    writer.println();
+                }
+                writer.println("---");
+                writer.println();
+            }
+        }
+
         writer.flush();
         return baos.toByteArray();
     }
@@ -312,6 +411,7 @@ public class ExportService {
         data.put("mapLocations", mapLocationRepository.findByNovelId(novelId));
         data.put("tags", tagRepository.findByNovelId(novelId));
         data.put("characterRelationships", relationshipRepository.findByNovelId(novelId));
+        data.put("worldviewEntries", worldviewEntryRepository.findByNovelId(novelId));
 
         return data;
     }

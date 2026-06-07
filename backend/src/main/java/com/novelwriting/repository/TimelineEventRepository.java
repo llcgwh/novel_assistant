@@ -30,4 +30,7 @@ public interface TimelineEventRepository extends JpaRepository<TimelineEvent, Lo
            "WHERE t.novelId = :novelId " +
            "ORDER BY t.realOrder ASC")
     List<TimelineEvent> findByNovelIdWithRelations(@Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM TimelineEvent t WHERE t.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

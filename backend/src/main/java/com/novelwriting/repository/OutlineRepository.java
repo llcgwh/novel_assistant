@@ -25,4 +25,7 @@ public interface OutlineRepository extends JpaRepository<Outline, Long> {
 
     @Query("SELECT DISTINCT o FROM Outline o LEFT JOIN FETCH o.tags WHERE o.novelId = :novelId")
     List<Outline> findByNovelIdWithTags(@Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Outline o WHERE o.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

@@ -14,4 +14,7 @@ public interface CharacterRelationshipRepository extends JpaRepository<Character
 
     @Query("SELECT cr FROM CharacterRelationship cr WHERE cr.novelId = :novelId AND (cr.characterId1 = :characterId OR cr.characterId2 = :characterId)")
     List<CharacterRelationship> findByNovelIdAndCharacterId(@Param("novelId") Long novelId, @Param("characterId") Long characterId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM CharacterRelationship cr WHERE cr.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

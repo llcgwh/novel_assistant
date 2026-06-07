@@ -57,33 +57,49 @@
    - 支持位置层级关系
    - 自动绘制位置连线
 
-8. **人物关系图谱**
-   - 可视化展示人物关系网络
-   - 添加、编辑人物间关系
-   - 自定义关系类型和描述
-   - Canvas 绘制关系连线
-   - **点击人物节点跳转到人物编辑页**
+8. **🌌 世界观系统** ✨ 新增
+   - 管理虚构世界的各类设定
+   - 支持 8 大类别：地理、历史、文化、魔法/科技、种族、政治、宗教、其他
+   - 每个条目可包含图片、详细描述和标签
+   - 关联人物、场景、地图位置
+   - 按类别筛选和关键词搜索
+   - 导出世界观 Markdown
 
-9. **标签系统**
-   - 创建自定义标签
-   - 自定义标签颜色（圆形取色器）
-   - 为所有元素添加标签
-   - 按标签筛选内容
+10. **人物关系图谱**
+    - 可视化展示人物关系网络
+    - 添加、编辑人物间关系
+    - 自定义关系类型和描述
+    - Canvas 绘制关系连线
+    - **点击人物节点跳转到人物编辑页**
 
-10. **全局搜索**
+11. **标签系统**
+    - 创建自定义标签
+    - 自定义标签颜色（圆形取色器）
+    - 为所有元素添加标签
+    - 按标签筛选内容
+
+12. **全局搜索**
     - 跨模块搜索所有内容
     - 搜索人物、场景、伏笔、大纲、时间轴事件、地图位置
     - 快速定位和跳转
 
-11. **全局设置**
+13. **全局设置**
     - 自定义全局背景图片
     - 覆盖层透明度调节
     - 设置持久化到本地存储
 
-12. **数据导出**
+14. **数据导出**
     - 导出小说所有数据为 JSON / Markdown 格式
-    - 导出人物/大纲 Markdown
+    - 导出人物/大纲/世界观 Markdown
     - 便于备份和分享
+
+15. **☁️ WebDAV 多终端同步** ✨ 新增
+    - 配置 WebDAV 服务器（NextCloud / ownCloud / 坚果云 / 群晖 NAS）
+    - 一键上传备份到云端
+    - 从云端恢复数据（完整导入，含新旧 ID 自动映射）
+    - 管理云端备份文件（查看/删除）
+    - 自动同步开关（计划中）
+    - 密码安全存储，已保存密码不重复要求输入
 
 ### 系统间关联
 
@@ -239,15 +255,33 @@ npm run build
 - 创建新标签并选择颜色（圆形取色器）
 - 在各模块中为元素添加标签
 
-### 10. 全局搜索
+### 10. 使用世界观
+- 点击"世界观"标签
+- 按类别筛选（地理/历史/文化/魔法科技/种族/政治/宗教/其他）
+- 点击"+ 添加条目"创建世界观设定
+- 填写名称、类别、详细描述
+- 可上传条目图片、添加标签
+- 关联人物、场景、地图位置
+- 支持关键词搜索
+
+### 12. 全局搜索
 - 使用顶部搜索框
 - 输入关键词搜索所有内容
 - 点击结果跳转到对应模块
 
-### 11. 全局设置
+### 13. 全局设置
 - 点击 ⚙️ 设置按钮
 - 上传全局背景图片
 - 调节覆盖层透明度
+
+### 14. WebDAV 云同步 ✨
+- 在小说设置页配置 WebDAV 服务器
+- 填写服务器地址、用户名、密码
+- 点击"测试连接"验证配置
+- 点击"立即同步（上传）"备份数据到云端
+- 点击"从云端恢复"选择备份文件恢复数据
+- 可删除不需要的云端备份文件
+- 密码存入数据库，后续使用无需重新输入
 
 ## API 端点
 
@@ -326,11 +360,34 @@ npm run build
 ### 搜索 (Search)
 - GET `/api/novels/{novelId}/search?keyword=xxx` - 全局搜索
 
+### 世界观 (Worldview) ✨
+- GET `/api/novels/{novelId}/worldview` - 获取所有世界观条目
+- POST `/api/novels/{novelId}/worldview` - 创建条目
+- PUT `/api/novels/{novelId}/worldview/{id}` - 更新条目
+- DELETE `/api/novels/{novelId}/worldview/{id}` - 删除条目
+- PUT `/api/novels/{novelId}/worldview/{id}/tags` - 设置标签
+- POST `/api/novels/{novelId}/worldview/{id}/characters/{characterId}` - 关联人物
+- DELETE `/api/novels/{novelId}/worldview/{id}/characters/{characterId}` - 取消关联人物
+- POST `/api/novels/{novelId}/worldview/{id}/scenes/{sceneId}` - 关联场景
+- DELETE `/api/novels/{novelId}/worldview/{id}/scenes/{sceneId}` - 取消关联场景
+- POST `/api/novels/{novelId}/worldview/{id}/locations/{locationId}` - 关联地图位置
+- DELETE `/api/novels/{novelId}/worldview/{id}/locations/{locationId}` - 取消关联地图位置
+
 ### 导出 (Export)
 - GET `/api/novels/{novelId}/export/json` - 导出 JSON
 - GET `/api/novels/{novelId}/export/markdown` - 导出 Markdown
-- GET `/api/novels/{novelId}/export/characters-markdown` - 导出人物
-- GET `/api/novels/{novelId}/export/outlines-markdown` - 导出大纲
+- GET `/api/novels/{novelId}/export/characters/markdown` - 导出人物
+- GET `/api/novels/{novelId}/export/outlines/markdown` - 导出大纲
+- GET `/api/novels/{novelId}/export/worldview/markdown` - 导出世界观 ✨
+
+### WebDAV 同步 ✨
+- POST `/api/novels/{novelId}/webdav/test` - 测试连接
+- POST `/api/novels/{novelId}/webdav/sync/upload` - 上传备份
+- POST `/api/novels/{novelId}/webdav/sync/download` - 下载并恢复
+- GET `/api/novels/{novelId}/webdav/status` - 获取同步状态
+- POST `/api/novels/{novelId}/webdav/config` - 保存配置
+- GET `/api/novels/{novelId}/webdav/files` - 列出云端文件
+- DELETE `/api/novels/{novelId}/webdav/files` - 删除云端文件
 
 ## 项目结构
 
@@ -343,8 +400,8 @@ project/
 │   │       │   ├── config/       # 配置类
 │   │       │   ├── entity/       # 实体类
 │   │       │   ├── repository/   # 数据访问层
-│   │       │   ├── service/      # 业务逻辑层
-│   │       │   └── controller/   # 控制器层
+│   │       │   ├── service/      # 业务逻辑层（含 ExportService / ImportService / WebDavSyncService）
+│   │       │   └── controller/   # 控制器层（含 WebDavController）
 │   │       └── resources/
 │   │           └── application.properties
 │   └── pom.xml
@@ -363,6 +420,7 @@ project/
 │   │   │   ├── foreshadows.ts / outlines.ts / timeline.ts
 │   │   │   ├── mapLocations.ts / relationships.ts / tags.ts
 │   │   │   ├── images.ts / search.ts / export.ts
+│   │   │   ├── worldview.ts / webdav.ts
 │   │   │   ├── index.ts / request.ts
 │   │   ├── assets/styles/        # SCSS 样式（液态玻璃主题）
 │   │   │   ├── variables.scss    # 变量和主题色
@@ -388,11 +446,14 @@ project/
 │   │   │   ├── novel.ts / characters.ts / scenes.ts
 │   │   │   ├── foreshadows.ts / outlines.ts / timeline.ts
 │   │   │   ├── map.ts / relationships.ts / tags.ts
+│   │   │   └── worldview.ts
 │   │   ├── types/                # TypeScript 类型定义
+│   │   │   └── worldview.ts / webdav.ts
 │   │   ├── views/                # 页面视图
 │   │   │   ├── NovelSelector.vue     # 首页 / 小说选择
 │   │   │   ├── MainLayout.vue        # 主布局（导航+导出）
 │   │   │   ├── TimelineView.vue      # 时间轴
+│   │   │   ├── WorldviewView.vue     # 世界观 ✨
 │   │   │   ├── CharactersView.vue    # 人物管理
 │   │   │   ├── ScenesView.vue        # 场景管理
 │   │   │   ├── ForeshadowsView.vue   # 伏笔管理
@@ -401,7 +462,7 @@ project/
 │   │   │   ├── RelationshipsView.vue # 人物关系
 │   │   │   ├── TagsView.vue          # 标签管理
 │   │   │   ├── SearchResultsView.vue # 搜索结果
-│   │   │   └── SettingsView.vue      # 全局设置
+│   │   │   └── SettingsView.vue      # 全局设置（含 WebDAV 同步）
 │   │   ├── App.vue
 │   │   └── main.ts
 │   ├── index.html
@@ -409,7 +470,8 @@ project/
 │   ├── vite.config.ts
 │   └── tsconfig.json
 └── database/
-    └── schema.sql                # 数据库脚本
+    ├── schema.sql                # 数据库基础架构
+    └── migration_v3.sql          # v3 迁移（世界观 + WebDAV）
 ```
 
 ## 常见问题

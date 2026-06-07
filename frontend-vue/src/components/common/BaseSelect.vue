@@ -66,7 +66,6 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 <style scoped>
 .base-select {
   position: relative;
-  width: 100%;
   user-select: none;
 }
 
@@ -74,8 +73,9 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 10px 16px;
+  height: 42px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.6);
@@ -84,6 +84,8 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   transition: all 0.3s ease;
   font-size: 14px;
   color: #2d3436;
+  line-height: 1.4;
+  box-sizing: border-box;
 }
 
 .select-trigger:hover {

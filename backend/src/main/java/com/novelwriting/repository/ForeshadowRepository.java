@@ -25,4 +25,7 @@ public interface ForeshadowRepository extends JpaRepository<Foreshadow, Long> {
 
     @Query("SELECT DISTINCT f FROM Foreshadow f LEFT JOIN FETCH f.tags WHERE f.novelId = :novelId")
     List<Foreshadow> findByNovelIdWithTags(@Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Foreshadow f WHERE f.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

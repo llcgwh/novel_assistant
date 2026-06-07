@@ -57,6 +57,7 @@ body.has-custom-bg {
 // 按钮基础样式
 .btn-primary {
   padding: 10px 24px;
+  height: 42px;
   background: linear-gradient(135deg, $primary-color, lighten($primary-color, 8%));
   color: $white;
   border: none;
@@ -64,6 +65,8 @@ body.has-custom-bg {
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.4;
+  box-sizing: border-box;
   transition: all $transition-normal;
   box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
 
@@ -79,14 +82,17 @@ body.has-custom-bg {
 }
 
 .btn-secondary {
-  padding: 8px 18px;
+  padding: 10px 18px;
+  height: 42px;
   background: rgba(255, 255, 255, 0.6);
   color: $text-primary;
   border: 1px solid $glass-border;
   border-radius: $border-radius;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
+  line-height: 1.4;
+  box-sizing: border-box;
   backdrop-filter: blur($glass-blur);
   transition: all $transition-normal;
 
@@ -143,6 +149,8 @@ body.has-custom-bg {
 
 .btn-back {
   padding: 8px 18px;
+  height: 42px;
+  box-sizing: border-box;
   background: $glass-bg-dark;
   color: $white;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -161,6 +169,8 @@ body.has-custom-bg {
 
 .btn-search {
   padding: 10px 20px;
+  height: 42px;
+  box-sizing: border-box;
   background: linear-gradient(135deg, $primary-color, lighten($primary-color, 8%));
   color: $white;
   border: none;
@@ -197,12 +207,15 @@ body.has-custom-bg {
 // 输入框样式
 .search-input {
   padding: 10px 16px;
+  height: 42px;
   border: 1px solid $glass-border;
   border-radius: $border-radius;
   font-size: 14px;
   background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur($glass-blur);
   width: 220px;
+  line-height: 1.4;
+  box-sizing: border-box;
   transition: all $transition-normal;
 
   &:focus {
@@ -215,11 +228,14 @@ body.has-custom-bg {
 
 .filter-select {
   padding: 10px 36px 10px 16px;
+  height: 42px;
   border: 1px solid $glass-border;
   border-radius: $border-radius;
   font-size: 14px;
   background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur($glass-blur);
+  line-height: 1.4;
+  box-sizing: border-box;
   transition: all $transition-normal;
   color: $text-primary;
   appearance: none;

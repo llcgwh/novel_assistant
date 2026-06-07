@@ -46,11 +46,14 @@
 
       input {
         flex: 1;
-        padding: 12px 18px;
+        padding: 10px 18px;
         border: 1px solid $glass-border;
         border-right: none;
         border-radius: $border-radius 0 0 $border-radius;
         font-size: 14px;
+        line-height: 1.4;
+        box-sizing: border-box;
+        height: 42px;
         background: rgba(255, 255, 255, 0.5);
         backdrop-filter: blur($glass-blur);
         transition: all $transition-normal;
@@ -64,15 +67,21 @@
       }
 
       button {
-        padding: 12px 24px;
+        padding: 10px 24px;
+        height: 42px;
+        line-height: 1.4;
+        box-sizing: border-box;
       }
     }
 
     select {
-      padding: 12px 36px 12px 18px;
+      height: 42px;
+      padding: 10px 36px 10px 18px;
       border: 1px solid $glass-border;
       border-radius: $border-radius;
       font-size: 14px;
+      line-height: 1.4;
+      box-sizing: border-box;
       background: rgba(255, 255, 255, 0.5);
       backdrop-filter: blur($glass-blur);
       cursor: pointer;
@@ -248,6 +257,7 @@ header {
 
   input {
     padding: 10px 16px;
+    height: 42px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-right: none;
     border-radius: $border-radius 0 0 $border-radius;
@@ -256,6 +266,7 @@ header {
     background: rgba(255, 255, 255, 0.15);
     color: $white;
     backdrop-filter: blur($glass-blur);
+    box-sizing: border-box;
     transition: all $transition-normal;
 
     &::placeholder {
@@ -271,6 +282,8 @@ header {
 
   .btn-search {
     padding: 10px 18px;
+    height: 42px;
+    box-sizing: border-box;
     border-radius: 0 $border-radius $border-radius 0;
   }
 }
@@ -355,6 +368,8 @@ nav {
 // 设置按钮
 .btn-settings {
   padding: 10px 18px;
+  height: 42px;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.1);
   color: $white;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -405,12 +420,24 @@ nav {
 
 .view-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
+  flex-wrap: nowrap;
 
   .base-select {
-    width: 170px;
+    width: 110px;
     flex-shrink: 0;
+  }
+
+  .search-input {
+    width: 180px;
+    flex-shrink: 1;
+    min-width: 120px;
+  }
+
+  .btn-primary {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 }
 
@@ -755,6 +782,10 @@ nav {
 
 .form-group {
   margin-bottom: 18px;
+
+  .base-select {
+    width: 100%;
+  }
 
   label {
     display: block;
@@ -1140,20 +1171,412 @@ nav {
 }
 
 // 响应式设计
-@media (max-width: $breakpoint-md) {
+// XXL 断点 (>1536px) - 默认样式已覆盖
+// XL 断点 (1280px-1536px) - MacBook Pro 14"/16" 等中等屏幕
+@media (max-width: $breakpoint-xxl) {
+  header {
+    padding: 16px 22px;
+
+    h1 {
+      font-size: 22px;
+    }
+  }
+
+  .header-left {
+    gap: 14px;
+  }
+
+  .header-right {
+    gap: 10px;
+  }
+
+  .global-search, .tag-search {
+    input {
+      width: 160px;
+    }
+
+    .btn-search {
+      padding: 10px 16px;
+      font-size: 13px;
+    }
+  }
+
+  .nav-btn {
+    padding: 9px 16px;
+    font-size: 13px;
+  }
+
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .novels-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .search-items {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+
+  .card {
+    padding: 18px;
+
+    h3 {
+      font-size: 17px;
+    }
+  }
+
+  .view-header {
+    padding: 16px 20px;
+
+    h2 {
+      font-size: 20px;
+    }
+  }
+
+  .view-actions {
+    .base-select {
+      width: 110px;
+    }
+
+    .search-input {
+      width: 160px;
+    }
+  }
+}
+
+// LG 断点 (1024px-1280px) - 平板横屏 / 小笔记本
+@media (max-width: $breakpoint-xl) {
+  header {
+    padding: 14px 18px;
+    margin-bottom: 20px;
+
+    h1 {
+      font-size: 20px;
+    }
+  }
+
+  .header-top {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header-left {
+    gap: 10px;
+    min-width: 0;
+
+    .btn-back {
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .global-search, .tag-search {
+    input {
+      width: 140px;
+      font-size: 13px;
+    }
+
+    .btn-search {
+      padding: 9px 14px;
+      font-size: 12px;
+    }
+  }
+
+  .btn-settings {
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+
+  nav {
+    gap: 6px;
+  }
+
+  .nav-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+  }
+
+  .novels-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .search-items {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
+  .card {
+    padding: 16px;
+
+    h3 {
+      font-size: 16px;
+    }
+  }
+
+  .view-header {
+    padding: 14px 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+
+    h2 {
+      font-size: 18px;
+    }
+  }
+
+  .view-actions {
+    gap: 8px;
+
+    .base-select {
+      width: 110px;
+    }
+
+    .search-input {
+      width: 140px;
+    }
+  }
+
+  .modal-content {
+    max-width: 85%;
+    padding: 24px;
+
+    h2 {
+      font-size: 20px;
+    }
+  }
+
   .novel-selector {
-    padding: 30px 16px;
+    &-header h1 {
+      font-size: 32px;
+    }
+
+    &-actions {
+      padding: 16px 20px;
+
+      .search-bar {
+        max-width: 100%;
+        flex: 1;
+      }
+    }
+  }
+
+  .settings-view {
+    .settings-section {
+      padding: 20px;
+    }
+  }
+
+  .export-dropdown {
+    position: static;
+  }
+}
+
+// MD 断点 (768px-1024px) - 平板竖屏
+@media (max-width: $breakpoint-lg) {
+  .container {
+    padding: 12px;
+  }
+
+  header {
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: $border-radius-lg;
+
+    h1 {
+      font-size: 18px;
+    }
+  }
+
+  .header-top {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .header-left {
+    flex-direction: row;
+    width: 100%;
+    gap: 10px;
+    justify-content: space-between;
+
+    .btn-back {
+      padding: 6px 12px;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: 18px;
+      word-break: break-all;
+    }
+  }
+
+  .header-right {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .global-search {
+    flex: 1;
+    min-width: 200px;
+
+    input {
+      flex: 1;
+      width: auto;
+      font-size: 13px;
+    }
+
+    .btn-search {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+  }
+
+  .btn-settings {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  nav {
+    gap: 4px;
+  }
+
+  .nav-btn {
+    padding: 7px 10px;
+    font-size: 12px;
+    flex: 1 1 auto;
+    text-align: center;
+    min-width: 60px;
+  }
+
+  .grid-container {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 14px;
+  }
+
+  .novels-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+  }
+
+  .search-items {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 14px;
+
+    h3 {
+      font-size: 15px;
+    }
+
+    p {
+      font-size: 13px;
+    }
+  }
+
+  .card-image {
+    margin: -14px -14px 12px -14px;
+    height: 150px;
+  }
+
+  .view-header {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 10px;
+
+    h2 {
+      font-size: 17px;
+    }
+  }
+
+  .view-actions {
+    width: 100%;
+    gap: 8px;
+
+    .search-input {
+      flex: 1;
+      min-width: 100px;
+      width: auto;
+    }
+
+    .btn-primary {
+      white-space: nowrap;
+    }
+
+    .base-select {
+      width: 110px;
+    }
+  }
+
+  .modal-content {
+    max-width: 92%;
+    width: 92%;
+    padding: 20px;
+    max-height: 85vh;
+
+    h2 {
+      font-size: 18px;
+    }
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+
+    button {
+      flex: 1;
+      min-width: 80px;
+    }
+  }
+
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 14px;
+
+    .actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+
+  .novel-selector {
+    padding: 20px 12px;
 
     &-header h1 {
-      font-size: 28px;
+      font-size: 26px;
+    }
+
+    &-header p {
+      font-size: 14px;
     }
 
     &-actions {
       flex-direction: column;
-      padding: 16px;
+      padding: 14px;
+      gap: 10px;
 
       .search-bar {
         max-width: 100%;
+        width: 100%;
       }
 
       select, .btn-primary {
@@ -1162,58 +1585,402 @@ nav {
     }
   }
 
-  .header-top {
-    flex-direction: column;
-    gap: 15px;
+  .novels-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
   }
 
-  .header-left {
-    flex-direction: column;
-    gap: 10px;
-  }
+  .novel-card {
+    .novel-cover {
+      height: 160px;
+    }
 
-  .header-right {
-    flex-direction: column;
-    width: 100%;
-  }
+    .novel-info {
+      padding: 14px 16px;
 
-  .global-search {
-    width: 100%;
-
-    input {
-      flex: 1;
+      h3 {
+        font-size: 17px;
+      }
     }
   }
 
-  .view-header {
-    flex-direction: column;
-    gap: 15px;
-  }
+  .settings-view {
+    .settings-section {
+      padding: 16px;
 
-  .view-actions {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+      h3 {
+        font-size: 16px;
+      }
 
-  .grid-container,
-  .novels-grid,
-  .search-items {
-    grid-template-columns: 1fr;
-  }
+      .setting-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px 0;
 
-  .list-item {
-    flex-direction: column;
-    align-items: flex-start;
+        .setting-label {
+          min-width: auto;
+        }
 
-    .actions {
-      width: 100%;
-      justify-content: flex-end;
+        .setting-control {
+          width: 100%;
+        }
+      }
     }
+  }
+
+  .timeline-item {
+    padding: 14px 16px;
+
+    h3 {
+      font-size: 16px;
+    }
+  }
+
+  .export-dropdown {
+    position: static;
   }
 
   #map-canvas,
   #relationship-canvas {
     max-width: 100%;
     height: auto;
+  }
+}
+
+// SM 断点 (<768px) - 手机
+@media (max-width: $breakpoint-md) {
+  .container {
+    padding: 8px;
+  }
+
+  header {
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: $border-radius;
+
+    h1 {
+      font-size: 16px;
+    }
+  }
+
+  .header-top {
+    gap: 8px;
+  }
+
+  .header-left {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+
+    h1 {
+      font-size: 17px;
+    }
+  }
+
+  .header-right {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .global-search {
+    width: 100%;
+    flex-direction: row;
+
+    input {
+      flex: 1;
+      width: auto;
+    }
+  }
+
+  .btn-settings {
+    width: 100%;
+    justify-content: center;
+  }
+
+  nav {
+    gap: 4px;
+  }
+
+  .nav-btn {
+    padding: 6px 8px;
+    font-size: 11px;
+    flex: 1 1 45%;
+    text-align: center;
+    min-width: 0;
+  }
+
+  .grid-container,
+  .novels-grid,
+  .search-items {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .novel-selector {
+    padding: 16px 8px;
+
+    &-header {
+      margin-bottom: 24px;
+
+      h1 {
+        font-size: 22px;
+        letter-spacing: 1px;
+      }
+
+      p {
+        font-size: 13px;
+      }
+    }
+
+    &-actions {
+      flex-direction: column;
+      padding: 12px;
+      gap: 8px;
+
+      .search-bar {
+        max-width: 100%;
+        flex-direction: row;
+      }
+
+      select, .btn-primary {
+        width: 100%;
+      }
+    }
+  }
+
+  .novels-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .novel-card {
+    .novel-cover {
+      height: 150px;
+    }
+
+    .novel-info {
+      padding: 12px 14px;
+
+      h3 {
+        font-size: 16px;
+      }
+    }
+
+    .novel-actions {
+      padding: 12px 14px;
+      flex-wrap: wrap;
+    }
+  }
+
+  .view-header {
+    padding: 12px;
+    flex-direction: column;
+    gap: 10px;
+
+    h2 {
+      font-size: 16px;
+    }
+  }
+
+  .view-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+
+    .search-input {
+      width: 100%;
+    }
+
+    .btn-primary {
+      width: 100%;
+      text-align: center;
+    }
+
+    .base-select {
+      width: 100%;
+    }
+  }
+
+  .card {
+    padding: 12px;
+
+    h3 {
+      font-size: 15px;
+    }
+
+    .actions {
+      flex-wrap: wrap;
+      gap: 6px;
+
+      button {
+        flex: 1;
+        min-width: 60px;
+        font-size: 12px;
+        padding: 7px 10px;
+      }
+    }
+  }
+
+  .card-image {
+    margin: -12px -12px 10px -12px;
+    height: 130px;
+  }
+
+  .modal-content {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    padding: 16px;
+
+    h2 {
+      font-size: 17px;
+    }
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    gap: 8px;
+
+    button {
+      width: 100%;
+    }
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+
+    label {
+      font-size: 13px;
+    }
+
+    input, textarea, select {
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+  }
+
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 12px;
+
+    h4 {
+      font-size: 15px;
+    }
+
+    .actions {
+      width: 100%;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+  }
+
+  .timeline-item {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+
+    &::before {
+      top: 18px;
+      width: 12px;
+      height: 12px;
+      left: -7px;
+    }
+
+    h3 {
+      font-size: 15px;
+    }
+  }
+
+  .settings-view {
+    padding: 10px;
+
+    .settings-section {
+      padding: 14px;
+      margin-bottom: 14px;
+
+      h3 {
+        font-size: 15px;
+      }
+
+      .setting-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+
+        .setting-label {
+          min-width: auto;
+        }
+
+        .setting-control {
+          width: 100%;
+        }
+      }
+    }
+  }
+
+  .tags-grid {
+    gap: 10px;
+  }
+
+  .tag-card {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+  }
+
+  .search-category h3 {
+    font-size: 16px;
+  }
+
+  .search-results-container {
+    padding: 16px;
+  }
+
+  #map-canvas,
+  #relationship-canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .canvas-container {
+    padding: 10px;
+  }
+
+  .export-dropdown {
+    position: static;
+    width: 100%;
+
+    .btn-secondary {
+      width: 100%;
+      text-align: center;
+    }
+  }
+
+  .dropdown-menu {
+    width: 100%;
+    right: auto;
+    left: 0;
+  }
+
+  .checkbox-group {
+    max-height: 140px;
+    padding: 8px 10px;
+
+    label {
+      font-size: 13px;
+    }
+  }
+
+  .relation-tag {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+
+  .element-tag {
+    font-size: 10px;
+    padding: 2px 8px;
   }
 }

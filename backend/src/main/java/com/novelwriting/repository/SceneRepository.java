@@ -23,4 +23,7 @@ public interface SceneRepository extends JpaRepository<Scene, Long> {
 
     @Query("SELECT DISTINCT s FROM Scene s LEFT JOIN FETCH s.tags WHERE s.novelId = :novelId")
     List<Scene> findByNovelIdWithTags(@Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Scene s WHERE s.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

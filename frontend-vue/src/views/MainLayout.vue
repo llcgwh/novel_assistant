@@ -33,6 +33,7 @@
                 <a href="#" @click.prevent="exportMarkdown">导出 Markdown</a>
                 <a href="#" @click.prevent="exportCharacters">导出人物 Markdown</a>
                 <a href="#" @click.prevent="exportOutlines">导出大纲 Markdown</a>
+                <a href="#" @click.prevent="exportWorldview">导出世界观 Markdown</a>
               </div>
             </div>
           </div>
@@ -82,6 +83,7 @@ const navItems = computed(() => {
   const novelId = route.params.novelId
   return [
     { name: 'Timeline', label: '时间轴', to: `/novel/${novelId}/timeline` },
+    { name: 'Worldview', label: '世界观', to: `/novel/${novelId}/worldview` },
     { name: 'Characters', label: '人物', to: `/novel/${novelId}/characters` },
     { name: 'Scenes', label: '场景', to: `/novel/${novelId}/scenes` },
     { name: 'Foreshadows', label: '伏笔', to: `/novel/${novelId}/foreshadows` },
@@ -146,6 +148,11 @@ function exportCharacters() {
 
 function exportOutlines() {
   exportApi.downloadOutlinesMarkdown()
+  showExportMenu.value = false
+}
+
+function exportWorldview() {
+  exportApi.downloadWorldviewMarkdown()
   showExportMenu.value = false
 }
 </script>

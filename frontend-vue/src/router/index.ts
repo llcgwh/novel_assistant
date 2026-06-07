@@ -63,6 +63,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/TagsView.vue')
       },
       {
+        path: 'worldview',
+        name: 'Worldview',
+        component: () => import('@/views/WorldviewView.vue')
+      },
+      {
         path: 'search',
         name: 'SearchResults',
         component: () => import('@/views/SearchResultsView.vue')

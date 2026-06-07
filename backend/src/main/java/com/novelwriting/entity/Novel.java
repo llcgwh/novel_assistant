@@ -31,6 +31,22 @@ public class Novel {
     @Column(name = "cover_image", length = 500)
     private String coverImage;
 
+    // WebDAV sync configuration
+    @Column(name = "webdav_server_url", length = 500)
+    private String webdavServerUrl;
+
+    @Column(name = "webdav_username", length = 100)
+    private String webdavUsername;
+
+    @Column(name = "webdav_password", length = 500)
+    private String webdavPassword;
+
+    @Column(name = "webdav_auto_sync")
+    private Boolean webdavAutoSync = false;
+
+    @Column(name = "last_webdav_sync")
+    private LocalDateTime lastWebdavSync;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

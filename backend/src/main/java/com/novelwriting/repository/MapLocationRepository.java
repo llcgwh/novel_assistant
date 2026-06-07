@@ -25,4 +25,7 @@ public interface MapLocationRepository extends JpaRepository<MapLocation, Long> 
 
     @Query("SELECT DISTINCT m FROM MapLocation m LEFT JOIN FETCH m.tags LEFT JOIN FETCH m.parentLocation WHERE m.novelId = :novelId")
     List<MapLocation> findByNovelIdWithTags(@Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM MapLocation m WHERE m.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }

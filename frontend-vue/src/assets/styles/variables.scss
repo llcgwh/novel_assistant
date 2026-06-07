@@ -72,6 +72,10 @@ $transition-fast: 0.2s ease;
 $transition-normal: 0.3s ease;
 
 // 断点
+$breakpoint-sm: 576px;
 $breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+$breakpoint-xxl: 1536px;
 
 // 玻璃态混入 (使用CSS自定义属性在组件样式中实现)

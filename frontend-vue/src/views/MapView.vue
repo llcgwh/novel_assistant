@@ -382,3 +382,52 @@ async function deleteLocation() {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+@import '@/assets/styles/variables.scss';
+
+.filter-input {
+  padding: 10px 14px;
+  border: 1px solid $glass-border;
+  border-radius: $border-radius;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur($glass-blur);
+  width: 170px;
+  transition: all $transition-normal;
+  color: $text-primary;
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    box-shadow: 0 0 0 3px $primary-light;
+  }
+}
+
+.map-canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.location-info {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: $breakpoint-xl) {
+  .filter-input {
+    width: 130px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: $breakpoint-lg) {
+  .filter-input {
+    width: 100%;
+  }
+
+  .map-canvas {
+    width: 100% !important;
+  }
+}
+</style>

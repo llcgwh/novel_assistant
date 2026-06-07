@@ -1,0 +1,26 @@
+# IDE
+.idea/
+*.iml
+
+# Backend
+backend/target/
+backend/uploads/
+*.class
+*.jar
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend-vue/node_modules/
+frontend-vue/dist/
+
+# Temp files
+tmpclaude-*
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Error logs
+后端报错.txt

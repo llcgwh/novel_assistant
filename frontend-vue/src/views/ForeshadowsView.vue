@@ -251,3 +251,15 @@ async function deleteForeshadow() {
   }
 }
 </script>
+
+<style lang="scss" scoped>
+@import '@/assets/styles/variables.scss';
+
+@media (max-width: $breakpoint-lg) {
+  .view-actions {
+    .btn-primary {
+      white-space: nowrap;
+    }
+  }
+}
+</style>
