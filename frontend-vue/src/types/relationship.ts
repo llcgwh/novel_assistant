@@ -22,3 +22,24 @@ export interface RelationshipCreateDTO {
 }
 
 export interface RelationshipUpdateDTO extends Partial<RelationshipCreateDTO> {}
+
+// ========== 关系组 ==========
+
+export interface RelationshipGroup {
+  id: ID
+  novelId: ID
+  name: string
+  description?: string
+  parentGroupId?: ID | null
+  characters: { id: ID; name: string }[]
+  createdAt?: Timestamp
+}
+
+export interface RelationshipGroupCreateDTO {
+  name: string
+  description?: string
+  parentGroupId?: ID | null
+  characterIds?: ID[]
+}
+
+export interface RelationshipGroupUpdateDTO extends Partial<RelationshipGroupCreateDTO> {}

@@ -65,11 +65,13 @@
    - 按类别筛选和关键词搜索
    - 导出世界观 Markdown
 
-10. **人物关系图谱**
-    - 可视化展示人物关系网络
-    - 添加、编辑人物间关系
-    - 自定义关系类型和描述
-    - Canvas 绘制关系连线
+10. **人物关系图谱** ✨ 更新
+    - Canvas 可视化展示人物关系网络
+    - 添加、编辑人物间两两关系，自定义关系类型和描述
+    - **新增关系组功能**：创建关系组，支持组嵌套（父子组）
+    - 一次性添加多个角色到关系组
+    - 侧边栏树形展示关系组及成员
+    - **悬浮角色节点显示该角色的所有关系及所属关系组**
     - **点击人物节点跳转到人物编辑页**
 
 11. **标签系统**
@@ -246,8 +248,13 @@ npm run build
 
 ### 8. 使用人物关系图谱
 - 点击"人物关系"标签
-- 点击"+ 添加关系"按钮
+- 点击"+ 添加关系"按钮添加两两人物关系
 - 选择两个人物和关系类型
+- **点击"+ 创建关系组"创建关系组**
+- 填写组名、描述，选择父组（可选，用于嵌套）
+- 勾选成员角色（支持多选），一次性添加多个角色
+- 右侧面板树形展示所有关系组及成员
+- **悬浮画布中的人物节点可查看该角色的所有关系及所属关系组**
 - **点击画布中的人物节点可跳转编辑该人物**
 
 ### 9. 管理标签
@@ -345,6 +352,16 @@ npm run build
 - PUT `/api/novels/{novelId}/relationships/{id}` - 更新关系
 - DELETE `/api/novels/{novelId}/relationships/{id}` - 删除关系
 
+### 关系组 (Relationship Groups) ✨
+- GET `/api/novels/{novelId}/relationship-groups` - 获取小说的所有关系组
+- GET `/api/novels/{novelId}/relationship-groups/{id}` - 获取单个关系组
+- POST `/api/novels/{novelId}/relationship-groups` - 创建关系组
+- PUT `/api/novels/{novelId}/relationship-groups/{id}` - 更新关系组
+- DELETE `/api/novels/{novelId}/relationship-groups/{id}` - 删除关系组
+- PUT `/api/novels/{novelId}/relationship-groups/{id}/characters` - 设置组成员
+- POST `/api/novels/{novelId}/relationship-groups/{id}/characters/{characterId}` - 添加角色到组
+- DELETE `/api/novels/{novelId}/relationship-groups/{id}/characters/{characterId}` - 从组中移除角色
+
 ### 标签 (Tags)
 - GET `/api/novels/{novelId}/tags` - 获取小说的所有标签
 - POST `/api/novels/{novelId}/tags` - 创建标签
@@ -398,7 +415,7 @@ project/
 │   │   └── main/
 │   │       ├── java/com/novelwriting/
 │   │       │   ├── config/       # 配置类
-│   │       │   ├── entity/       # 实体类
+│   │       │   ├── entity/       # 实体类（含 RelationshipGroup ✨）
 │   │       │   ├── repository/   # 数据访问层
 │   │       │   ├── service/      # 业务逻辑层（含 ExportService / ImportService / WebDavSyncService）
 │   │       │   └── controller/   # 控制器层（含 WebDavController）
@@ -418,7 +435,7 @@ project/
 │   │   ├── api/                  # API 请求层
 │   │   │   ├── characters.ts / scenes.ts / novels.ts
 │   │   │   ├── foreshadows.ts / outlines.ts / timeline.ts
-│   │   │   ├── mapLocations.ts / relationships.ts / tags.ts
+│   │   │   ├── mapLocations.ts / relationships.ts / relationshipGroups.ts / tags.ts
 │   │   │   ├── images.ts / search.ts / export.ts
 │   │   │   ├── worldview.ts / webdav.ts
 │   │   │   ├── index.ts / request.ts
@@ -445,7 +462,7 @@ project/
 │   │   │   ├── app.ts            # 全局设置（背景图等）
 │   │   │   ├── novel.ts / characters.ts / scenes.ts
 │   │   │   ├── foreshadows.ts / outlines.ts / timeline.ts
-│   │   │   ├── map.ts / relationships.ts / tags.ts
+│   │   │   ├── map.ts / relationships.ts / relationshipGroups.ts / tags.ts
 │   │   │   └── worldview.ts
 │   │   ├── types/                # TypeScript 类型定义
 │   │   │   └── worldview.ts / webdav.ts
@@ -459,7 +476,7 @@ project/
 │   │   │   ├── ForeshadowsView.vue   # 伏笔管理
 │   │   │   ├── OutlinesView.vue      # 大纲管理
 │   │   │   ├── MapView.vue           # 地图系统
-│   │   │   ├── RelationshipsView.vue # 人物关系
+│   │   │   ├── RelationshipsView.vue # 人物关系（含关系组面板）✨
 │   │   │   ├── TagsView.vue          # 标签管理
 │   │   │   ├── SearchResultsView.vue # 搜索结果
 │   │   │   └── SettingsView.vue      # 全局设置（含 WebDAV 同步）
