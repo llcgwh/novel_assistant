@@ -23,7 +23,7 @@ public class CharacterController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Character> getCharacterById(@PathVariable Long novelId, @PathVariable Long id) {
-        return characterService.getCharacterById(id)
+        return characterService.getCharacterById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -36,16 +36,12 @@ public class CharacterController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Character> updateCharacter(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Character character) {
-        try {
-            return ResponseEntity.ok(characterService.updateCharacter(id, character));
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(characterService.updateCharacter(novelId, id, character));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCharacter(@PathVariable Long novelId, @PathVariable Long id) {
-        characterService.deleteCharacter(id);
+        characterService.deleteCharacter(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -56,28 +52,16 @@ public class CharacterController {
 
     @PostMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Character> addTagToCharacter(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
-        try {
-            return ResponseEntity.ok(characterService.addTagToCharacter(id, tagId));
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(characterService.addTagToCharacter(novelId, id, tagId));
     }
 
     @DeleteMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Character> removeTagFromCharacter(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
-        try {
-            return ResponseEntity.ok(characterService.removeTagFromCharacter(id, tagId));
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(characterService.removeTagFromCharacter(novelId, id, tagId));
     }
 
     @PutMapping("/{id}/tags")
     public ResponseEntity<Character> setCharacterTags(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
-        try {
-            return ResponseEntity.ok(characterService.setCharacterTags(id, tagIds));
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(characterService.setCharacterTags(novelId, id, tagIds));
     }
 }

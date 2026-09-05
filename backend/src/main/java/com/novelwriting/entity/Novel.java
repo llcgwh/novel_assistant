@@ -1,6 +1,7 @@
 package com.novelwriting.entity;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -38,6 +39,8 @@ public class Novel {
     @Column(name = "webdav_username", length = 100)
     private String webdavUsername;
 
+    @JsonIgnore
+    @lombok.ToString.Exclude
     @Column(name = "webdav_password", length = 500)
     private String webdavPassword;
 
