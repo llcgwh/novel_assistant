@@ -9,7 +9,7 @@ import java.util.Set;
 @Data
 @Entity
 @Table(name = "scenes")
-public class Scene {
+public class Scene implements NovelOwned {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

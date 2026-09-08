@@ -23,7 +23,7 @@ public class SceneController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Scene> getSceneById(@PathVariable Long novelId, @PathVariable Long id) {
-        return sceneService.getSceneById(id)
+        return sceneService.getSceneById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -37,7 +37,9 @@ public class SceneController {
     @PutMapping("/{id}")
     public ResponseEntity<Scene> updateScene(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Scene scene) {
         try {
-            return ResponseEntity.ok(sceneService.updateScene(id, scene));
+            return ResponseEntity.ok(sceneService.updateScene(novelId, id, scene));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -45,7 +47,7 @@ public class SceneController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteScene(@PathVariable Long novelId, @PathVariable Long id) {
-        sceneService.deleteScene(id);
+        sceneService.deleteScene(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -57,7 +59,9 @@ public class SceneController {
     @PostMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Scene> addTagToScene(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(sceneService.addTagToScene(id, tagId));
+            return ResponseEntity.ok(sceneService.addTagToScene(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -66,7 +70,9 @@ public class SceneController {
     @DeleteMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Scene> removeTagFromScene(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(sceneService.removeTagFromScene(id, tagId));
+            return ResponseEntity.ok(sceneService.removeTagFromScene(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -75,7 +81,9 @@ public class SceneController {
     @PutMapping("/{id}/tags")
     public ResponseEntity<Scene> setSceneTags(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
         try {
-            return ResponseEntity.ok(sceneService.setSceneTags(id, tagIds));
+            return ResponseEntity.ok(sceneService.setSceneTags(novelId, id, tagIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -84,7 +92,9 @@ public class SceneController {
     @PostMapping("/{id}/locations/{locationId}")
     public ResponseEntity<Scene> addLocationToScene(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long locationId) {
         try {
-            return ResponseEntity.ok(sceneService.addMapLocationToScene(id, locationId));
+            return ResponseEntity.ok(sceneService.addMapLocationToScene(novelId, id, locationId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -93,7 +103,9 @@ public class SceneController {
     @DeleteMapping("/{id}/locations/{locationId}")
     public ResponseEntity<Scene> removeLocationFromScene(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long locationId) {
         try {
-            return ResponseEntity.ok(sceneService.removeMapLocationFromScene(id, locationId));
+            return ResponseEntity.ok(sceneService.removeMapLocationFromScene(novelId, id, locationId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -102,7 +114,9 @@ public class SceneController {
     @PutMapping("/{id}/locations")
     public ResponseEntity<Scene> setSceneLocations(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> locationIds) {
         try {
-            return ResponseEntity.ok(sceneService.setSceneMapLocations(id, locationIds));
+            return ResponseEntity.ok(sceneService.setSceneMapLocations(novelId, id, locationIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

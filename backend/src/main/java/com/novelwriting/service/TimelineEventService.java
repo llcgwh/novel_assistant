@@ -10,7 +10,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class TimelineEventService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private TimelineEventRepository timelineEventRepository;
@@ -38,15 +42,22 @@ public class TimelineEventService {
         return timelineEventRepository.findByNovelIdWithRelations(novelId);
     }
 
-    public Optional<TimelineEvent> getTimelineEventById(Long id) {
+    public Optional<TimelineEvent> getTimelineEventById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, id);
         return timelineEventRepository.findById(id);
     }
 
     public TimelineEvent createTimelineEvent(TimelineEvent timelineEvent) {
+        Long novelId = timelineEvent.getNovelId();
+        scope.requireNovel(novelId);
+        timelineEvent.setId(null);
+        scope.validateLinks(timelineEvent, novelId, null);
         return timelineEventRepository.save(timelineEvent);
     }
 
-    public TimelineEvent updateTimelineEvent(Long id, TimelineEvent eventDetails) {
+    public TimelineEvent updateTimelineEvent(Long novelId, Long id, TimelineEvent eventDetails) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, id);
+        scope.validateLinks(eventDetails, novelId, id);
         TimelineEvent event = timelineEventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -58,7 +69,8 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public void deleteTimelineEvent(Long id) {
+    public void deleteTimelineEvent(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, id);
         timelineEventRepository.deleteById(id);
     }
 
@@ -66,7 +78,9 @@ public class TimelineEventService {
         return timelineEventRepository.searchByNovelIdAndKeyword(novelId, keyword);
     }
 
-    public TimelineEvent addCharactersToEvent(Long eventId, Set<Long> characterIds) {
+    public TimelineEvent addCharactersToEvent(Long novelId, Long eventId, Set<Long> characterIds) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.requireAll(com.novelwriting.entity.Character.class, novelId, characterIds);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -79,7 +93,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent addScenesToEvent(Long eventId, Set<Long> sceneIds) {
+    public TimelineEvent addScenesToEvent(Long novelId, Long eventId, Set<Long> sceneIds) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.requireAll(com.novelwriting.entity.Scene.class, novelId, sceneIds);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -92,7 +108,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent addForeshadowsToEvent(Long eventId, Set<Long> foreshadowIds) {
+    public TimelineEvent addForeshadowsToEvent(Long novelId, Long eventId, Set<Long> foreshadowIds) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.requireAll(com.novelwriting.entity.Foreshadow.class, novelId, foreshadowIds);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -105,7 +123,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent addOutlinesToEvent(Long eventId, Set<Long> outlineIds) {
+    public TimelineEvent addOutlinesToEvent(Long novelId, Long eventId, Set<Long> outlineIds) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.requireAll(com.novelwriting.entity.Outline.class, novelId, outlineIds);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -118,7 +138,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent removeCharactersFromEvent(Long eventId, Long characterId) {
+    public TimelineEvent removeCharactersFromEvent(Long novelId, Long eventId, Long characterId) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.require(com.novelwriting.entity.Character.class, novelId, characterId);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -126,7 +148,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent removeScenesFromEvent(Long eventId, Long sceneId) {
+    public TimelineEvent removeScenesFromEvent(Long novelId, Long eventId, Long sceneId) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -134,7 +158,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent removeForeshadowsFromEvent(Long eventId, Long foreshadowId) {
+    public TimelineEvent removeForeshadowsFromEvent(Long novelId, Long eventId, Long foreshadowId) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, foreshadowId);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -142,7 +168,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent removeOutlinesFromEvent(Long eventId, Long outlineId) {
+    public TimelineEvent removeOutlinesFromEvent(Long novelId, Long eventId, Long outlineId) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.require(com.novelwriting.entity.Outline.class, novelId, outlineId);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -150,7 +178,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent addTagToEvent(Long eventId, Long tagId) {
+    public TimelineEvent addTagToEvent(Long novelId, Long eventId, Long tagId) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
         Tag tag = tagRepository.findById(tagId)
@@ -160,7 +190,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent removeTagFromEvent(Long eventId, Long tagId) {
+    public TimelineEvent removeTagFromEvent(Long novelId, Long eventId, Long tagId) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -168,7 +200,9 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent setEventTags(Long eventId, Set<Long> tagIds) {
+    public TimelineEvent setEventTags(Long novelId, Long eventId, Set<Long> tagIds) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.requireAll(com.novelwriting.entity.Tag.class, novelId, tagIds);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 
@@ -180,8 +214,12 @@ public class TimelineEventService {
         return timelineEventRepository.save(event);
     }
 
-    public TimelineEvent updateEventRelations(Long eventId, Set<Long> characterIds,
-            Set<Long> sceneIds, Set<Long> foreshadowIds, Set<Long> outlineIds) {
+    public TimelineEvent updateEventRelations(Long novelId, Long eventId, Set<Long> characterIds, Set<Long> sceneIds, Set<Long> foreshadowIds, Set<Long> outlineIds) {
+        scope.require(com.novelwriting.entity.TimelineEvent.class, novelId, eventId);
+        scope.requireAll(com.novelwriting.entity.Character.class, novelId, characterIds);
+        scope.requireAll(com.novelwriting.entity.Scene.class, novelId, sceneIds);
+        scope.requireAll(com.novelwriting.entity.Foreshadow.class, novelId, foreshadowIds);
+        scope.requireAll(com.novelwriting.entity.Outline.class, novelId, outlineIds);
         TimelineEvent event = timelineEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Timeline Event not found"));
 

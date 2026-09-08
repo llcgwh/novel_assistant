@@ -29,7 +29,7 @@ public class CharacterRelationshipController {
     @GetMapping("/{id}")
     public ResponseEntity<CharacterRelationship> getRelationshipById(
             @PathVariable Long novelId, @PathVariable Long id) {
-        return relationshipService.getRelationshipById(id)
+        return relationshipService.getRelationshipById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -46,7 +46,9 @@ public class CharacterRelationshipController {
             @PathVariable Long novelId, @PathVariable Long id,
             @RequestBody CharacterRelationship relationship) {
         try {
-            return ResponseEntity.ok(relationshipService.updateRelationship(id, relationship));
+            return ResponseEntity.ok(relationshipService.updateRelationship(novelId, id, relationship));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -54,7 +56,7 @@ public class CharacterRelationshipController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteRelationship(@PathVariable Long novelId, @PathVariable Long id) {
-        relationshipService.deleteRelationship(id);
+        relationshipService.deleteRelationship(novelId, id);
         return ResponseEntity.ok().build();
     }
 }

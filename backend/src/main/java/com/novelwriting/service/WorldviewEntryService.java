@@ -9,7 +9,11 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class WorldviewEntryService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private WorldviewEntryRepository worldviewEntryRepository;
@@ -30,7 +34,8 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.findByNovelIdWithTags(novelId);
     }
 
-    public Optional<WorldviewEntry> getEntryById(Long id) {
+    public Optional<WorldviewEntry> getEntryById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, id);
         return worldviewEntryRepository.findByIdWithTags(id);
     }
 
@@ -54,10 +59,16 @@ public class WorldviewEntryService {
     }
 
     public WorldviewEntry createEntry(WorldviewEntry entry) {
+        Long novelId = entry.getNovelId();
+        scope.requireNovel(novelId);
+        entry.setId(null);
+        scope.validateLinks(entry, novelId, null);
         return worldviewEntryRepository.save(entry);
     }
 
-    public WorldviewEntry updateEntry(Long id, WorldviewEntry details) {
+    public WorldviewEntry updateEntry(Long novelId, Long id, WorldviewEntry details) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, id);
+        scope.validateLinks(details, novelId, id);
         WorldviewEntry entry = worldviewEntryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
 
@@ -69,12 +80,15 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.save(entry);
     }
 
-    public void deleteEntry(Long id) {
+    public void deleteEntry(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, id);
         worldviewEntryRepository.deleteById(id);
     }
 
     // Tag management
-    public WorldviewEntry setEntryTags(Long entryId, Set<Long> tagIds) {
+    public WorldviewEntry setEntryTags(Long novelId, Long entryId, Set<Long> tagIds) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.requireAll(com.novelwriting.entity.Tag.class, novelId, tagIds);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
 
@@ -88,7 +102,9 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.save(entry);
     }
 
-    public WorldviewEntry addTagToEntry(Long entryId, Long tagId) {
+    public WorldviewEntry addTagToEntry(Long novelId, Long entryId, Long tagId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
         Tag tag = tagRepository.findById(tagId)
@@ -98,7 +114,9 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.save(entry);
     }
 
-    public WorldviewEntry removeTagFromEntry(Long entryId, Long tagId) {
+    public WorldviewEntry removeTagFromEntry(Long novelId, Long entryId, Long tagId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
 
@@ -107,7 +125,9 @@ public class WorldviewEntryService {
     }
 
     // Character relations
-    public WorldviewEntry addCharacterRelation(Long entryId, Long characterId) {
+    public WorldviewEntry addCharacterRelation(Long novelId, Long entryId, Long characterId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.Character.class, novelId, characterId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
         Character character = characterRepository.findById(characterId)
@@ -117,7 +137,9 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.save(entry);
     }
 
-    public WorldviewEntry removeCharacterRelation(Long entryId, Long characterId) {
+    public WorldviewEntry removeCharacterRelation(Long novelId, Long entryId, Long characterId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.Character.class, novelId, characterId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
 
@@ -126,7 +148,9 @@ public class WorldviewEntryService {
     }
 
     // Scene relations
-    public WorldviewEntry addSceneRelation(Long entryId, Long sceneId) {
+    public WorldviewEntry addSceneRelation(Long novelId, Long entryId, Long sceneId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
         Scene scene = sceneRepository.findById(sceneId)
@@ -136,7 +160,9 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.save(entry);
     }
 
-    public WorldviewEntry removeSceneRelation(Long entryId, Long sceneId) {
+    public WorldviewEntry removeSceneRelation(Long novelId, Long entryId, Long sceneId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
 
@@ -145,7 +171,9 @@ public class WorldviewEntryService {
     }
 
     // Map location relations
-    public WorldviewEntry addMapLocationRelation(Long entryId, Long locationId) {
+    public WorldviewEntry addMapLocationRelation(Long novelId, Long entryId, Long locationId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
         MapLocation location = mapLocationRepository.findById(locationId)
@@ -155,7 +183,9 @@ public class WorldviewEntryService {
         return worldviewEntryRepository.save(entry);
     }
 
-    public WorldviewEntry removeMapLocationRelation(Long entryId, Long locationId) {
+    public WorldviewEntry removeMapLocationRelation(Long novelId, Long entryId, Long locationId) {
+        scope.require(com.novelwriting.entity.WorldviewEntry.class, novelId, entryId);
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
         WorldviewEntry entry = worldviewEntryRepository.findById(entryId)
                 .orElseThrow(() -> new RuntimeException("WorldviewEntry not found"));
 

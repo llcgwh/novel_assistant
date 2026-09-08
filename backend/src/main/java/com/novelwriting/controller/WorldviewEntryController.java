@@ -41,7 +41,7 @@ public class WorldviewEntryController {
 
     @GetMapping("/{id}")
     public ResponseEntity<WorldviewEntry> getEntryById(@PathVariable Long novelId, @PathVariable Long id) {
-        return worldviewEntryService.getEntryById(id)
+        return worldviewEntryService.getEntryById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -56,7 +56,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> updateEntry(
             @PathVariable Long novelId, @PathVariable Long id, @RequestBody WorldviewEntry entry) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.updateEntry(id, entry));
+            return ResponseEntity.ok(worldviewEntryService.updateEntry(novelId, id, entry));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -64,7 +66,7 @@ public class WorldviewEntryController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEntry(@PathVariable Long novelId, @PathVariable Long id) {
-        worldviewEntryService.deleteEntry(id);
+        worldviewEntryService.deleteEntry(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -73,7 +75,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> setEntryTags(
             @PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.setEntryTags(id, tagIds));
+            return ResponseEntity.ok(worldviewEntryService.setEntryTags(novelId, id, tagIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -83,7 +87,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> addTagToEntry(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.addTagToEntry(id, tagId));
+            return ResponseEntity.ok(worldviewEntryService.addTagToEntry(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -93,7 +99,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> removeTagFromEntry(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.removeTagFromEntry(id, tagId));
+            return ResponseEntity.ok(worldviewEntryService.removeTagFromEntry(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -104,7 +112,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> addCharacterRelation(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long characterId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.addCharacterRelation(id, characterId));
+            return ResponseEntity.ok(worldviewEntryService.addCharacterRelation(novelId, id, characterId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -114,7 +124,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> removeCharacterRelation(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long characterId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.removeCharacterRelation(id, characterId));
+            return ResponseEntity.ok(worldviewEntryService.removeCharacterRelation(novelId, id, characterId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -125,7 +137,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> addSceneRelation(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long sceneId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.addSceneRelation(id, sceneId));
+            return ResponseEntity.ok(worldviewEntryService.addSceneRelation(novelId, id, sceneId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -135,7 +149,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> removeSceneRelation(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long sceneId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.removeSceneRelation(id, sceneId));
+            return ResponseEntity.ok(worldviewEntryService.removeSceneRelation(novelId, id, sceneId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -146,7 +162,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> addMapLocationRelation(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long locationId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.addMapLocationRelation(id, locationId));
+            return ResponseEntity.ok(worldviewEntryService.addMapLocationRelation(novelId, id, locationId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -156,7 +174,9 @@ public class WorldviewEntryController {
     public ResponseEntity<WorldviewEntry> removeMapLocationRelation(
             @PathVariable Long novelId, @PathVariable Long id, @PathVariable Long locationId) {
         try {
-            return ResponseEntity.ok(worldviewEntryService.removeMapLocationRelation(id, locationId));
+            return ResponseEntity.ok(worldviewEntryService.removeMapLocationRelation(novelId, id, locationId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

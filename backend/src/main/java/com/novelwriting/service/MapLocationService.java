@@ -11,7 +11,11 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class MapLocationService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private MapLocationRepository mapLocationRepository;
@@ -19,23 +23,26 @@ public class MapLocationService {
     @Autowired
     private TagRepository tagRepository;
 
-    public List<MapLocation> getAllMapLocations() {
-        return mapLocationRepository.findAll();
-    }
-
     public List<MapLocation> getMapLocationsByNovelId(Long novelId) {
         return mapLocationRepository.findByNovelIdWithTags(novelId);
     }
 
-    public Optional<MapLocation> getMapLocationById(Long id) {
+    public Optional<MapLocation> getMapLocationById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, id);
         return mapLocationRepository.findById(id);
     }
 
     public MapLocation createMapLocation(MapLocation mapLocation) {
+        Long novelId = mapLocation.getNovelId();
+        scope.requireNovel(novelId);
+        mapLocation.setId(null);
+        scope.validateLinks(mapLocation, novelId, null);
         return mapLocationRepository.save(mapLocation);
     }
 
-    public MapLocation updateMapLocation(Long id, MapLocation locationDetails) {
+    public MapLocation updateMapLocation(Long novelId, Long id, MapLocation locationDetails) {
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, id);
+        scope.validateLinks(locationDetails, novelId, id);
         MapLocation location = mapLocationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Map Location not found"));
 
@@ -50,7 +57,8 @@ public class MapLocationService {
         return mapLocationRepository.save(location);
     }
 
-    public void deleteMapLocation(Long id) {
+    public void deleteMapLocation(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, id);
         mapLocationRepository.deleteById(id);
     }
 
@@ -62,7 +70,9 @@ public class MapLocationService {
         return mapLocationRepository.findByNovelIdAndLocationType(novelId, locationType);
     }
 
-    public MapLocation addTagToMapLocation(Long locationId, Long tagId) {
+    public MapLocation addTagToMapLocation(Long novelId, Long locationId, Long tagId) {
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         MapLocation location = mapLocationRepository.findById(locationId)
                 .orElseThrow(() -> new RuntimeException("Map Location not found"));
         Tag tag = tagRepository.findById(tagId)
@@ -72,7 +82,9 @@ public class MapLocationService {
         return mapLocationRepository.save(location);
     }
 
-    public MapLocation removeTagFromMapLocation(Long locationId, Long tagId) {
+    public MapLocation removeTagFromMapLocation(Long novelId, Long locationId, Long tagId) {
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         MapLocation location = mapLocationRepository.findById(locationId)
                 .orElseThrow(() -> new RuntimeException("Map Location not found"));
 
@@ -80,7 +92,9 @@ public class MapLocationService {
         return mapLocationRepository.save(location);
     }
 
-    public MapLocation setMapLocationTags(Long locationId, Set<Long> tagIds) {
+    public MapLocation setMapLocationTags(Long novelId, Long locationId, Set<Long> tagIds) {
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
+        scope.requireAll(com.novelwriting.entity.Tag.class, novelId, tagIds);
         MapLocation location = mapLocationRepository.findById(locationId)
                 .orElseThrow(() -> new RuntimeException("Map Location not found"));
 

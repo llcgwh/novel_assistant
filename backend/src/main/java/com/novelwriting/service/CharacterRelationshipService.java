@@ -8,7 +8,11 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class CharacterRelationshipService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private CharacterRelationshipRepository relationshipRepository;
@@ -18,18 +22,26 @@ public class CharacterRelationshipService {
     }
 
     public List<CharacterRelationship> getRelationshipsByCharacterId(Long novelId, Long characterId) {
+        scope.require(com.novelwriting.entity.Character.class, novelId, characterId);
         return relationshipRepository.findByNovelIdAndCharacterId(novelId, characterId);
     }
 
-    public Optional<CharacterRelationship> getRelationshipById(Long id) {
+    public Optional<CharacterRelationship> getRelationshipById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.CharacterRelationship.class, novelId, id);
         return relationshipRepository.findById(id);
     }
 
     public CharacterRelationship createRelationship(CharacterRelationship relationship) {
+        Long novelId = relationship.getNovelId();
+        scope.requireNovel(novelId);
+        relationship.setId(null);
+        scope.validateLinks(relationship, novelId, null);
         return relationshipRepository.save(relationship);
     }
 
-    public CharacterRelationship updateRelationship(Long id, CharacterRelationship relationshipDetails) {
+    public CharacterRelationship updateRelationship(Long novelId, Long id, CharacterRelationship relationshipDetails) {
+        scope.require(com.novelwriting.entity.CharacterRelationship.class, novelId, id);
+        scope.validateLinks(relationshipDetails, novelId, id);
         CharacterRelationship relationship = relationshipRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Relationship not found"));
 
@@ -41,7 +53,8 @@ public class CharacterRelationshipService {
         return relationshipRepository.save(relationship);
     }
 
-    public void deleteRelationship(Long id) {
+    public void deleteRelationship(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.CharacterRelationship.class, novelId, id);
         relationshipRepository.deleteById(id);
     }
 }

@@ -11,7 +11,11 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class OutlineService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private OutlineRepository outlineRepository;
@@ -19,23 +23,26 @@ public class OutlineService {
     @Autowired
     private TagRepository tagRepository;
 
-    public List<Outline> getAllOutlines() {
-        return outlineRepository.findAll();
-    }
-
     public List<Outline> getOutlinesByNovelId(Long novelId) {
         return outlineRepository.findByNovelIdWithTags(novelId);
     }
 
-    public Optional<Outline> getOutlineById(Long id) {
+    public Optional<Outline> getOutlineById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Outline.class, novelId, id);
         return outlineRepository.findById(id);
     }
 
     public Outline createOutline(Outline outline) {
+        Long novelId = outline.getNovelId();
+        scope.requireNovel(novelId);
+        outline.setId(null);
+        scope.validateLinks(outline, novelId, null);
         return outlineRepository.save(outline);
     }
 
-    public Outline updateOutline(Long id, Outline outlineDetails) {
+    public Outline updateOutline(Long novelId, Long id, Outline outlineDetails) {
+        scope.require(com.novelwriting.entity.Outline.class, novelId, id);
+        scope.validateLinks(outlineDetails, novelId, id);
         Outline outline = outlineRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Outline not found"));
 
@@ -48,7 +55,8 @@ public class OutlineService {
         return outlineRepository.save(outline);
     }
 
-    public void deleteOutline(Long id) {
+    public void deleteOutline(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Outline.class, novelId, id);
         outlineRepository.deleteById(id);
     }
 
@@ -60,7 +68,9 @@ public class OutlineService {
         return outlineRepository.findByNovelIdAndStatus(novelId, status);
     }
 
-    public Outline addTagToOutline(Long outlineId, Long tagId) {
+    public Outline addTagToOutline(Long novelId, Long outlineId, Long tagId) {
+        scope.require(com.novelwriting.entity.Outline.class, novelId, outlineId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         Outline outline = outlineRepository.findById(outlineId)
                 .orElseThrow(() -> new RuntimeException("Outline not found"));
         Tag tag = tagRepository.findById(tagId)
@@ -70,7 +80,9 @@ public class OutlineService {
         return outlineRepository.save(outline);
     }
 
-    public Outline removeTagFromOutline(Long outlineId, Long tagId) {
+    public Outline removeTagFromOutline(Long novelId, Long outlineId, Long tagId) {
+        scope.require(com.novelwriting.entity.Outline.class, novelId, outlineId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         Outline outline = outlineRepository.findById(outlineId)
                 .orElseThrow(() -> new RuntimeException("Outline not found"));
 
@@ -78,7 +90,9 @@ public class OutlineService {
         return outlineRepository.save(outline);
     }
 
-    public Outline setOutlineTags(Long outlineId, Set<Long> tagIds) {
+    public Outline setOutlineTags(Long novelId, Long outlineId, Set<Long> tagIds) {
+        scope.require(com.novelwriting.entity.Outline.class, novelId, outlineId);
+        scope.requireAll(com.novelwriting.entity.Tag.class, novelId, tagIds);
         Outline outline = outlineRepository.findById(outlineId)
                 .orElseThrow(() -> new RuntimeException("Outline not found"));
 

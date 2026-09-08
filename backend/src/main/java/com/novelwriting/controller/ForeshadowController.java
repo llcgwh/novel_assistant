@@ -23,7 +23,7 @@ public class ForeshadowController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Foreshadow> getForeshadowById(@PathVariable Long novelId, @PathVariable Long id) {
-        return foreshadowService.getForeshadowById(id)
+        return foreshadowService.getForeshadowById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -37,7 +37,9 @@ public class ForeshadowController {
     @PutMapping("/{id}")
     public ResponseEntity<Foreshadow> updateForeshadow(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Foreshadow foreshadow) {
         try {
-            return ResponseEntity.ok(foreshadowService.updateForeshadow(id, foreshadow));
+            return ResponseEntity.ok(foreshadowService.updateForeshadow(novelId, id, foreshadow));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -45,7 +47,7 @@ public class ForeshadowController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteForeshadow(@PathVariable Long novelId, @PathVariable Long id) {
-        foreshadowService.deleteForeshadow(id);
+        foreshadowService.deleteForeshadow(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -62,7 +64,9 @@ public class ForeshadowController {
     @PostMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Foreshadow> addTagToForeshadow(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(foreshadowService.addTagToForeshadow(id, tagId));
+            return ResponseEntity.ok(foreshadowService.addTagToForeshadow(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -71,7 +75,9 @@ public class ForeshadowController {
     @DeleteMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Foreshadow> removeTagFromForeshadow(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(foreshadowService.removeTagFromForeshadow(id, tagId));
+            return ResponseEntity.ok(foreshadowService.removeTagFromForeshadow(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -80,7 +86,9 @@ public class ForeshadowController {
     @PutMapping("/{id}/tags")
     public ResponseEntity<Foreshadow> setForeshadowTags(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
         try {
-            return ResponseEntity.ok(foreshadowService.setForeshadowTags(id, tagIds));
+            return ResponseEntity.ok(foreshadowService.setForeshadowTags(novelId, id, tagIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

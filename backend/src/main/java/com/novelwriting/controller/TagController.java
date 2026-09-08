@@ -22,7 +22,7 @@ public class TagController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Tag> getTagById(@PathVariable Long novelId, @PathVariable Long id) {
-        return tagService.getTagById(id)
+        return tagService.getTagById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -36,7 +36,9 @@ public class TagController {
     @PutMapping("/{id}")
     public ResponseEntity<Tag> updateTag(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Tag tag) {
         try {
-            return ResponseEntity.ok(tagService.updateTag(id, tag));
+            return ResponseEntity.ok(tagService.updateTag(novelId, id, tag));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -44,7 +46,7 @@ public class TagController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTag(@PathVariable Long novelId, @PathVariable Long id) {
-        tagService.deleteTag(id);
+        tagService.deleteTag(novelId, id);
         return ResponseEntity.ok().build();
     }
 

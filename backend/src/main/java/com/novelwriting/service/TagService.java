@@ -8,7 +8,11 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class TagService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private TagRepository tagRepository;
@@ -17,15 +21,22 @@ public class TagService {
         return tagRepository.findByNovelId(novelId);
     }
 
-    public Optional<Tag> getTagById(Long id) {
+    public Optional<Tag> getTagById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Tag.class, novelId, id);
         return tagRepository.findById(id);
     }
 
     public Tag createTag(Tag tag) {
+        Long novelId = tag.getNovelId();
+        scope.requireNovel(novelId);
+        tag.setId(null);
+        scope.validateLinks(tag, novelId, null);
         return tagRepository.save(tag);
     }
 
-    public Tag updateTag(Long id, Tag tagDetails) {
+    public Tag updateTag(Long novelId, Long id, Tag tagDetails) {
+        scope.require(com.novelwriting.entity.Tag.class, novelId, id);
+        scope.validateLinks(tagDetails, novelId, id);
         Tag tag = tagRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tag not found"));
 
@@ -36,7 +47,8 @@ public class TagService {
         return tagRepository.save(tag);
     }
 
-    public void deleteTag(Long id) {
+    public void deleteTag(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Tag.class, novelId, id);
         tagRepository.deleteById(id);
     }
 

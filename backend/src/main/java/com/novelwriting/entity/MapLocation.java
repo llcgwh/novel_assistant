@@ -9,7 +9,7 @@ import java.util.Set;
 @Data
 @Entity
 @Table(name = "map_locations")
-public class MapLocation {
+public class MapLocation implements NovelOwned {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

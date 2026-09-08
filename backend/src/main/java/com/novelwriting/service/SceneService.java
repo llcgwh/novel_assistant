@@ -13,7 +13,11 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class SceneService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private SceneRepository sceneRepository;
@@ -24,23 +28,26 @@ public class SceneService {
     @Autowired
     private MapLocationRepository mapLocationRepository;
 
-    public List<Scene> getAllScenes() {
-        return sceneRepository.findAll();
-    }
-
     public List<Scene> getScenesByNovelId(Long novelId) {
         return sceneRepository.findByNovelIdWithTags(novelId);
     }
 
-    public Optional<Scene> getSceneById(Long id) {
+    public Optional<Scene> getSceneById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, id);
         return sceneRepository.findById(id);
     }
 
     public Scene createScene(Scene scene) {
+        Long novelId = scene.getNovelId();
+        scope.requireNovel(novelId);
+        scene.setId(null);
+        scope.validateLinks(scene, novelId, null);
         return sceneRepository.save(scene);
     }
 
-    public Scene updateScene(Long id, Scene sceneDetails) {
+    public Scene updateScene(Long novelId, Long id, Scene sceneDetails) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, id);
+        scope.validateLinks(sceneDetails, novelId, id);
         Scene scene = sceneRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
 
@@ -53,7 +60,8 @@ public class SceneService {
         return sceneRepository.save(scene);
     }
 
-    public void deleteScene(Long id) {
+    public void deleteScene(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, id);
         sceneRepository.deleteById(id);
     }
 
@@ -61,7 +69,9 @@ public class SceneService {
         return sceneRepository.searchByNovelIdAndKeyword(novelId, keyword);
     }
 
-    public Scene addTagToScene(Long sceneId, Long tagId) {
+    public Scene addTagToScene(Long novelId, Long sceneId, Long tagId) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
         Tag tag = tagRepository.findById(tagId)
@@ -71,7 +81,9 @@ public class SceneService {
         return sceneRepository.save(scene);
     }
 
-    public Scene removeTagFromScene(Long sceneId, Long tagId) {
+    public Scene removeTagFromScene(Long novelId, Long sceneId, Long tagId) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
 
@@ -79,7 +91,9 @@ public class SceneService {
         return sceneRepository.save(scene);
     }
 
-    public Scene setSceneTags(Long sceneId, Set<Long> tagIds) {
+    public Scene setSceneTags(Long novelId, Long sceneId, Set<Long> tagIds) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
+        scope.requireAll(com.novelwriting.entity.Tag.class, novelId, tagIds);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
 
@@ -93,7 +107,9 @@ public class SceneService {
         return sceneRepository.save(scene);
     }
 
-    public Scene addMapLocationToScene(Long sceneId, Long locationId) {
+    public Scene addMapLocationToScene(Long novelId, Long sceneId, Long locationId) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
         MapLocation location = mapLocationRepository.findById(locationId)
@@ -103,7 +119,9 @@ public class SceneService {
         return sceneRepository.save(scene);
     }
 
-    public Scene removeMapLocationFromScene(Long sceneId, Long locationId) {
+    public Scene removeMapLocationFromScene(Long novelId, Long sceneId, Long locationId) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
+        scope.require(com.novelwriting.entity.MapLocation.class, novelId, locationId);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
 
@@ -111,7 +129,9 @@ public class SceneService {
         return sceneRepository.save(scene);
     }
 
-    public Scene setSceneMapLocations(Long sceneId, Set<Long> locationIds) {
+    public Scene setSceneMapLocations(Long novelId, Long sceneId, Set<Long> locationIds) {
+        scope.require(com.novelwriting.entity.Scene.class, novelId, sceneId);
+        scope.requireAll(com.novelwriting.entity.MapLocation.class, novelId, locationIds);
         Scene scene = sceneRepository.findById(sceneId)
                 .orElseThrow(() -> new RuntimeException("Scene not found"));
 

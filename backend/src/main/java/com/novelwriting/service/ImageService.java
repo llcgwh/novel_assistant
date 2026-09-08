@@ -16,7 +16,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class ImageService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private ImageRepository imageRepository;
@@ -32,11 +36,13 @@ public class ImageService {
         return imageRepository.findByNovelIdAndImageType(novelId, imageType);
     }
 
-    public Optional<Image> getImageById(Long id) {
+    public Optional<Image> getImageById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Image.class, novelId, id);
         return imageRepository.findById(id);
     }
 
     public Image uploadImage(Long novelId, MultipartFile file, String imageType) throws IOException {
+        scope.requireNovel(novelId);
         // 验证上传的文件
         if (file.isEmpty()) {
             throw new IOException("Cannot upload empty file");
@@ -108,7 +114,8 @@ public class ImageService {
                ".bmp".equals(lowerExt) || ".webp".equals(lowerExt);
     }
 
-    public void deleteImage(Long id) throws IOException {
+    public void deleteImage(Long novelId, Long id) throws IOException {
+        scope.require(com.novelwriting.entity.Image.class, novelId, id);
         Image image = imageRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Image not found"));
 

@@ -11,7 +11,11 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class ForeshadowService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private ForeshadowRepository foreshadowRepository;
@@ -19,23 +23,26 @@ public class ForeshadowService {
     @Autowired
     private TagRepository tagRepository;
 
-    public List<Foreshadow> getAllForeshadows() {
-        return foreshadowRepository.findAll();
-    }
-
     public List<Foreshadow> getForeshadowsByNovelId(Long novelId) {
         return foreshadowRepository.findByNovelIdWithTags(novelId);
     }
 
-    public Optional<Foreshadow> getForeshadowById(Long id) {
+    public Optional<Foreshadow> getForeshadowById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, id);
         return foreshadowRepository.findById(id);
     }
 
     public Foreshadow createForeshadow(Foreshadow foreshadow) {
+        Long novelId = foreshadow.getNovelId();
+        scope.requireNovel(novelId);
+        foreshadow.setId(null);
+        scope.validateLinks(foreshadow, novelId, null);
         return foreshadowRepository.save(foreshadow);
     }
 
-    public Foreshadow updateForeshadow(Long id, Foreshadow foreshadowDetails) {
+    public Foreshadow updateForeshadow(Long novelId, Long id, Foreshadow foreshadowDetails) {
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, id);
+        scope.validateLinks(foreshadowDetails, novelId, id);
         Foreshadow foreshadow = foreshadowRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Foreshadow not found"));
 
@@ -48,7 +55,8 @@ public class ForeshadowService {
         return foreshadowRepository.save(foreshadow);
     }
 
-    public void deleteForeshadow(Long id) {
+    public void deleteForeshadow(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, id);
         foreshadowRepository.deleteById(id);
     }
 
@@ -60,7 +68,9 @@ public class ForeshadowService {
         return foreshadowRepository.findByNovelIdAndStatus(novelId, status);
     }
 
-    public Foreshadow addTagToForeshadow(Long foreshadowId, Long tagId) {
+    public Foreshadow addTagToForeshadow(Long novelId, Long foreshadowId, Long tagId) {
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, foreshadowId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         Foreshadow foreshadow = foreshadowRepository.findById(foreshadowId)
                 .orElseThrow(() -> new RuntimeException("Foreshadow not found"));
         Tag tag = tagRepository.findById(tagId)
@@ -70,7 +80,9 @@ public class ForeshadowService {
         return foreshadowRepository.save(foreshadow);
     }
 
-    public Foreshadow removeTagFromForeshadow(Long foreshadowId, Long tagId) {
+    public Foreshadow removeTagFromForeshadow(Long novelId, Long foreshadowId, Long tagId) {
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, foreshadowId);
+        scope.require(com.novelwriting.entity.Tag.class, novelId, tagId);
         Foreshadow foreshadow = foreshadowRepository.findById(foreshadowId)
                 .orElseThrow(() -> new RuntimeException("Foreshadow not found"));
 
@@ -78,7 +90,9 @@ public class ForeshadowService {
         return foreshadowRepository.save(foreshadow);
     }
 
-    public Foreshadow setForeshadowTags(Long foreshadowId, Set<Long> tagIds) {
+    public Foreshadow setForeshadowTags(Long novelId, Long foreshadowId, Set<Long> tagIds) {
+        scope.require(com.novelwriting.entity.Foreshadow.class, novelId, foreshadowId);
+        scope.requireAll(com.novelwriting.entity.Tag.class, novelId, tagIds);
         Foreshadow foreshadow = foreshadowRepository.findById(foreshadowId)
                 .orElseThrow(() -> new RuntimeException("Foreshadow not found"));
 

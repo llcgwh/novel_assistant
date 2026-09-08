@@ -23,7 +23,7 @@ public class OutlineController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Outline> getOutlineById(@PathVariable Long novelId, @PathVariable Long id) {
-        return outlineService.getOutlineById(id)
+        return outlineService.getOutlineById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -37,7 +37,9 @@ public class OutlineController {
     @PutMapping("/{id}")
     public ResponseEntity<Outline> updateOutline(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Outline outline) {
         try {
-            return ResponseEntity.ok(outlineService.updateOutline(id, outline));
+            return ResponseEntity.ok(outlineService.updateOutline(novelId, id, outline));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -45,7 +47,7 @@ public class OutlineController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOutline(@PathVariable Long novelId, @PathVariable Long id) {
-        outlineService.deleteOutline(id);
+        outlineService.deleteOutline(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -62,7 +64,9 @@ public class OutlineController {
     @PostMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Outline> addTagToOutline(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(outlineService.addTagToOutline(id, tagId));
+            return ResponseEntity.ok(outlineService.addTagToOutline(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -71,7 +75,9 @@ public class OutlineController {
     @DeleteMapping("/{id}/tags/{tagId}")
     public ResponseEntity<Outline> removeTagFromOutline(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(outlineService.removeTagFromOutline(id, tagId));
+            return ResponseEntity.ok(outlineService.removeTagFromOutline(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -80,7 +86,9 @@ public class OutlineController {
     @PutMapping("/{id}/tags")
     public ResponseEntity<Outline> setOutlineTags(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
         try {
-            return ResponseEntity.ok(outlineService.setOutlineTags(id, tagIds));
+            return ResponseEntity.ok(outlineService.setOutlineTags(novelId, id, tagIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

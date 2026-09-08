@@ -14,7 +14,11 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class RelationshipGroupService {
+
+    @Autowired
+    private NovelScope scope;
 
     @Autowired
     private RelationshipGroupRepository groupRepository;
@@ -26,15 +30,22 @@ public class RelationshipGroupService {
         return groupRepository.findByNovelId(novelId);
     }
 
-    public Optional<RelationshipGroup> getGroupById(Long id) {
+    public Optional<RelationshipGroup> getGroupById(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.RelationshipGroup.class, novelId, id);
         return groupRepository.findById(id);
     }
 
     public RelationshipGroup createGroup(RelationshipGroup group) {
+        Long novelId = group.getNovelId();
+        scope.requireNovel(novelId);
+        group.setId(null);
+        scope.validateLinks(group, novelId, null);
         return groupRepository.save(group);
     }
 
-    public RelationshipGroup updateGroup(Long id, RelationshipGroup groupDetails) {
+    public RelationshipGroup updateGroup(Long novelId, Long id, RelationshipGroup groupDetails) {
+        scope.require(com.novelwriting.entity.RelationshipGroup.class, novelId, id);
+        scope.validateLinks(groupDetails, novelId, id);
         RelationshipGroup group = groupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Relationship group not found"));
 
@@ -45,12 +56,15 @@ public class RelationshipGroupService {
         return groupRepository.save(group);
     }
 
-    public void deleteGroup(Long id) {
+    public void deleteGroup(Long novelId, Long id) {
+        scope.require(com.novelwriting.entity.RelationshipGroup.class, novelId, id);
         groupRepository.deleteById(id);
     }
 
     @Transactional
-    public RelationshipGroup setCharacters(Long groupId, Set<Long> characterIds) {
+    public RelationshipGroup setCharacters(Long novelId, Long groupId, Set<Long> characterIds) {
+        scope.require(com.novelwriting.entity.RelationshipGroup.class, novelId, groupId);
+        scope.requireAll(com.novelwriting.entity.Character.class, novelId, characterIds);
         RelationshipGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Relationship group not found"));
 
@@ -64,7 +78,9 @@ public class RelationshipGroupService {
     }
 
     @Transactional
-    public RelationshipGroup addCharacter(Long groupId, Long characterId) {
+    public RelationshipGroup addCharacter(Long novelId, Long groupId, Long characterId) {
+        scope.require(com.novelwriting.entity.RelationshipGroup.class, novelId, groupId);
+        scope.require(com.novelwriting.entity.Character.class, novelId, characterId);
         RelationshipGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Relationship group not found"));
 
@@ -76,12 +92,26 @@ public class RelationshipGroupService {
     }
 
     @Transactional
-    public RelationshipGroup removeCharacter(Long groupId, Long characterId) {
+    public RelationshipGroup removeCharacter(Long novelId, Long groupId, Long characterId) {
+        scope.require(com.novelwriting.entity.RelationshipGroup.class, novelId, groupId);
+        scope.require(com.novelwriting.entity.Character.class, novelId, characterId);
         RelationshipGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Relationship group not found"));
 
         group.getCharacters().removeIf(c -> c.getId().equals(characterId));
 
         return groupRepository.save(group);
+    }
+    public RelationshipGroup createGroupWithMembers(RelationshipGroup group, Set<Long> characterIds) {
+        if (characterIds != null) scope.requireAll(Character.class, group.getNovelId(), characterIds);
+        RelationshipGroup created = createGroup(group);
+        return characterIds == null ? created : setCharacters(group.getNovelId(), created.getId(), characterIds);
+    }
+
+    public RelationshipGroup updateGroupWithMembers(Long novelId, Long id, RelationshipGroup details, Set<Long> characterIds) {
+        scope.require(RelationshipGroup.class, novelId, id);
+        if (characterIds != null) scope.requireAll(Character.class, novelId, characterIds);
+        RelationshipGroup updated = updateGroup(novelId, id, details);
+        return characterIds == null ? updated : setCharacters(novelId, id, characterIds);
     }
 }

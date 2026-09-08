@@ -25,7 +25,7 @@ public class RelationshipGroupController {
     @GetMapping("/{id}")
     public ResponseEntity<RelationshipGroup> getGroupById(
             @PathVariable Long novelId, @PathVariable Long id) {
-        return groupService.getGroupById(id)
+        return groupService.getGroupById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -39,14 +39,7 @@ public class RelationshipGroupController {
         group.setDescription(request.getDescription());
         group.setParentGroupId(request.getParentGroupId());
 
-        RelationshipGroup saved = groupService.createGroup(group);
-
-        if (request.getCharacterIds() != null && !request.getCharacterIds().isEmpty()) {
-            groupService.setCharacters(saved.getId(), request.getCharacterIds());
-            return groupService.getGroupById(saved.getId()).orElse(saved);
-        }
-
-        return saved;
+        return groupService.createGroupWithMembers(group, request.getCharacterIds());
     }
 
     @PutMapping("/{id}")
@@ -59,14 +52,10 @@ public class RelationshipGroupController {
             details.setDescription(request.getDescription());
             details.setParentGroupId(request.getParentGroupId());
 
-            RelationshipGroup updated = groupService.updateGroup(id, details);
-
-            if (request.getCharacterIds() != null) {
-                groupService.setCharacters(id, request.getCharacterIds());
-                updated = groupService.getGroupById(id).orElse(updated);
-            }
-
-            return ResponseEntity.ok(updated);
+            return ResponseEntity.ok(groupService.updateGroupWithMembers(
+                    novelId, id, details, request.getCharacterIds()));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -74,7 +63,7 @@ public class RelationshipGroupController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGroup(@PathVariable Long novelId, @PathVariable Long id) {
-        groupService.deleteGroup(id);
+        groupService.deleteGroup(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -83,7 +72,9 @@ public class RelationshipGroupController {
             @PathVariable Long novelId, @PathVariable Long id,
             @RequestBody Set<Long> characterIds) {
         try {
-            return ResponseEntity.ok(groupService.setCharacters(id, characterIds));
+            return ResponseEntity.ok(groupService.setCharacters(novelId, id, characterIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -94,7 +85,9 @@ public class RelationshipGroupController {
             @PathVariable Long novelId, @PathVariable Long id,
             @PathVariable Long characterId) {
         try {
-            return ResponseEntity.ok(groupService.addCharacter(id, characterId));
+            return ResponseEntity.ok(groupService.addCharacter(novelId, id, characterId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -105,7 +98,9 @@ public class RelationshipGroupController {
             @PathVariable Long novelId, @PathVariable Long id,
             @PathVariable Long characterId) {
         try {
-            return ResponseEntity.ok(groupService.removeCharacter(id, characterId));
+            return ResponseEntity.ok(groupService.removeCharacter(novelId, id, characterId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

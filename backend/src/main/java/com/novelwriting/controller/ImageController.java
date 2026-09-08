@@ -42,7 +42,7 @@ public class ImageController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Image> getImageById(@PathVariable Long novelId, @PathVariable Long id) {
-        return imageService.getImageById(id)
+        return imageService.getImageById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -63,7 +63,7 @@ public class ImageController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteImage(@PathVariable Long novelId, @PathVariable Long id) {
         try {
-            imageService.deleteImage(id);
+            imageService.deleteImage(novelId, id);
             return ResponseEntity.ok().build();
         } catch (IOException e) {
             return ResponseEntity.internalServerError().build();
@@ -73,7 +73,7 @@ public class ImageController {
     @GetMapping("/{id}/file")
     public ResponseEntity<Resource> getImageFile(@PathVariable Long novelId, @PathVariable Long id) {
         try {
-            Image image = imageService.getImageById(id)
+            Image image = imageService.getImageById(novelId, id)
                     .orElseThrow(() -> new RuntimeException("Image not found"));
 
             // 验证文件路径安全性，防止路径遍历
@@ -99,6 +99,8 @@ public class ImageController {
             } else {
                 return ResponseEntity.notFound().build();
             }
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

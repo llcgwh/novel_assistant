@@ -25,7 +25,7 @@ public class TimelineEventController {
 
     @GetMapping("/{id}")
     public ResponseEntity<TimelineEvent> getTimelineEventById(@PathVariable Long novelId, @PathVariable Long id) {
-        return timelineEventService.getTimelineEventById(id)
+        return timelineEventService.getTimelineEventById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -39,7 +39,9 @@ public class TimelineEventController {
     @PutMapping("/{id}")
     public ResponseEntity<TimelineEvent> updateTimelineEvent(@PathVariable Long novelId, @PathVariable Long id, @RequestBody TimelineEvent event) {
         try {
-            return ResponseEntity.ok(timelineEventService.updateTimelineEvent(id, event));
+            return ResponseEntity.ok(timelineEventService.updateTimelineEvent(novelId, id, event));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -47,7 +49,7 @@ public class TimelineEventController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTimelineEvent(@PathVariable Long novelId, @PathVariable Long id) {
-        timelineEventService.deleteTimelineEvent(id);
+        timelineEventService.deleteTimelineEvent(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -59,7 +61,9 @@ public class TimelineEventController {
     @PostMapping("/{id}/characters")
     public ResponseEntity<TimelineEvent> addCharactersToEvent(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> characterIds) {
         try {
-            return ResponseEntity.ok(timelineEventService.addCharactersToEvent(id, characterIds));
+            return ResponseEntity.ok(timelineEventService.addCharactersToEvent(novelId, id, characterIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -68,7 +72,9 @@ public class TimelineEventController {
     @PostMapping("/{id}/scenes")
     public ResponseEntity<TimelineEvent> addScenesToEvent(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> sceneIds) {
         try {
-            return ResponseEntity.ok(timelineEventService.addScenesToEvent(id, sceneIds));
+            return ResponseEntity.ok(timelineEventService.addScenesToEvent(novelId, id, sceneIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -77,7 +83,9 @@ public class TimelineEventController {
     @PostMapping("/{id}/foreshadows")
     public ResponseEntity<TimelineEvent> addForeshadowsToEvent(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> foreshadowIds) {
         try {
-            return ResponseEntity.ok(timelineEventService.addForeshadowsToEvent(id, foreshadowIds));
+            return ResponseEntity.ok(timelineEventService.addForeshadowsToEvent(novelId, id, foreshadowIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -86,7 +94,9 @@ public class TimelineEventController {
     @PostMapping("/{id}/outlines")
     public ResponseEntity<TimelineEvent> addOutlinesToEvent(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> outlineIds) {
         try {
-            return ResponseEntity.ok(timelineEventService.addOutlinesToEvent(id, outlineIds));
+            return ResponseEntity.ok(timelineEventService.addOutlinesToEvent(novelId, id, outlineIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -95,7 +105,9 @@ public class TimelineEventController {
     @DeleteMapping("/{id}/characters/{characterId}")
     public ResponseEntity<TimelineEvent> removeCharacterFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long characterId) {
         try {
-            return ResponseEntity.ok(timelineEventService.removeCharactersFromEvent(id, characterId));
+            return ResponseEntity.ok(timelineEventService.removeCharactersFromEvent(novelId, id, characterId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -104,7 +116,9 @@ public class TimelineEventController {
     @DeleteMapping("/{id}/scenes/{sceneId}")
     public ResponseEntity<TimelineEvent> removeSceneFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long sceneId) {
         try {
-            return ResponseEntity.ok(timelineEventService.removeScenesFromEvent(id, sceneId));
+            return ResponseEntity.ok(timelineEventService.removeScenesFromEvent(novelId, id, sceneId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -113,7 +127,9 @@ public class TimelineEventController {
     @DeleteMapping("/{id}/foreshadows/{foreshadowId}")
     public ResponseEntity<TimelineEvent> removeForeshadowFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long foreshadowId) {
         try {
-            return ResponseEntity.ok(timelineEventService.removeForeshadowsFromEvent(id, foreshadowId));
+            return ResponseEntity.ok(timelineEventService.removeForeshadowsFromEvent(novelId, id, foreshadowId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -122,7 +138,9 @@ public class TimelineEventController {
     @DeleteMapping("/{id}/outlines/{outlineId}")
     public ResponseEntity<TimelineEvent> removeOutlineFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long outlineId) {
         try {
-            return ResponseEntity.ok(timelineEventService.removeOutlinesFromEvent(id, outlineId));
+            return ResponseEntity.ok(timelineEventService.removeOutlinesFromEvent(novelId, id, outlineId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -150,8 +168,9 @@ public class TimelineEventController {
                     ((java.util.List<Integer>) relations.getOrDefault("outlineIds", java.util.List.of())).stream()
                             .map(Long::valueOf).toList());
 
-            return ResponseEntity.ok(timelineEventService.updateEventRelations(
-                    id, characterIds, sceneIds, foreshadowIds, outlineIds));
+            return ResponseEntity.ok(timelineEventService.updateEventRelations(novelId, id, characterIds, sceneIds, foreshadowIds, outlineIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -160,7 +179,9 @@ public class TimelineEventController {
     @PostMapping("/{id}/tags/{tagId}")
     public ResponseEntity<TimelineEvent> addTagToEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(timelineEventService.addTagToEvent(id, tagId));
+            return ResponseEntity.ok(timelineEventService.addTagToEvent(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -169,7 +190,9 @@ public class TimelineEventController {
     @DeleteMapping("/{id}/tags/{tagId}")
     public ResponseEntity<TimelineEvent> removeTagFromEvent(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(timelineEventService.removeTagFromEvent(id, tagId));
+            return ResponseEntity.ok(timelineEventService.removeTagFromEvent(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -178,7 +201,9 @@ public class TimelineEventController {
     @PutMapping("/{id}/tags")
     public ResponseEntity<TimelineEvent> setEventTags(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
         try {
-            return ResponseEntity.ok(timelineEventService.setEventTags(id, tagIds));
+            return ResponseEntity.ok(timelineEventService.setEventTags(novelId, id, tagIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @Data
 @Entity
 @Table(name = "images")
-public class Image {
+public class Image implements NovelOwned {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

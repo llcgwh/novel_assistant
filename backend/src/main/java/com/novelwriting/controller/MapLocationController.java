@@ -23,7 +23,7 @@ public class MapLocationController {
 
     @GetMapping("/{id}")
     public ResponseEntity<MapLocation> getMapLocationById(@PathVariable Long novelId, @PathVariable Long id) {
-        return mapLocationService.getMapLocationById(id)
+        return mapLocationService.getMapLocationById(novelId, id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -37,7 +37,9 @@ public class MapLocationController {
     @PutMapping("/{id}")
     public ResponseEntity<MapLocation> updateMapLocation(@PathVariable Long novelId, @PathVariable Long id, @RequestBody MapLocation location) {
         try {
-            return ResponseEntity.ok(mapLocationService.updateMapLocation(id, location));
+            return ResponseEntity.ok(mapLocationService.updateMapLocation(novelId, id, location));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -45,7 +47,7 @@ public class MapLocationController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMapLocation(@PathVariable Long novelId, @PathVariable Long id) {
-        mapLocationService.deleteMapLocation(id);
+        mapLocationService.deleteMapLocation(novelId, id);
         return ResponseEntity.ok().build();
     }
 
@@ -62,7 +64,9 @@ public class MapLocationController {
     @PostMapping("/{id}/tags/{tagId}")
     public ResponseEntity<MapLocation> addTagToMapLocation(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(mapLocationService.addTagToMapLocation(id, tagId));
+            return ResponseEntity.ok(mapLocationService.addTagToMapLocation(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -71,7 +75,9 @@ public class MapLocationController {
     @DeleteMapping("/{id}/tags/{tagId}")
     public ResponseEntity<MapLocation> removeTagFromMapLocation(@PathVariable Long novelId, @PathVariable Long id, @PathVariable Long tagId) {
         try {
-            return ResponseEntity.ok(mapLocationService.removeTagFromMapLocation(id, tagId));
+            return ResponseEntity.ok(mapLocationService.removeTagFromMapLocation(novelId, id, tagId));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
@@ -80,7 +86,9 @@ public class MapLocationController {
     @PutMapping("/{id}/tags")
     public ResponseEntity<MapLocation> setMapLocationTags(@PathVariable Long novelId, @PathVariable Long id, @RequestBody Set<Long> tagIds) {
         try {
-            return ResponseEntity.ok(mapLocationService.setMapLocationTags(id, tagIds));
+            return ResponseEntity.ok(mapLocationService.setMapLocationTags(novelId, id, tagIds));
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
