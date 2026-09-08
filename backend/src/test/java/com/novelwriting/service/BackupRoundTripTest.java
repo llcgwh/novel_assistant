@@ -18,7 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 @DataJpaTest(showSql = false, properties = "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect")
-@Import({ImportService.class, ExportService.class})
+@Import({com.novelwriting.security.TestCredentials.class, ImportService.class, ExportService.class})
 class BackupRoundTripTest {
     @Autowired EntityManager em;
     @Autowired ImportService importer;

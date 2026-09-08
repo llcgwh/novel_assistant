@@ -41,7 +41,8 @@ public class Novel {
 
     @JsonIgnore
     @lombok.ToString.Exclude
-    @Column(name = "webdav_password", length = 500)
+    @Convert(converter = com.novelwriting.security.WebDavPasswordConverter.class)
+    @Column(name = "webdav_password", columnDefinition = "TEXT")
     private String webdavPassword;
 
     @Column(name = "webdav_auto_sync")

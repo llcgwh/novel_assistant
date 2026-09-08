@@ -24,3 +24,6 @@ Thumbs.db
 
 # Error logs
 后端报错.txt
+
+# Local credential encryption key (never commit or bundle)
+.secrets/

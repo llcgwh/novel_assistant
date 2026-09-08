@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @DataJpaTest(showSql = false, properties = "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect")
-@Import({NovelScope.class, SceneService.class, ForeshadowService.class, OutlineService.class,
+@Import({com.novelwriting.security.TestCredentials.class, NovelScope.class, SceneService.class, ForeshadowService.class, OutlineService.class,
         TimelineEventService.class, MapLocationService.class, CharacterRelationshipService.class,
         RelationshipGroupService.class, WorldviewEntryService.class, TagService.class, ImageService.class,
         SceneController.class, ForeshadowController.class, OutlineController.class, TimelineEventController.class,
