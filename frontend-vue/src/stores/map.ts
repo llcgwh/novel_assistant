@@ -54,11 +54,18 @@ export const useMapStore = defineStore('map', () => {
     await fetchLocations()
   }
 
-  function loadBackgroundFromStorage(novelId: number) {
-    const savedBgId = localStorage.getItem(`mapBackground_${novelId}`)
-    if (savedBgId) {
-      backgroundImageId.value = parseInt(savedBgId)
-      backgroundImageUrl.value = imagesApi.getFileUrl(backgroundImageId.value)
+  async function loadBackgroundFromStorage(novelId: number) {
+    backgroundImageId.value = null
+    backgroundImageUrl.value = null
+    const saved = localStorage.getItem(`mapBackground_${novelId}`)
+    if (saved === 'none') return
+    const images = await imagesApi.getByType('map_background')
+    const selected = images.find(image => image.id === Number(saved))
+      || images.sort((a, b) => b.id - a.id)[0]
+    if (selected) {
+      backgroundImageId.value = selected.id
+      backgroundImageUrl.value = imagesApi.getFileUrl(selected.id)
+      localStorage.setItem(`mapBackground_${novelId}`, String(selected.id))
     }
   }
 
@@ -72,7 +79,7 @@ export const useMapStore = defineStore('map', () => {
   function clearBackground(novelId: number) {
     backgroundImageUrl.value = null
     backgroundImageId.value = null
-    localStorage.removeItem(`mapBackground_${novelId}`)
+    localStorage.setItem(`mapBackground_${novelId}`, 'none')
   }
 
   function $reset() {

@@ -205,7 +205,7 @@ onMounted(async () => {
     tagsStore.fetchTags(),
     scenesStore.fetchScenes()
   ])
-  mapStore.loadBackgroundFromStorage(novelId)
+  await mapStore.loadBackgroundFromStorage(novelId)
   nextTick(() => drawMap())
 })
 

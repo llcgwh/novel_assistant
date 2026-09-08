@@ -7,7 +7,6 @@ import com.novelwriting.repository.NovelRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -20,10 +19,8 @@ public class WebDavSyncService {
     private NovelRepository novelRepository;
 
     @Autowired
-    private ExportService exportService;
+    private BackupBundleService backupBundleService;
 
-    @Autowired
-    private ImportService importService;
 
     public Map<String, Object> testConnection(String serverUrl, String username, String password) {
         Map<String, Object> result = new HashMap<>();
@@ -53,13 +50,13 @@ public class WebDavSyncService {
         try {
             Sardine sardine = SardineFactory.begin(novel.getWebdavUsername(), novel.getWebdavPassword());
 
-            byte[] exportData = exportService.exportNovelToJson(novelId);
+            byte[] exportData = backupBundleService.exportBundle(novelId);
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             String safeTitle = novel.getTitle().replaceAll("[^a-zA-Z0-9_\\-]", "_");
             if (safeTitle.length() > 40) {
                 safeTitle = safeTitle.substring(0, 40);
             }
-            String filename = safeTitle + "_" + timestamp + ".json";
+            String filename = safeTitle + "_" + timestamp + ".backup.json";
 
             String baseUrl = novel.getWebdavServerUrl();
             if (!baseUrl.endsWith("/")) {
@@ -120,19 +117,15 @@ public class WebDavSyncService {
             String downloadUrl = backupDir + remoteFilename;
 
             System.out.println("[WebDAV Sardine GET] URL: " + downloadUrl);
-            InputStream inputStream = sardine.get(downloadUrl);
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] chunk = new byte[8192];
-            int n;
-            while ((n = inputStream.read(chunk)) != -1) {
-                buffer.write(chunk, 0, n);
+            byte[] downloadedData;
+            try (InputStream inputStream = sardine.get(downloadUrl)) {
+                downloadedData = BackupBundleService.readLimited(inputStream, BackupBundleService.MAX_BACKUP_BYTES);
             }
-            inputStream.close();
-            byte[] downloadedData = buffer.toByteArray();
             System.out.println("[WebDAV Sardine GET] Downloaded: " + downloadedData.length + " bytes");
 
             // Import the downloaded JSON data into the database
-            importService.importFromJson(novelId, downloadedData);
+            backupBundleService.restore(novelId, downloadedData);
+            novel = novelRepository.findById(novelId).orElseThrow();
             System.out.println("[WebDAV Sardine GET] Import complete");
 
             novel.setLastWebdavSync(LocalDateTime.now());

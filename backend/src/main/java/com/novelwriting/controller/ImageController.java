@@ -77,8 +77,8 @@ public class ImageController {
                     .orElseThrow(() -> new RuntimeException("Image not found"));
 
             // 验证文件路径安全性，防止路径遍历
-            Path filePath = Paths.get(image.getFilePath()).normalize();
-            Path uploadDirPath = Paths.get(uploadDir).normalize();
+            Path filePath = Paths.get(image.getFilePath()).toAbsolutePath().normalize();
+            Path uploadDirPath = Paths.get(uploadDir).toAbsolutePath().normalize();
             
             if (!filePath.startsWith(uploadDirPath)) {
                 return ResponseEntity.badRequest().build();

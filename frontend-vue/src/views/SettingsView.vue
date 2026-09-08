@@ -5,6 +5,18 @@
       <button v-if="inNovel" class="btn-back" @click="goBack">← 返回</button>
     </div>
 
+    <div v-if="inNovel" class="settings-section">
+      <h3>备份与恢复</h3>
+      <p>包含小说数据和已上传图片。恢复会替换当前小说数据及封面；外部图片链接和浏览器外观设置不打包。</p>
+      <p>每张图片最多 8 MiB，图片总计最多 32 MiB，备份文件最多 48 MiB。</p>
+      <button class="btn-primary" :disabled="backupBusy" @click="backupApi.download(Number(route.params.novelId))">下载含图片备份</button>
+      <label class="btn-secondary">
+        从备份恢复
+        <input type="file" accept=".json,application/json" :disabled="backupBusy" @change="restoreLocalBackup" />
+      </label>
+      <p role="status">{{ backupMessage }}</p>
+    </div>
+
     <div class="settings-section">
       <h3>🖼️ 全局背景</h3>
       <div class="setting-row">
@@ -202,11 +214,35 @@ import { useAppStore } from '@/stores/app'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { webdavApi } from '@/api/webdav'
+import { backupApi } from '@/api/backup'
 import type { RemoteFile } from '@/types/webdav'
 
 const appStore = useAppStore()
 const router = useRouter()
 const route = useRoute()
+
+const backupBusy = ref(false)
+const backupMessage = ref('')
+async function restoreLocalBackup(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || backupBusy.value) return
+  if (file.size > 48 * 1024 * 1024) { backupMessage.value = '备份文件超过 48 MiB'; return }
+  if (!confirm('恢复将替换当前小说数据及封面。确定继续？')) return
+  backupBusy.value = true
+  backupMessage.value = '正在恢复…'
+  try {
+    await backupApi.restore(Number(route.params.novelId), file)
+    localStorage.removeItem(`mapBackground_${route.params.novelId}`)
+    window.location.reload()
+  } catch (error: unknown) {
+    const failure = error as { response?: { data?: { message?: string } } }
+    backupMessage.value = failure.response?.data?.message || '恢复失败，请检查备份文件或网络连接'
+  } finally {
+    backupBusy.value = false
+  }
+}
 
 const inNovel = computed(() => !!route.params.novelId)
 
@@ -349,6 +385,7 @@ async function restoreFromCloud() {
     alert('请选择一个备份文件')
     return
   }
+  if (!confirm('恢复将替换当前小说数据及封面。确定继续？')) return
   showRemoteFiles.value = false
   syncInProgress.value = true
   syncMessage.value = ''
@@ -359,6 +396,8 @@ async function restoreFromCloud() {
       syncMessage.value = result.message
       syncError.value = false
       syncStatus.lastSyncTime = result.timestamp || null
+      localStorage.removeItem(`mapBackground_${route.params.novelId}`)
+      window.location.reload()
     } else {
       syncMessage.value = result.message
       syncError.value = true

@@ -69,10 +69,10 @@ public class ImageService {
         String filename = UUID.randomUUID().toString() + extension;
 
         // 安全路径构建，防止路径遍历
-        Path uploadPath = Paths.get(uploadDir).resolve(novelId.toString()).normalize();
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().resolve(novelId.toString()).normalize();
         
         // 确保上传路径在指定目录下
-        Path uploadDirPath = Paths.get(uploadDir).normalize();
+        Path uploadDirPath = Paths.get(uploadDir).toAbsolutePath().normalize();
         if (!uploadPath.startsWith(uploadDirPath)) {
             throw new IOException("Invalid upload path");
         }
@@ -113,8 +113,8 @@ public class ImageService {
                 .orElseThrow(() -> new RuntimeException("Image not found"));
 
         // 验证文件路径安全性，防止路径遍历
-        Path filePath = Paths.get(image.getFilePath()).normalize();
-        Path uploadDirPath = Paths.get(uploadDir).normalize();
+        Path filePath = Paths.get(image.getFilePath()).toAbsolutePath().normalize();
+        Path uploadDirPath = Paths.get(uploadDir).toAbsolutePath().normalize();
         
         if (!filePath.startsWith(uploadDirPath)) {
             throw new IOException("Invalid file path for deletion");
