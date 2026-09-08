@@ -48,6 +48,10 @@ public class ExportService {
     @Autowired
     private WorldviewEntryRepository worldviewEntryRepository;
 
+    @Autowired
+    private RelationshipGroupRepository relationshipGroupRepository;
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public byte[] exportNovelToJson(Long novelId) throws Exception {
         Map<String, Object> exportData = buildExportData(novelId);
 
@@ -401,6 +405,7 @@ public class ExportService {
 
         Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new RuntimeException("Novel not found"));
+        data.put("schemaVersion", 2);
         data.put("novel", novel);
 
         data.put("characters", characterRepository.findByNovelId(novelId));
@@ -413,6 +418,7 @@ public class ExportService {
         data.put("characterRelationships", relationshipRepository.findByNovelId(novelId));
         data.put("worldviewEntries", worldviewEntryRepository.findByNovelId(novelId));
 
+        data.put("relationshipGroups", relationshipGroupRepository.findByNovelId(novelId));
         return data;
     }
 }

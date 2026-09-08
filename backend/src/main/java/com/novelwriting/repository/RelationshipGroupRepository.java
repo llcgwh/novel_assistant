@@ -14,6 +14,10 @@ public interface RelationshipGroupRepository extends JpaRepository<RelationshipG
     @EntityGraph(attributePaths = {"characters"})
     List<RelationshipGroup> findByNovelId(Long novelId);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM RelationshipGroup g WHERE g.novelId = :novelId")
+    void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
+
     @Override
     @EntityGraph(attributePaths = {"characters"})
     Optional<RelationshipGroup> findById(Long id);

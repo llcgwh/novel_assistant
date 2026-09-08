@@ -45,11 +45,17 @@ public class ImportService {
     @Autowired
     private WorldviewEntryRepository worldviewEntryRepository;
 
-    @Transactional
+    @Autowired
+    private RelationshipGroupRepository relationshipGroupRepository;
+
+    @Transactional(rollbackFor = Exception.class)
     public void importFromJson(Long novelId, byte[] jsonData) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         JsonNode root = mapper.readTree(jsonData);
+        BackupValidator.validate(root);
+        Novel novel = novelRepository.findById(novelId)
+                .orElseThrow(() -> new IllegalArgumentException("Novel not found"));
 
         Map<Long, Long> oldToNewTagIds = new HashMap<>();
         Map<Long, Long> oldToNewCharacterIds = new HashMap<>();
@@ -61,18 +67,18 @@ public class ImportService {
         Map<Long, Long> oldToNewWorldviewIds = new HashMap<>();
 
         // Step 1: Clear existing data for this novel (reverse dependency order)
+        relationshipGroupRepository.deleteByNovelId(novelId);
         relationshipRepository.deleteByNovelId(novelId);
         worldviewEntryRepository.deleteByNovelId(novelId);
         timelineEventRepository.deleteByNovelId(novelId);
         foreshadowRepository.deleteByNovelId(novelId);
         outlineRepository.deleteByNovelId(novelId);
         sceneRepository.deleteByNovelId(novelId);
+        mapLocationRepository.clearParentsByNovelId(novelId);
         mapLocationRepository.deleteByNovelId(novelId);
         characterRepository.deleteByNovelId(novelId);
         tagRepository.deleteByNovelId(novelId);
 
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
 
         // Step 2: Restore tags
         JsonNode tagsNode = root.get("tags");
@@ -105,6 +111,7 @@ public class ImportService {
                 setIfPresent(charNode, "background", v -> c.setBackground(v));
                 setIfPresent(charNode, "role", v -> c.setRole(v));
                 setIfPresent(charNode, "portraitImage", v -> c.setPortraitImage(v));
+                c.setTags(restoreTags(charNode, oldToNewTagIds));
                 Character saved = characterRepository.save(c);
                 if (charNode.has("id")) {
                     oldToNewCharacterIds.put(charNode.get("id").asLong(), saved.getId());
@@ -123,6 +130,7 @@ public class ImportService {
                 setIfPresent(sceneNode, "location", v -> s.setLocation(v));
                 setIfPresent(sceneNode, "atmosphere", v -> s.setAtmosphere(v));
                 setIfPresent(sceneNode, "sceneImage", v -> s.setSceneImage(v));
+                s.setTags(restoreTags(sceneNode, oldToNewTagIds));
                 Scene saved = sceneRepository.save(s);
                 if (sceneNode.has("id")) {
                     oldToNewSceneIds.put(sceneNode.get("id").asLong(), saved.getId());
@@ -142,6 +150,7 @@ public class ImportService {
                 setIfPresentInt(locNode, "positionY", v -> ml.setPositionY(v));
                 setIfPresent(locNode, "locationType", v -> ml.setLocationType(v));
                 setIfPresent(locNode, "locationImage", v -> ml.setLocationImage(v));
+                ml.setTags(restoreTags(locNode, oldToNewTagIds));
                 MapLocation saved = mapLocationRepository.save(ml);
                 if (locNode.has("id")) {
                     oldToNewMapLocationIds.put(locNode.get("id").asLong(), saved.getId());
@@ -180,6 +189,7 @@ public class ImportService {
                 setIfPresent(fNode, "laidAt", v -> f.setLaidAt(v));
                 setIfPresent(fNode, "revealedAt", v -> f.setRevealedAt(v));
                 setIfPresent(fNode, "status", v -> f.setStatus(v));
+                f.setTags(restoreTags(fNode, oldToNewTagIds));
                 Foreshadow saved = foreshadowRepository.save(f);
                 if (fNode.has("id")) {
                     oldToNewForeshadowIds.put(fNode.get("id").asLong(), saved.getId());
@@ -198,6 +208,7 @@ public class ImportService {
                 setIfPresentInt(oNode, "chapterNumber", v -> o.setChapterNumber(v));
                 setIfPresentInt(oNode, "plotOrder", v -> o.setPlotOrder(v));
                 setIfPresent(oNode, "status", v -> o.setStatus(v));
+                o.setTags(restoreTags(oNode, oldToNewTagIds));
                 Outline saved = outlineRepository.save(o);
                 if (oNode.has("id")) {
                     oldToNewOutlineIds.put(oNode.get("id").asLong(), saved.getId());
@@ -215,6 +226,7 @@ public class ImportService {
                 setIfPresent(tNode, "description", v -> te.setDescription(v));
                 setIfPresent(tNode, "eventTime", v -> te.setEventTime(v));
                 setIfPresentInt(tNode, "realOrder", v -> te.setRealOrder(v));
+                te.setTags(restoreTags(tNode, oldToNewTagIds));
                 TimelineEvent saved = timelineEventRepository.save(te);
                 if (tNode.has("id")) {
                     oldToNewTimelineIds.put(tNode.get("id").asLong(), saved.getId());
@@ -232,6 +244,7 @@ public class ImportService {
                 setIfPresent(wNode, "category", v -> we.setCategory(v));
                 setIfPresent(wNode, "content", v -> we.setContent(v));
                 setIfPresent(wNode, "entryImage", v -> we.setEntryImage(v));
+                we.setTags(restoreTags(wNode, oldToNewTagIds));
                 WorldviewEntry saved = worldviewEntryRepository.save(we);
                 if (wNode.has("id")) {
                     oldToNewWorldviewIds.put(wNode.get("id").asLong(), saved.getId());
@@ -261,27 +274,38 @@ public class ImportService {
             }
         }
 
-        // Step 11: Restore tags for all entities
-        // Character tags
-        if (charsNode != null && charsNode.isArray()) {
-            for (JsonNode charNode : charsNode) {
-                Long oldCharId = charNode.has("id") ? charNode.get("id").asLong() : null;
-                Long newCharId = oldToNewCharacterIds.get(oldCharId);
-                if (newCharId != null && charNode.has("tags") && charNode.get("tags").isArray()) {
-                    Character c = characterRepository.findById(newCharId).orElse(null);
-                    if (c != null) {
-                        Set<Tag> tags = new HashSet<>();
-                        for (JsonNode tagNode : charNode.get("tags")) {
-                            Long oldTagId = tagNode.get("id").asLong();
-                            Long newTagId = oldToNewTagIds.get(oldTagId);
-                            if (newTagId != null) {
-                                tagRepository.findById(newTagId).ifPresent(tags::add);
-                            }
-                        }
-                        c.setTags(tags);
-                        characterRepository.save(c);
-                    }
-                }
+        // Restore scene locations after every location has its new ID.
+        for (JsonNode sceneNode : scenesNode) {
+            Scene scene = sceneRepository.findById(oldToNewSceneIds.get(sceneNode.get("id").asLong())).orElseThrow();
+            Set<MapLocation> locations = new HashSet<>();
+            for (JsonNode location : sceneNode.path("mapLocations")) {
+                locations.add(mapLocationRepository.findById(
+                        oldToNewMapLocationIds.get(location.get("id").asLong())).orElseThrow());
+            }
+            scene.setMapLocations(locations);
+            sceneRepository.save(scene);
+        }
+
+        // Two passes allow a child group to appear before its parent in the backup.
+        Map<Long, RelationshipGroup> restoredGroups = new HashMap<>();
+        for (JsonNode groupNode : root.path("relationshipGroups")) {
+            RelationshipGroup group = new RelationshipGroup();
+            group.setNovelId(novelId);
+            group.setName(groupNode.get("name").asText());
+            setIfPresent(groupNode, "description", group::setDescription);
+            Set<Character> members = new HashSet<>();
+            for (JsonNode member : groupNode.path("characters")) {
+                members.add(characterRepository.findById(
+                        oldToNewCharacterIds.get(member.get("id").asLong())).orElseThrow());
+            }
+            group.setCharacters(members);
+            restoredGroups.put(groupNode.get("id").asLong(), relationshipGroupRepository.save(group));
+        }
+        for (JsonNode groupNode : root.path("relationshipGroups")) {
+            if (groupNode.hasNonNull("parentGroupId")) {
+                RelationshipGroup group = restoredGroups.get(groupNode.get("id").asLong());
+                group.setParentGroupId(restoredGroups.get(groupNode.get("parentGroupId").asLong()).getId());
+                relationshipGroupRepository.save(group);
             }
         }
 
@@ -343,14 +367,6 @@ public class ImportService {
                 if (newWorldviewId != null) {
                     WorldviewEntry we = worldviewEntryRepository.findById(newWorldviewId).orElse(null);
                     if (we != null) {
-                        if (wNode.has("tags") && wNode.get("tags").isArray()) {
-                            Set<Tag> tags = new HashSet<>();
-                            for (JsonNode tagNode : wNode.get("tags")) {
-                                Long newTagId = oldToNewTagIds.get(tagNode.get("id").asLong());
-                                if (newTagId != null) tagRepository.findById(newTagId).ifPresent(tags::add);
-                            }
-                            we.setTags(tags);
-                        }
                         if (wNode.has("characters") && wNode.get("characters").isArray()) {
                             Set<Character> chars = new HashSet<>();
                             for (JsonNode cNode : wNode.get("characters")) {
@@ -389,6 +405,14 @@ public class ImportService {
             setIfPresent(novelNode, "genre", v -> novel.setGenre(v));
             novelRepository.save(novel);
         }
+    }
+
+    private Set<Tag> restoreTags(JsonNode node, Map<Long, Long> tagIds) {
+        Set<Tag> tags = new HashSet<>();
+        for (JsonNode tagNode : node.path("tags")) {
+            tags.add(tagRepository.findById(tagIds.get(tagNode.get("id").asLong())).orElseThrow());
+        }
+        return tags;
     }
 
     private void setIfPresent(JsonNode node, String field, java.util.function.Consumer<String> setter) {

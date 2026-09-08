@@ -28,4 +28,7 @@ public interface MapLocationRepository extends JpaRepository<MapLocation, Long> 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("DELETE FROM MapLocation m WHERE m.novelId = :novelId")
     void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE MapLocation m SET m.parentLocation = null WHERE m.novelId = :novelId")
+    void clearParentsByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);
 }
