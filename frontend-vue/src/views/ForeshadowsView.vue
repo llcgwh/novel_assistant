@@ -49,6 +49,7 @@
       v-if="showCreateModal || editingForeshadow"
       :title="editingForeshadow ? '编辑伏笔' : '添加伏笔'"
       @close="closeModal"
+      :busy="saving"
       @confirm="saveForeshadow"
     >
       <div class="form-group">
@@ -136,6 +137,7 @@ const foreshadowStatusOptions = [
   { value: 'revealed', label: '已揭示' },
   { value: 'abandoned', label: '已废弃' }
 ]
+const saving = ref(false)
 const showCreateModal = ref(false)
 const editingForeshadow = ref<Foreshadow | null>(null)
 const deletingForeshadow = ref<Foreshadow | null>(null)
@@ -210,7 +212,9 @@ function closeModal() {
 }
 
 async function saveForeshadow() {
+  if (saving.value) return
   if (!form.title.trim()) { alert('请输入伏笔标题'); return }
+  saving.value = true
   try {
     let foreshadowId: number
     if (editingForeshadow.value) {
@@ -218,6 +222,8 @@ async function saveForeshadow() {
       foreshadowId = editingForeshadow.value.id
     } else {
       const newForeshadow = await foreshadowsStore.createForeshadow({ ...form })
+      // 保留服务器已创建的记录，标签失败后重试改为更新。
+      editingForeshadow.value = newForeshadow
       foreshadowId = newForeshadow.id
     }
     // 保存标签
@@ -228,6 +234,8 @@ async function saveForeshadow() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 

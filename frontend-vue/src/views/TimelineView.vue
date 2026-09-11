@@ -82,6 +82,7 @@
       v-if="showCreateModal || editingEvent"
       :title="editingEvent ? '编辑事件' : '添加事件'"
       @close="closeModal"
+      :busy="saving"
       @confirm="saveEvent"
     >
       <div class="form-group">
@@ -199,6 +200,7 @@ const outlinesStore = useOutlinesStore()
 const tagsStore = useTagsStore()
 
 const searchKeyword = ref('')
+const saving = ref(false)
 const showCreateModal = ref(false)
 const editingEvent = ref<TimelineEvent | null>(null)
 const deletingEvent = ref<TimelineEvent | null>(null)
@@ -275,7 +277,9 @@ function closeModal() {
 }
 
 async function saveEvent() {
+  if (saving.value) return
   if (!form.title.trim()) { alert('请输入事件标题'); return }
+  saving.value = true
   try {
     let eventId: number
     if (editingEvent.value) {
@@ -283,6 +287,8 @@ async function saveEvent() {
       eventId = editingEvent.value.id
     } else {
       const newEvent = await timelineStore.createEvent({ ...form })
+      // 保留服务器已创建的记录，标签失败后重试改为更新。
+      editingEvent.value = newEvent
       eventId = newEvent.id
     }
     // 保存标签
@@ -293,6 +299,8 @@ async function saveEvent() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 

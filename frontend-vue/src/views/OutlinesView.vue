@@ -49,6 +49,7 @@
       v-if="showCreateModal || editingOutline"
       :title="editingOutline ? '编辑大纲' : '添加大纲'"
       @close="closeModal"
+      :busy="saving"
       @confirm="saveOutline"
     >
       <div class="form-group">
@@ -136,6 +137,7 @@ const outlineStatusOptions = [
   { value: 'writing', label: '写作中' },
   { value: 'completed', label: '已完成' }
 ]
+const saving = ref(false)
 const showCreateModal = ref(false)
 const editingOutline = ref<Outline | null>(null)
 const deletingOutline = ref<Outline | null>(null)
@@ -218,11 +220,13 @@ function closeModal() {
 }
 
 async function saveOutline() {
+  if (saving.value) return
   if (!form.title.trim()) {
     alert('请输入大纲标题')
     return
   }
 
+  saving.value = true
   try {
     let outlineId: number
     if (editingOutline.value) {
@@ -230,6 +234,8 @@ async function saveOutline() {
       outlineId = editingOutline.value.id
     } else {
       const newOutline = await outlinesStore.createOutline({ ...form })
+      // 保留服务器已创建的记录，标签失败后重试改为更新。
+      editingOutline.value = newOutline
       outlineId = newOutline.id
     }
     // 保存标签
@@ -240,6 +246,8 @@ async function saveOutline() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 

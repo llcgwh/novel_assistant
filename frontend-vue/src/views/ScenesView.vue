@@ -46,6 +46,7 @@
       v-if="showCreateModal || editingScene"
       :title="editingScene ? '编辑场景' : '添加场景'"
       @close="closeModal"
+      :busy="saving"
       @confirm="saveScene"
     >
       <div class="form-group">
@@ -120,6 +121,7 @@ const tagsStore = useTagsStore()
 const route = useRoute()
 
 const searchKeyword = ref('')
+const saving = ref(false)
 const showCreateModal = ref(false)
 const editingScene = ref<Scene | null>(null)
 const deletingScene = ref<Scene | null>(null)
@@ -196,7 +198,9 @@ function closeModal() {
 }
 
 async function saveScene() {
+  if (saving.value) return
   if (!form.name.trim()) { alert('请输入场景名称'); return }
+  saving.value = true
   try {
     let sceneId: number
     if (editingScene.value) {
@@ -204,6 +208,8 @@ async function saveScene() {
       sceneId = editingScene.value.id
     } else {
       const newScene = await scenesStore.createScene({ ...form })
+      // 保留服务器已创建的记录，标签失败后重试改为更新。
+      editingScene.value = newScene
       sceneId = newScene.id
     }
     if (formTagIds.value.length > 0 || editingScene.value) {
@@ -213,6 +219,8 @@ async function saveScene() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 

@@ -1,13 +1,15 @@
 <template>
   <Teleport to="body">
-    <div class="modal" @click.self="$emit('close')">
-      <div class="modal-content">
+    <div class="modal" @click.self="!busy && $emit('close')">
+      <div class="modal-content" :aria-busy="busy">
         <h2>{{ title }}</h2>
-        <slot></slot>
+        <fieldset class="modal-fields" :disabled="busy">
+          <slot></slot>
+        </fieldset>
         <div class="modal-actions">
-          <slot name="actions">
-            <button class="btn-secondary" @click="$emit('close')">取消</button>
-            <button class="btn-primary" @click="$emit('confirm')">确定</button>
+          <slot name="actions" :busy="busy">
+            <button class="btn-secondary" :disabled="busy" @click="!busy && $emit('close')">取消</button>
+            <button class="btn-primary" :disabled="busy" @click="!busy && $emit('confirm')">{{ busy ? '保存中…' : '确定' }}</button>
           </slot>
         </div>
       </div>
@@ -16,12 +18,25 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   title: string
-}>()
+  busy?: boolean
+}>(), { busy: false })
 
 defineEmits<{
   close: []
   confirm: []
 }>()
 </script>
+
+<style scoped>
+.modal-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.modal-fields:disabled {
+  pointer-events: none;
+}
+</style>

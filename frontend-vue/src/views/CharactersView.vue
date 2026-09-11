@@ -51,6 +51,7 @@
       v-if="showCreateModal || editingCharacter"
       :title="editingCharacter ? '编辑人物' : '添加人物'"
       @close="closeModal"
+      :busy="saving"
       @confirm="saveCharacter"
     >
       <div class="form-group">
@@ -129,6 +130,7 @@ const tagsStore = useTagsStore()
 const route = useRoute()
 
 const searchKeyword = ref('')
+const saving = ref(false)
 const showCreateModal = ref(false)
 const editingCharacter = ref<Character | null>(null)
 const deletingCharacter = ref<Character | null>(null)
@@ -214,11 +216,13 @@ function resetForm() {
 }
 
 async function saveCharacter() {
+  if (saving.value) return
   if (!form.name.trim()) {
     alert('请输入人物姓名')
     return
   }
 
+  saving.value = true
   try {
     let characterId: number
     if (editingCharacter.value) {
@@ -226,6 +230,8 @@ async function saveCharacter() {
       characterId = editingCharacter.value.id
     } else {
       const newCharacter = await charactersStore.createCharacter({ ...form })
+      // 保留服务器已创建的记录，标签失败后重试改为更新。
+      editingCharacter.value = newCharacter
       characterId = newCharacter.id
     }
     if (formTagIds.value.length > 0 || editingCharacter.value) {
@@ -235,6 +241,8 @@ async function saveCharacter() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 

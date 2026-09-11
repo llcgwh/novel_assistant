@@ -66,6 +66,7 @@
       v-if="showCreateModal || editingLocation"
       :title="editingLocation ? '编辑位置' : '添加位置'"
       @close="closeModal"
+      :busy="saving"
       @confirm="saveLocation"
     >
       <div class="form-group">
@@ -150,6 +151,7 @@ const scenesStore = useScenesStore()
 
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const bgInput = ref<HTMLInputElement | null>(null)
+const saving = ref(false)
 const showCreateModal = ref(false)
 const editingLocation = ref<MapLocation | null>(null)
 const deletingLocation = ref<MapLocation | null>(null)
@@ -313,7 +315,9 @@ function closeModal() {
 }
 
 async function saveLocation() {
+  if (saving.value) return
   if (!form.name.trim()) { alert('请输入位置名称'); return }
+  saving.value = true
   try {
     const data = {
       name: form.name, locationType: form.locationType, description: form.description,
@@ -329,6 +333,8 @@ async function saveLocation() {
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')
+  } finally {
+    saving.value = false
   }
 }
 
