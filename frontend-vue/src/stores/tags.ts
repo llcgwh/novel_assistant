@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Tag, TagCreateDTO, TagUpdateDTO } from '@/types/tag'
@@ -8,11 +9,12 @@ export const useTagsStore = defineStore('tags', () => {
   const loading = ref(false)
 
   async function fetchTags() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       tags.value = await tagsApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -41,6 +43,7 @@ export const useTagsStore = defineStore('tags', () => {
   }
 
   function $reset() {
+    loading.value = false
     tags.value = []
   }
 

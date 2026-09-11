@@ -12,15 +12,17 @@
     class="visible"
     :style="{ background: `rgba(255, 255, 255, ${appStore.settings.backgroundOpacity})` }"
   ></div>
-  <router-view />
+  <router-view :key="String(route.params.novelId || 'global')" />
   <Toast />
 </template>
 
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import Toast from '@/components/common/Toast.vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
+const route = useRoute()
 </script>
 
 <style lang="scss">

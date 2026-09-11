@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { Novel, NovelCreateDTO, NovelUpdateDTO } from '@/types/novel'
 import { novelsApi } from '@/api/novels'
 import { setCurrentNovelId } from '@/api/request'
+import { resetNovelData } from './novelData'
 
 export const useNovelStore = defineStore('novel', () => {
   // 状态
@@ -46,22 +47,14 @@ export const useNovelStore = defineStore('novel', () => {
     await novelsApi.delete(id)
     novels.value = novels.value.filter(n => n.id !== id)
     if (currentNovelId.value === id) {
-      currentNovelId.value = null
-      setCurrentNovelId(null)
+      setCurrentNovel(null)
     }
   }
 
   function setCurrentNovel(id: number | null) {
-    currentNovelId.value = id
     setCurrentNovelId(id)
-  }
-
-  function initFromStorage() {
-    const stored = localStorage.getItem('currentNovelId')
-    if (stored) {
-      currentNovelId.value = parseInt(stored)
-      setCurrentNovelId(parseInt(stored))
-    }
+    if (currentNovelId.value !== id) resetNovelData()
+    currentNovelId.value = id
   }
 
   return {
@@ -74,7 +67,6 @@ export const useNovelStore = defineStore('novel', () => {
     createNovel,
     updateNovel,
     deleteNovel,
-    setCurrentNovel,
-    initFromStorage
+    setCurrentNovel
   }
 })

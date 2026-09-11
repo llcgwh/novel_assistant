@@ -59,11 +59,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
 import { exportApi } from '@/api/export'
-import { setCurrentNovelId } from '@/api/request'
 
 const router = useRouter()
 const route = useRoute()
@@ -94,28 +93,15 @@ const navItems = computed(() => {
   ]
 })
 
-onMounted(async () => {
-  const novelId = Number(route.params.novelId)
-  if (novelId) {
-    novelStore.setCurrentNovel(novelId)
-    setCurrentNovelId(novelId)
-    if (novelStore.novels.length === 0) {
-      await novelStore.fetchNovels()
-    }
-  }
+onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  if (novelStore.novels.length === 0) {
+    void novelStore.fetchNovels().catch(error => console.error('加载小说列表失败:', error))
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
-})
-
-watch(() => route.params.novelId, (newId) => {
-  if (newId) {
-    const id = Number(newId)
-    novelStore.setCurrentNovel(id)
-    setCurrentNovelId(id)
-  }
 })
 
 function goBack() {

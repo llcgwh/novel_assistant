@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { TimelineEvent, TimelineEventCreateDTO, TimelineEventUpdateDTO, TimelineEventRelations } from '@/types/timeline'
@@ -27,11 +28,12 @@ export const useTimelineStore = defineStore('timeline', () => {
   })
 
   async function fetchEvents() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       events.value = await timelineApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -70,6 +72,7 @@ export const useTimelineStore = defineStore('timeline', () => {
   }
 
   function $reset() {
+    loading.value = false
     events.value = []
     searchKeyword.value = ''
   }

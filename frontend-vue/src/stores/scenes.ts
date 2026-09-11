@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Scene, SceneCreateDTO, SceneUpdateDTO } from '@/types/scene'
@@ -19,11 +20,12 @@ export const useScenesStore = defineStore('scenes', () => {
   })
 
   async function fetchScenes() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       scenes.value = await scenesApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -57,6 +59,7 @@ export const useScenesStore = defineStore('scenes', () => {
   }
 
   function $reset() {
+    loading.value = false
     scenes.value = []
     searchKeyword.value = ''
   }

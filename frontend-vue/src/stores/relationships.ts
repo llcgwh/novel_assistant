@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Relationship, RelationshipCreateDTO, RelationshipUpdateDTO } from '@/types/relationship'
@@ -8,11 +9,12 @@ export const useRelationshipsStore = defineStore('relationships', () => {
   const loading = ref(false)
 
   async function fetchRelationships() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       relationships.value = await relationshipsApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -37,6 +39,7 @@ export const useRelationshipsStore = defineStore('relationships', () => {
   }
 
   function $reset() {
+    loading.value = false
     relationships.value = []
   }
 

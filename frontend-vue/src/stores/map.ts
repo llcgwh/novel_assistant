@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { ID } from '@/types'
@@ -12,20 +13,22 @@ export const useMapStore = defineStore('map', () => {
   const backgroundImageUrl = ref<string | null>(null)
 
   async function fetchLocations() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       locations.value = await mapLocationsApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
   async function fetchLocationsByType(type: string) {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       locations.value = await mapLocationsApi.getByType(type)
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -83,6 +86,7 @@ export const useMapStore = defineStore('map', () => {
   }
 
   function $reset() {
+    loading.value = false
     locations.value = []
     backgroundImageId.value = null
     backgroundImageUrl.value = null

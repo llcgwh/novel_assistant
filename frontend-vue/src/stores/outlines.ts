@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Outline, OutlineCreateDTO, OutlineUpdateDTO, OutlineStatus } from '@/types/outline'
@@ -28,11 +29,12 @@ export const useOutlinesStore = defineStore('outlines', () => {
   })
 
   async function fetchOutlines() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       outlines.value = await outlinesApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -70,6 +72,7 @@ export const useOutlinesStore = defineStore('outlines', () => {
   }
 
   function $reset() {
+    loading.value = false
     outlines.value = []
     searchKeyword.value = ''
     statusFilter.value = ''

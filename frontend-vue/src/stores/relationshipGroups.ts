@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { RelationshipGroup, RelationshipGroupCreateDTO, RelationshipGroupUpdateDTO } from '@/types/relationship'
@@ -9,11 +10,12 @@ export const useRelationshipGroupsStore = defineStore('relationshipGroups', () =
   const loading = ref(false)
 
   async function fetchGroups() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       groups.value = await relationshipGroupsApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -54,6 +56,7 @@ export const useRelationshipGroupsStore = defineStore('relationshipGroups', () =
   }
 
   function $reset() {
+    loading.value = false
     groups.value = []
   }
 

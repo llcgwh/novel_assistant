@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Character, CharacterCreateDTO, CharacterUpdateDTO } from '@/types/character'
@@ -22,11 +23,12 @@ export const useCharactersStore = defineStore('characters', () => {
 
   // Actions
   async function fetchCharacters() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       characters.value = await charactersApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -60,6 +62,7 @@ export const useCharactersStore = defineStore('characters', () => {
   }
 
   function $reset() {
+    loading.value = false
     characters.value = []
     searchKeyword.value = ''
   }

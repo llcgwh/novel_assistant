@@ -188,7 +188,6 @@ onMounted(() => {
 })
 
 function enterNovel(id: number) {
-  novelStore.setCurrentNovel(id)
   router.push(`/novel/${id}/timeline`)
 }
 

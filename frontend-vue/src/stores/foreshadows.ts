@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Foreshadow, ForeshadowCreateDTO, ForeshadowUpdateDTO, ForeshadowStatus } from '@/types/foreshadow'
@@ -28,11 +29,12 @@ export const useForeshadowsStore = defineStore('foreshadows', () => {
   })
 
   async function fetchForeshadows() {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       foreshadows.value = await foreshadowsApi.getAll()
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -70,6 +72,7 @@ export const useForeshadowsStore = defineStore('foreshadows', () => {
   }
 
   function $reset() {
+    loading.value = false
     foreshadows.value = []
     searchKeyword.value = ''
     statusFilter.value = ''

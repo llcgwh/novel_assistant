@@ -1,3 +1,4 @@
+import { installNovelContext } from './novelContext'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -86,15 +87,6 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫
-router.beforeEach((to, _from, next) => {
-  const novelId = to.params.novelId as string
-
-  if (to.meta.requiresNovel && !novelId) {
-    next({ name: 'NovelSelector' })
-  } else {
-    next()
-  }
-})
+installNovelContext(router)
 
 export default router

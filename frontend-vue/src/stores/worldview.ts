@@ -1,3 +1,4 @@
+import { getNovelContextVersion } from '@/api/request'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { WorldviewEntry, WorldviewEntryCreateDTO, WorldviewEntryUpdateDTO } from '@/types/worldview'
@@ -28,11 +29,12 @@ export const useWorldviewStore = defineStore('worldview', () => {
   })
 
   async function fetchEntries(category?: string, keyword?: string) {
+    const context = getNovelContextVersion()
     loading.value = true
     try {
       entries.value = await worldviewApi.getAll(category, keyword)
     } finally {
-      loading.value = false
+      if (context === getNovelContextVersion()) loading.value = false
     }
   }
 
@@ -74,6 +76,7 @@ export const useWorldviewStore = defineStore('worldview', () => {
   }
 
   function $reset() {
+    loading.value = false
     entries.value = []
     searchKeyword.value = ''
     activeCategory.value = ''
