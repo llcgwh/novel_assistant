@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>世界观</h2>
+      <h2>世界设定</h2>
       <div class="view-actions">
         <BaseSelect
           v-model="activeCategory"
@@ -13,7 +13,7 @@
           v-model="searchKeyword"
           type="text"
           class="search-input"
-          placeholder="🔍 搜索世界观..."
+          placeholder="搜索世界观..."
           @input="debouncedSearch"
         />
         <button class="btn-primary" @click="showCreateModal = true">+ 添加条目</button>
@@ -36,7 +36,7 @@
       >
         <div class="card-image">
           <img v-if="entry.entryImage" :src="entry.entryImage" alt="条目图片" />
-          <div v-else class="no-image-placeholder">{{ getCategoryIcon(entry.category) }}</div>
+          <div v-else class="no-image-placeholder"><StudioIcon name="worldview"/></div>
         </div>
         <h3>
           {{ entry.name }}
@@ -64,9 +64,9 @@
           >📍 {{ l.name }}</span>
         </div>
         <div class="actions">
-          <button class="btn-secondary" @click="editEntry(entry)">✏️ 编辑</button>
-          <button class="btn-small" @click="manageTags(entry)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(entry)">🗑️ 删除</button>
+          <button class="btn-secondary" @click="editEntry(entry)">编辑</button>
+          <button class="btn-small" @click="manageTags(entry)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(entry)">删除</button>
         </div>
       </div>
     </div>
@@ -109,7 +109,7 @@
         ></textarea>
       </div>
       <div class="form-group">
-        <label>🏷️ 标签</label>
+        <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
       <div class="form-group">
@@ -179,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import StudioIcon from '@/components/common/StudioIcon.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted, watch, computed } from 'vue'
@@ -188,7 +189,7 @@ import { useCharactersStore } from '@/stores/characters'
 import { useScenesStore } from '@/stores/scenes'
 import { useMapStore } from '@/stores/map'
 import type { WorldviewEntry } from '@/types/worldview'
-import { WORLDVIEW_CATEGORIES, getCategoryLabel, getCategoryIcon } from '@/types/worldview'
+import { WORLDVIEW_CATEGORIES, getCategoryLabel } from '@/types/worldview'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'

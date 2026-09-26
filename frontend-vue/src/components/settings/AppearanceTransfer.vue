@@ -71,7 +71,7 @@ async function importAppearance(event: Event) {
 }
 </script>
 <style scoped>
-p { font-size: 14px; line-height: 1.8; color: #687184; }
+p { font-size: 14px; line-height: 1.8; color: var(--muted); }
 .appearance-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
 input[type="file"] { display: block; max-width: 230px; margin-top: 8px; font-size: 12px; }
 </style>

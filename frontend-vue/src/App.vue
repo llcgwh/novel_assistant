@@ -10,7 +10,7 @@
     v-if="appStore.settings.backgroundImage"
     id="global-bg-overlay"
     class="visible"
-    :style="{ background: `rgba(255, 255, 255, ${appStore.settings.backgroundOpacity})` }"
+    :style="{ opacity: appStore.settings.backgroundOpacity }"
   ></div>
   <router-view :key="String(route.params.novelId || 'global')" />
   <Toast />
@@ -18,11 +18,15 @@
 
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { watchEffect } from 'vue'
+import { useStudioStore } from '@/stores/studio'
 import Toast from '@/components/common/Toast.vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const route = useRoute()
+const studio = useStudioStore()
+watchEffect(() => { document.documentElement.dataset.studioTheme = studio.theme })
 </script>
 
 <style lang="scss">

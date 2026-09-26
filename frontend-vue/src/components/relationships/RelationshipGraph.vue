@@ -40,6 +40,9 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import type { Character } from '@/types/character'
 import type { Relationship, RelationshipGroup } from '@/types/relationship'
+import { useStudioStore } from '@/stores/studio'
+const studio = useStudioStore()
+watch(() => studio.theme, () => nextTick(drawGraph))
 const props = defineProps<{ characters: Character[]; relationships: Relationship[]; groups: RelationshipGroup[] }>()
 const emit = defineEmits<{ openCharacter: [id: number] }>()
 let observer: ResizeObserver | undefined
@@ -102,8 +105,15 @@ function drawGraph() {
   canvas.height = Math.round(height * ratio)
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
   ctx.clearRect(0, 0, width, height)
-  ctx.fillStyle = '#fafafa'
+  const palette = getComputedStyle(document.documentElement)
+  const surface = palette.getPropertyValue('--panel').trim()
+  const textColor = palette.getPropertyValue('--text').trim()
+  const accent = palette.getPropertyValue('--accent').trim()
+  const muted = palette.getPropertyValue('--muted').trim()
+  ctx.fillStyle = surface
   ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = palette.getPropertyValue('--line').trim()
+  for (let x = 18; x < width; x += 24) for (let y = 18; y < height; y += 24) { ctx.beginPath(); ctx.arc(x, y, .7, 0, Math.PI * 2); ctx.fill() }
 
   const characters = props.characters
   nodePositions.value = {}
@@ -141,7 +151,7 @@ function drawGraph() {
       const midX = (pos1.x + pos2.x) / 2
       const midY = (pos1.y + pos2.y) / 2
       if (rel.relationshipType) {
-        ctx.fillStyle = '#666'
+        ctx.fillStyle = muted
         ctx.font = '11px Microsoft YaHei'
         ctx.textAlign = 'center'
         ctx.fillText(rel.relationshipType, midX, midY)
@@ -155,13 +165,16 @@ function drawGraph() {
     if (pos) {
       ctx.beginPath()
       ctx.arc(pos.x, pos.y, 25, 0, Math.PI * 2)
-      ctx.fillStyle = '#3498db'
+      ctx.shadowColor = accent
+      ctx.shadowBlur = 13
+      ctx.fillStyle = surface
       ctx.fill()
-      ctx.strokeStyle = '#2980b9'
-      ctx.lineWidth = 3
+      ctx.shadowBlur = 0
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 1.5
       ctx.stroke()
 
-      ctx.fillStyle = '#fff'
+      ctx.fillStyle = textColor
       ctx.font = 'bold 12px Microsoft YaHei'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -229,7 +242,7 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   margin-bottom: 16px;
 }
 
@@ -242,9 +255,9 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
 .canvas-tooltip {
   position: absolute;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--panel);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 14px;
   min-width: 180px;
@@ -253,16 +266,16 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
   z-index: 500;
   font-size: 13px;
   line-height: 1.5;
-  color: #2d3436;
+  color: var(--text);
 }
 
 .tooltip-header {
   font-weight: 700;
   font-size: 15px;
-  color: #6c5ce7;
+  color: var(--accent);
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .tooltip-section {
@@ -271,7 +284,7 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
 
 .tooltip-label {
   font-size: 11px;
-  color: #7f8c8d;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -280,7 +293,7 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
 .tooltip-item {
   padding: 2px 0;
   font-size: 13px;
-  color: #2d3436;
+  color: var(--text);
 }
 
 .tooltip-item .rel-other {
@@ -288,16 +301,16 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
 }
 
 .tooltip-item .rel-type {
-  color: #7f8c8d;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .group-item {
-  color: #6c5ce7;
+  color: var(--accent);
 }
 
 .tooltip-empty {
-  color: #95a5a6;
+  color: var(--muted);
   font-size: 12px;
   font-style: italic;
 }

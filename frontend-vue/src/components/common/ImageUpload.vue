@@ -6,7 +6,7 @@
     </div>
     <button v-else type="button" class="image-upload-area" :disabled="uploading" @click="triggerUpload">
       <span class="upload-placeholder">
-        <span class="upload-icon">🖼️</span>
+        <span class="upload-icon"><StudioIcon name="scenes"/></span>
         {{ placeholder || '点击上传图片' }}
       </span>
     </button>
@@ -24,9 +24,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { imagesApi } from '@/api/images'
+import StudioIcon from '@/components/common/StudioIcon.vue'
 
 const props = defineProps<{
   modelValue?: string  // 已有的图片 URL
+  novelId?: number
   imageType?: string   // 图片类型: novel_cover, character_portrait, scene_image, background
   placeholder?: string
 }>()
@@ -65,8 +67,8 @@ async function handleFileChange(event: Event) {
         const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file)
       })
     } else {
-      const result = await imagesApi.upload(file, props.imageType || 'other')
-      fileUrl = imagesApi.getFileUrl(result.id)
+      const result = await imagesApi.upload(file, props.imageType || 'other', props.novelId)
+      fileUrl = imagesApi.getFileUrl(result.id, props.novelId)
     }
     previewUrl.value = fileUrl
     emit('update:modelValue', fileUrl)

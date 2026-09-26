@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>地图系统</h2>
+      <h2>世界地图</h2>
       <div class="view-actions">
         <input type="file" ref="bgInput" accept="image/*" style="display: none" @change="uploadBackground" />
         <button class="btn-secondary" @click="($refs.bgInput as HTMLInputElement).click()">设置背景</button>
@@ -54,9 +54,9 @@
         </div>
         <TagList :tags="location.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editLocation(location)">✏️ 编辑</button>
-          <button class="btn-small" @click="manageTags(location)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(location)">🗑️ 删除</button>
+          <button class="btn-secondary" @click="editLocation(location)">编辑</button>
+          <button class="btn-small" @click="manageTags(location)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(location)">删除</button>
         </div>
       </div>
     </div>
@@ -131,6 +131,8 @@
 </template>
 
 <script setup lang="ts">
+import { mapPoint } from '@/utils/map'
+import { onBeforeUnmount } from 'vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
@@ -138,6 +140,7 @@ import { useRoute } from 'vue-router'
 import { useMapStore } from '@/stores/map'
 import { useTagsStore } from '@/stores/tags'
 import { useScenesStore } from '@/stores/scenes'
+import { useStudioStore } from '@/stores/studio'
 import type { MapLocation } from '@/types/map'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
@@ -147,12 +150,21 @@ import TagList from '@/components/tags/TagList.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const route = useRoute()
+const studio = useStudioStore()
+watch(() => studio.theme, () => nextTick(drawMap))
 const mapStore = useMapStore()
 const formSaver = useFormSave('map-locations', () => mapStore.locations)
 const tagsStore = useTagsStore()
 const scenesStore = useScenesStore()
 
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
+const mapWidth = 800, mapHeight = 600
+let mapResizeObserver: ResizeObserver | undefined
+onMounted(() => {
+  mapResizeObserver = new ResizeObserver(drawMap)
+  if (mapCanvas.value) mapResizeObserver.observe(mapCanvas.value)
+})
+onBeforeUnmount(() => mapResizeObserver?.disconnect())
 const bgInput = ref<HTMLInputElement | null>(null)
 const saving = ref(false)
 const showCreateModal = ref(false)
@@ -220,44 +232,66 @@ watch(() => [mapStore.locations, mapStore.backgroundImageUrl], () => {
   nextTick(() => drawMap())
 }, { deep: true })
 
+let mapDrawVersion = 0
 function drawMap() {
+  const version = ++mapDrawVersion
   const canvas = mapCanvas.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#fafafa'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  const cssWidth = canvas.clientWidth
+  if (!cssWidth) return
+  const pixelRatio = window.devicePixelRatio || 1
+  canvas.width = Math.round(cssWidth * pixelRatio)
+  canvas.height = Math.round(cssWidth * mapHeight / mapWidth * pixelRatio)
+  ctx.setTransform(canvas.width / mapWidth, 0, 0, canvas.height / mapHeight, 0, 0)
+  ctx.clearRect(0, 0, mapWidth, mapHeight)
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim()
+  ctx.fillRect(0, 0, mapWidth, mapHeight)
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--line').trim()
+  for (let x = 20; x < mapWidth; x += 30) for (let y = 20; y < mapHeight; y += 30) { ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill() }
+  drawLocations(ctx)
 
   // Draw background if exists
   if (mapStore.backgroundImageUrl) {
     const img = new Image()
     img.onload = () => {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      if (version !== mapDrawVersion || !canvas.isConnected) return
+      ctx.drawImage(img, 0, 0, mapWidth, mapHeight)
       drawLocations(ctx)
     }
     img.src = mapStore.backgroundImageUrl
-  } else {
-    drawLocations(ctx)
   }
 }
 
 function drawLocations(ctx: CanvasRenderingContext2D) {
+  const scale = mapWidth / (mapCanvas.value?.clientWidth || mapWidth)
+  const palette = getComputedStyle(document.documentElement)
+  const accent = palette.getPropertyValue('--accent').trim()
+  const surface = palette.getPropertyValue('--panel').trim()
+  const text = palette.getPropertyValue('--text').trim()
   mapStore.locations.forEach(loc => {
     if (loc.positionX !== undefined && loc.positionY !== undefined) {
       ctx.beginPath()
-      ctx.arc(loc.positionX, loc.positionY, 8, 0, Math.PI * 2)
-      ctx.fillStyle = '#e74c3c'
+      ctx.arc(loc.positionX, loc.positionY, 5 * scale, 0, Math.PI * 2)
+      ctx.fillStyle = accent
       ctx.fill()
-      ctx.strokeStyle = '#c0392b'
-      ctx.lineWidth = 2
+      ctx.strokeStyle = surface
+      ctx.lineWidth = 2 * scale
       ctx.stroke()
 
-      ctx.fillStyle = '#2c3e50'
-      ctx.font = '12px Microsoft YaHei'
+      ctx.font = `${12 * scale}px -apple-system, "Microsoft YaHei", sans-serif`
       ctx.textAlign = 'center'
-      ctx.fillText(loc.name, loc.positionX, loc.positionY - 15)
+      ctx.textBaseline = 'middle'
+      const title = loc.name.length > 12 ? loc.name.slice(0, 12) + '…' : loc.name
+      const labelWidth = ctx.measureText(title).width + 12 * scale
+      const labelX = Math.max(labelWidth / 2, Math.min(mapWidth - labelWidth / 2, loc.positionX))
+      const labelY = Math.max(14 * scale, loc.positionY - 20 * scale)
+      ctx.fillStyle = surface
+      ctx.fillRect(labelX - labelWidth / 2, labelY - 11 * scale, labelWidth, 22 * scale)
+      ctx.fillStyle = text
+      ctx.fillText(title, labelX, labelY)
     }
   })
 }
@@ -266,8 +300,7 @@ function onCanvasClick(e: MouseEvent) {
   const canvas = mapCanvas.value
   if (!canvas) return
   const rect = canvas.getBoundingClientRect()
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
+  const { x, y } = mapPoint(e.clientX, e.clientY, rect, mapWidth, mapHeight)
   clickedPosition.value = { x, y }
   form.positionX = Math.round(x)
   form.positionY = Math.round(y)

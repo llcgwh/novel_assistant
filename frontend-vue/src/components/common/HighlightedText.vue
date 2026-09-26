@@ -10,5 +10,5 @@ const parts = computed(() => highlightParts(props.text, props.keyword))
 </script>
 
 <style scoped>
-mark { background: #ece6ff; color: #513bb0; border-radius: 3px; padding: 0 2px; }
+mark { background: var(--panel); color: var(--accent); border-radius: 3px; padding: 0 2px; }
 </style>

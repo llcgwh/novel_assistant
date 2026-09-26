@@ -20,16 +20,16 @@ export const imagesApi = {
     return request.get(withNovelId(`/images/type/${imageType}`))
   },
 
-  getFileUrl(id: ID): string {
-    return `${getApiBaseUrl()}/novels/${getCurrentNovelId()}/images/${id}/file`
+  getFileUrl(id: ID, novelId?: ID): string {
+    return `${getApiBaseUrl()}/novels/${novelId ?? getCurrentNovelId()}/images/${id}/file`
   },
 
-  async upload(file: File, imageType: string): Promise<UploadedImage> {
+  async upload(file: File, imageType: string, novelId?: ID): Promise<UploadedImage> {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('imageType', imageType)
 
-    return request.post(withNovelId('/images'), formData, {
+    return request.post(novelId ? `/novels/${novelId}/images` : withNovelId('/images'), formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },

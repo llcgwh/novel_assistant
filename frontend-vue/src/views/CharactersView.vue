@@ -1,13 +1,13 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>人物管理</h2>
+      <h2>人物档案</h2>
       <div class="view-actions">
         <input
           v-model="searchKeyword"
           type="text"
           class="search-input"
-          placeholder="🔍 搜索人物..."
+          placeholder="搜索人物..."
           @input="debouncedSearch"
         />
         <button class="btn-primary" @click="showCreateModal = true">+ 添加人物</button>
@@ -30,7 +30,7 @@
       >
         <div class="card-image">
           <img v-if="character.portraitImage" :src="character.portraitImage" alt="人物肖像" />
-          <div v-else class="no-image-placeholder">👤</div>
+          <div v-else class="no-image-placeholder"><span class="portrait-initial">{{ character.name.slice(0, 1) }}</span></div>
         </div>
         <h3>{{ character.name }}</h3>
         <p v-if="character.role"><span class="label">角色：</span>{{ character.role }}</p>
@@ -39,9 +39,9 @@
         <p v-if="character.background"><span class="label">背景：</span>{{ truncate(character.background, 60) }}</p>
         <TagList :tags="character.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editCharacter(character)">✏️ 编辑</button>
-          <button class="btn-small" @click="manageTags(character)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(character)">🗑️ 删除</button>
+          <button class="btn-secondary" @click="editCharacter(character)">编辑</button>
+          <button class="btn-small" @click="manageTags(character)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(character)">删除</button>
         </div>
       </div>
     </div>
@@ -85,7 +85,7 @@
         <textarea v-model="form.background" placeholder="描述人物背景故事" rows="2"></textarea>
       </div>
       <div class="form-group">
-        <label>🏷️ 标签</label>
+        <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
     </BaseModal>

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>标签管理</h2>
+      <h2>标签索引</h2>
       <div class="view-actions">
         <button class="btn-primary" @click="showCreateModal = true">+ 添加标签</button>
       </div>
@@ -20,8 +20,8 @@
         <div class="tag-color" :style="{ backgroundColor: tag.color || '#95a5a6' }"></div>
         <span class="tag-name">{{ tag.name }}</span>
         <div class="tag-actions">
-          <button class="btn-small" @click="editTag(tag)">✏️ 编辑</button>
-          <button class="btn-small btn-danger" @click="confirmDelete(tag)">🗑️ 删除</button>
+          <button class="btn-small" @click="editTag(tag)">编辑</button>
+          <button class="btn-small btn-danger" @click="confirmDelete(tag)">删除</button>
         </div>
       </div>
     </div>

@@ -21,8 +21,9 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: { name: 'Timeline' }
+        redirect: { name: 'Overview' }
       },
+      { path: 'overview', name: 'Overview', component: () => import('@/views/OverviewView.vue') },
       {
         path: 'timeline',
         name: 'Timeline',
@@ -84,7 +85,12 @@ const routes: RouteRecordRaw[] = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path !== from.path) return { left: 0, top: 0 }
+    return false
+  }
 })
 
 installNovelContext(router)

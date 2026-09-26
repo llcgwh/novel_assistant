@@ -69,10 +69,10 @@
         <TagList :tags="event.tags" />
 
         <div class="actions">
-          <button class="btn-secondary" @click="editEvent(event)">✏️ 编辑</button>
+          <button class="btn-secondary" @click="editEvent(event)">编辑</button>
           <button class="btn-small" @click="manageRelations(event)">🔗 关联</button>
-          <button class="btn-small" @click="manageTags(event)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(event)">🗑️ 删除</button>
+          <button class="btn-small" @click="manageTags(event)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(event)">删除</button>
         </div>
       </div>
     </div>

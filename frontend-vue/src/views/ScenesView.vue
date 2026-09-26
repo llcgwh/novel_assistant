@@ -1,13 +1,13 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>场景管理</h2>
+      <h2>场景画册</h2>
       <div class="view-actions">
         <input
           v-model="searchKeyword"
           type="text"
           class="search-input"
-          placeholder="🔍 搜索场景..."
+          placeholder="搜索场景..."
           @input="debouncedSearch"
         />
         <button class="btn-primary" @click="showCreateModal = true">+ 添加场景</button>
@@ -26,7 +26,7 @@
       <div v-for="scene in scenesStore.filteredScenes" :key="scene.id" class="card">
         <div class="card-image">
           <img v-if="scene.sceneImage" :src="scene.sceneImage" alt="场景图片" />
-          <div v-else class="no-image-placeholder">🏞️</div>
+          <div v-else class="no-image-placeholder"><StudioIcon name="scenes"/></div>
         </div>
         <h3>{{ scene.name }}</h3>
         <p v-if="scene.location"><span class="label">📍 位置：</span>{{ scene.location }}</p>
@@ -34,9 +34,9 @@
         <p v-if="scene.description">{{ truncate(scene.description, 80) }}</p>
         <TagList :tags="scene.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editScene(scene)">✏️ 编辑</button>
-          <button class="btn-small" @click="manageTags(scene)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(scene)">🗑️ 删除</button>
+          <button class="btn-secondary" @click="editScene(scene)">编辑</button>
+          <button class="btn-small" @click="manageTags(scene)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(scene)">删除</button>
         </div>
       </div>
     </div>
@@ -76,7 +76,7 @@
         <textarea v-model="form.description" placeholder="详细描述场景" rows="3"></textarea>
       </div>
       <div class="form-group">
-        <label>🏷️ 标签</label>
+        <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
     </BaseModal>
@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import StudioIcon from '@/components/common/StudioIcon.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'

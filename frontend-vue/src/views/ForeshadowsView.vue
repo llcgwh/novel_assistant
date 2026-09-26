@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>伏笔管理</h2>
+      <h2>伏笔线索</h2>
       <div class="view-actions">
         <input
           v-model="searchKeyword"
@@ -37,9 +37,9 @@
         <p v-if="foreshadow.revealedAt"><span class="label">揭示位置：</span>{{ foreshadow.revealedAt }}</p>
         <TagList :tags="foreshadow.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editForeshadow(foreshadow)">✏️ 编辑</button>
-          <button class="btn-small" @click="manageTags(foreshadow)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(foreshadow)">🗑️ 删除</button>
+          <button class="btn-secondary" @click="editForeshadow(foreshadow)">编辑</button>
+          <button class="btn-small" @click="manageTags(foreshadow)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(foreshadow)">删除</button>
         </div>
       </div>
     </div>

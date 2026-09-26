@@ -31,8 +31,8 @@
               <p v-if="rel.description">{{ rel.description }}</p>
             </div>
             <div class="actions">
-              <button class="btn-secondary" @click="editRelationship(rel)">✏️ 编辑</button>
-              <button class="btn-danger" @click="confirmDelete(rel)">🗑️ 删除</button>
+              <button class="btn-secondary" @click="editRelationship(rel)">编辑</button>
+              <button class="btn-danger" @click="confirmDelete(rel)">删除</button>
             </div>
           </div>
         </div>
@@ -451,7 +451,7 @@ function goToCharacter(charId: number) {
 .view-header h2 {
   margin: 0;
   font-size: 22px;
-  color: #2d3436;
+  color: var(--text);
 }
 
 .view-actions {
@@ -474,10 +474,10 @@ function goToCharacter(charId: number) {
 .groups-panel {
   width: 280px;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--panel);
   backdrop-filter: blur(12px);
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   padding: 16px;
   max-height: calc(100vh - 200px);
   overflow-y: auto;
@@ -493,7 +493,7 @@ function goToCharacter(charId: number) {
 .groups-panel-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #2d3436;
+  color: var(--text);
 }
 
 /* ========== 关系组树 ========== */
@@ -528,7 +528,7 @@ function goToCharacter(charId: number) {
 
 .group-expand-arrow {
   font-size: 12px;
-  color: #7f8c8d;
+  color: var(--muted);
   transition: transform 0.2s;
   width: 16px;
   text-align: center;
@@ -542,7 +542,7 @@ function goToCharacter(charId: number) {
 .group-name {
   font-weight: 600;
   font-size: 14px;
-  color: #2d3436;
+  color: var(--text);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -551,7 +551,7 @@ function goToCharacter(charId: number) {
 
 .group-count {
   font-size: 12px;
-  color: #7f8c8d;
+  color: var(--muted);
   flex-shrink: 0;
 }
 
@@ -591,7 +591,7 @@ function goToCharacter(charId: number) {
 .group-member {
   padding: 3px 8px;
   font-size: 13px;
-  color: #555;
+  color: var(--muted);
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.15s;
@@ -599,11 +599,11 @@ function goToCharacter(charId: number) {
 
 .group-member:hover {
   background: rgba(108, 92, 231, 0.08);
-  color: #6c5ce7;
+  color: var(--accent);
 }
 
 .group-member.empty {
-  color: #95a5a6;
+  color: var(--muted);
   font-style: italic;
   cursor: default;
 }
@@ -617,7 +617,7 @@ function goToCharacter(charId: number) {
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #2d3436;
+  color: var(--text);
   margin-bottom: 6px;
 }
 
@@ -625,14 +625,14 @@ function goToCharacter(charId: number) {
 .form-group .form-input {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
   min-height: 60px;
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--panel);
   backdrop-filter: blur(12px);
   transition: border-color 0.3s;
 }
@@ -640,7 +640,7 @@ function goToCharacter(charId: number) {
 .form-group textarea:focus,
 .form-group .form-input:focus {
   outline: none;
-  border-color: #6c5ce7;
+  border-color: var(--line);
   box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
 }
 
@@ -648,9 +648,9 @@ function goToCharacter(charId: number) {
   max-height: 200px;
   overflow-y: auto;
   padding: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--panel);
 }
 
 .character-checkbox {
@@ -662,20 +662,20 @@ function goToCharacter(charId: number) {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #2d3436;
+  color: var(--text);
   cursor: pointer;
   font-weight: 400;
   margin: 0;
 }
 
 .character-checkbox input[type="checkbox"] {
-  accent-color: #6c5ce7;
+  accent-color: var(--accent);
   width: 16px;
   height: 16px;
 }
 
 .no-characters {
-  color: #95a5a6;
+  color: var(--muted);
   font-size: 13px;
   font-style: italic;
   text-align: center;
@@ -683,7 +683,7 @@ function goToCharacter(charId: number) {
 }
 
 .hint {
-  color: #7f8c8d;
+  color: var(--muted);
   font-size: 13px;
   font-style: italic;
 }
@@ -691,7 +691,7 @@ function goToCharacter(charId: number) {
 /* ========== 按钮 ========== */
 .btn-primary {
   padding: 8px 18px;
-  background: #6c5ce7;
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -709,8 +709,8 @@ function goToCharacter(charId: number) {
 
 .btn-secondary {
   padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -725,7 +725,7 @@ function goToCharacter(charId: number) {
   padding: 6px 14px;
   background: rgba(231, 76, 60, 0.08);
   color: #e74c3c;
-  border: 1px solid rgba(231, 76, 60, 0.2);
+  border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
@@ -748,22 +748,22 @@ function goToCharacter(charId: number) {
   justify-content: space-between;
   align-items: center;
   padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--panel);
   backdrop-filter: blur(12px);
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
 }
 
 .relationship-info h4 {
   margin: 0 0 4px 0;
   font-size: 15px;
-  color: #2d3436;
+  color: var(--text);
 }
 
 .relationship-info p {
   margin: 2px 0;
   font-size: 13px;
-  color: #555;
+  color: var(--muted);
 }
 
 .actions {

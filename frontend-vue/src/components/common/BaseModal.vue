@@ -50,6 +50,6 @@ useDialog(panel, () => pending.value, close)
 .modal-fields:not(.modal-actions) { margin: 0; }
 .modal-fields:disabled { pointer-events: none; }
 .modal-content:focus { outline: none; }
-.modal-content :focus-visible { outline: 2px solid #8871cf; outline-offset: 3px; }
-.modal-error { color: #a02735; font-size: 14px; margin-top: 12px; }
+.modal-content :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.modal-error { color: var(--danger); font-size: 14px; margin-top: 12px; }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="view-header">
-      <h2>大纲管理</h2>
+      <h2>章节大纲</h2>
       <div class="view-actions">
         <input
           v-model="searchKeyword"
@@ -37,9 +37,9 @@
         <p v-if="outline.plotOrder"><span class="label">排序：</span>{{ outline.plotOrder }}</p>
         <TagList :tags="outline.tags" />
         <div class="actions">
-          <button class="btn-secondary" @click="editOutline(outline)">✏️ 编辑</button>
-          <button class="btn-small" @click="manageTags(outline)">🏷️ 标签</button>
-          <button class="btn-danger" @click="confirmDelete(outline)">🗑️ 删除</button>
+          <button class="btn-secondary" @click="editOutline(outline)">编辑</button>
+          <button class="btn-small" @click="manageTags(outline)">标签</button>
+          <button class="btn-danger" @click="confirmDelete(outline)">删除</button>
         </div>
       </div>
     </div>

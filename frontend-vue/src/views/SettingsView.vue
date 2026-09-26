@@ -1,10 +1,18 @@
 <template>
   <div class="settings-view">
     <div class="view-header">
-      <h2>⚙️ 全局设置</h2>
+      <h2>设置与备份</h2>
       <button v-if="inNovel" class="btn-back" @click="goBack">← 返回</button>
+      <RouterLink v-else to="/" class="btn-back">← 作品书架</RouterLink>
     </div>
 
+    <div class="settings-section">
+      <h3>工作室外观</h3><p>夜航适合沉浸构思，晨雾适合日间阅读。</p>
+      <div class="theme-choices"><button class="theme-choice" :aria-pressed="studio.theme === 'dark'" @click="studio.theme = 'dark'"><span class="theme-swatch night"></span>夜航 · 深墨与青光</button><button class="theme-choice" :aria-pressed="studio.theme === 'light'" @click="studio.theme = 'light'"><span class="theme-swatch day"></span>晨雾 · 纸白与松绿</button></div>
+    </div>
+    <div v-if="inNovel" class="settings-section">
+      <h3>作品导出</h3><p>把当前作品的资料带到你喜欢的写作环境。</p><div class="export-actions"><button class="btn-secondary" @click="exportApi.downloadMarkdown()">完整 Markdown</button><button class="btn-secondary" @click="exportApi.downloadJson()">数据 JSON</button><button class="btn-secondary" @click="exportApi.downloadCharactersMarkdown()">人物档案</button><button class="btn-secondary" @click="exportApi.downloadOutlinesMarkdown()">章节大纲</button><button class="btn-secondary" @click="exportApi.downloadWorldviewMarkdown()">世界设定</button></div>
+    </div>
     <div v-if="inNovel" class="settings-section">
       <h3>备份与恢复</h3>
       <p>包含小说数据和已上传图片。恢复会替换当前小说数据及封面；外部图片链接和浏览器外观设置不打包。</p>
@@ -18,7 +26,7 @@
     </div>
 
     <div class="settings-section">
-      <h3>🖼️ 全局背景</h3>
+      <h3>全局背景</h3>
       <div class="setting-row">
         <div class="setting-label">背景图片</div>
         <div class="setting-control">
@@ -52,7 +60,7 @@
 
     <!-- WebDAV 同步设置 -->
     <div v-if="inNovel" class="settings-section">
-      <h3>☁️ WebDAV 同步</h3>
+      <h3>WebDAV 同步</h3>
       <p class="section-desc">配置 WebDAV 服务器实现多终端数据同步。支持 NextCloud、ownCloud、群晖 NAS 等。</p>
 
       <div class="setting-row">
@@ -214,6 +222,8 @@ import AppearanceTransfer from '@/components/settings/AppearanceTransfer.vue'
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useStudioStore } from '@/stores/studio'
+import { exportApi } from '@/api/export'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { webdavApi } from '@/api/webdav'
@@ -221,6 +231,7 @@ import { backupApi } from '@/api/backup'
 import type { RemoteFile } from '@/types/webdav'
 
 const appStore = useAppStore()
+const studio = useStudioStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -473,13 +484,13 @@ function formatFileSize(bytes: number): string {
 .opacity-slider {
   width: 100%;
   max-width: 300px;
-  accent-color: #6c5ce7;
+  accent-color: var(--accent);
 }
 
 .opacity-value {
   margin-left: 12px;
   font-weight: 600;
-  color: #6c5ce7;
+  color: var(--accent);
   font-size: 14px;
 }
 
