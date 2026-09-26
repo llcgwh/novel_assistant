@@ -11,6 +11,7 @@
       正文、篇章、资料、段落关联与统计一起同步。自动同步在后端运行时执行；云端有分歧时保留版本，等待你处理。
     </p>
     <div class="writer-cloud-state">
+      <span v-if="busy" role="status" aria-live="polite">{{ operation }}</span>
       <span>本机版本 {{ writer.workspace?.changeSequence }}</span
       ><span>已上传 {{ writer.workspace?.syncedSequence }}</span
       ><span
@@ -26,6 +27,11 @@
           ? `上次同步：${writer.workspace.syncMessage}`
           : '尚未同步'
       }}</span>
+      <span v-if="writer.workspace?.lastSync"
+        >上次成功：{{
+          new Date(writer.workspace.lastSync).toLocaleString()
+        }}</span
+      >
     </div>
     <div class="writer-cloud-actions">
       <button :disabled="busy" @click="act('push')">上传当前作品</button
@@ -47,6 +53,7 @@
     </details>
     <p v-if="error" class="writer-warning" role="alert">{{ error }}</p>
     <div v-if="versions.length" class="writer-cloud-versions">
+      <h4>云端版本记录</h4>
       <article v-for="version in versions" :key="version.file">
         <div>
           <b>{{ version.time }}</b
@@ -117,6 +124,7 @@ defineEmits<{ close: [] }>()
 const writer = useWritingStore(),
   remoteUid = ref(writer.workspace?.uid || ''),
   busy = ref(false),
+  operation = ref(''),
   error = ref(''),
   versions = ref<any[]>([]),
   remote = ref<any>(null),
@@ -177,6 +185,7 @@ function url(path: string) {
 }
 async function load() {
   busy.value = true
+  operation.value = '正在读取云端版本…'
   error.value = ''
   try {
     versions.value = await request.get<any, any[]>(url('versions'), {
@@ -191,6 +200,7 @@ async function load() {
 }
 async function preview(name: string) {
   busy.value = true
+  operation.value = '正在读取版本内容…'
   error.value = ''
   try {
     remote.value = await request.post(
@@ -209,6 +219,8 @@ async function preview(name: string) {
 }
 async function act(action: string) {
   busy.value = true
+  operation.value =
+    action === 'pull' ? '正在保留本机副本并恢复…' : '正在保存正文并上传作品…'
   error.value = ''
   try {
     if (!(await writer.flush())) throw Error('请先保存正文或处理本机冲突')

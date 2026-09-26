@@ -9,6 +9,11 @@
     <p v-else-if="!links.length">
       <small>还没有关联正文。可在写作工作台中把这条资料连到章节或段落。</small>
     </p>
+    <p v-else-if="type === 'characters'" class="writer-footprint-note">
+      <small
+        >按篇卷、章节及段落的叙述顺序，仅统计明确关联；已失效的段落不计首末。</small
+      >
+    </p>
     <RouterLink
       v-for="link in links"
       :key="link.uid"
@@ -16,7 +21,21 @@
         path: `/novel/${route.params.novelId}/writing`,
         query: { chapter: link.chapterUid, block: link.blockId || undefined },
       }"
-      >{{ link.chapterTitle }} · {{ linkRoles[link.role] }}
+      ><span
+        v-if="
+          type === 'characters' &&
+          (link.uid === firstAppearance || link.uid === lastAppearance)
+        "
+        class="writer-footprint-marker"
+        >{{
+          firstAppearance === lastAppearance
+            ? '首次 · 最近登场'
+            : link.uid === firstAppearance
+              ? '首次登场'
+              : '最近登场'
+        }}</span
+      >
+      {{ link.chapterTitle }} · {{ linkRoles[link.role] }}
       <small>{{
         link.anchorMissing ? '原段落已变动，打开章节' : '定位原文 ↗'
       }}</small></RouterLink
@@ -31,7 +50,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { writingApi } from '@/api/writing'
 import { emptyDoc, linkRoles } from '@/utils/writing'
@@ -48,6 +67,11 @@ const props = defineProps<{
   error = ref(''),
   busy = ref(false),
   createUid = crypto.randomUUID()
+const appearances = computed(() =>
+    links.value.filter((link) => !link.anchorMissing),
+  ),
+  firstAppearance = computed(() => appearances.value[0]?.uid),
+  lastAppearance = computed(() => appearances.value.at(-1)?.uid)
 let generation = 0
 async function load() {
   const ticket = ++generation
@@ -68,7 +92,9 @@ async function load() {
     if (ticket === generation) loading.value = false
   }
 }
-watch(() => [props.targetId, props.type], load, { immediate: true })
+watch(() => [props.targetId, props.type, route.params.novelId], load, {
+  immediate: true,
+})
 async function createChapter() {
   busy.value = true
   try {
@@ -99,3 +125,17 @@ async function createChapter() {
   }
 }
 </script>
+<style scoped>
+.writer-footprint-marker {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-right: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 10px;
+}
+.writer-footprint-note {
+  color: var(--muted);
+}
+</style>

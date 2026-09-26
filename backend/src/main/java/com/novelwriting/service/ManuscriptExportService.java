@@ -4,6 +4,7 @@ import static com.novelwriting.service.WritingDocuments.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.novelwriting.entity.*;
+import com.novelwriting.entity.Character;
 import jakarta.persistence.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -63,12 +64,16 @@ public class ManuscriptExportService {
       !selected.isEmpty() && chapters.size() != selected.size()
     ) throw WritingService.bad("导出范围含无效章节");
     String format = options.path("format").asText("txt");
+    List<AppendixSection> appendix = options.path("includeNotes").asBoolean()
+      ? appendix(novelId, chapters, titles)
+      : List.of();
     if (format.equals("docx")) return docx(
       novel,
       chapters,
       volumes,
       titles,
-      options
+      options,
+      appendix
     );
     if (!Set.of("txt", "md").contains(format)) throw WritingService.bad(
       "不支持的导出格式"
@@ -99,23 +104,182 @@ public class ManuscriptExportService {
             : text(parse(chapter.getDocument()))
         )
         .append("\n\n");
-      if (options.path("includeNotes").asBoolean()) {
+    }
+    if (!appendix.isEmpty()) out.append(
+      md ? "## 创作附录\n\n" : "【创作附录】\n\n"
+    );
+    for (AppendixSection section : appendix) {
+      out.append(md ? "### " : "").append(section.title()).append("\n\n");
+      if (!section.notes().isBlank()) out
+        .append(md ? "#### 创作笔记\n\n" : "【创作笔记】\n")
+        .append(md ? markdownLiteral(section.notes()) : section.notes())
+        .append("\n\n");
+      for (ResourceNote resource : section.resources()) {
         out
-          .append(md ? "#### 创作笔记\n" : "【创作笔记】\n")
-          .append(chapter.getNotes())
-          .append("\n");
-        for (JsonNode l : parse(chapter.getLinks()))
-          out
-            .append("- ")
-            .append(l.path("type").asText())
-            .append(" / ")
-            .append(l.path("title").asText())
-            .append(" / ")
-            .append(l.path("role").asText())
-            .append("\n");
+          .append(md ? "#### " : "")
+          .append(md ? markdownLiteral(resource.title()) : resource.title())
+          .append("\n\n");
+        for (String line : resource.lines())
+          out.append(md ? markdownLiteral(line) : line).append("\n\n");
       }
     }
     return out.toString().getBytes(StandardCharsets.UTF_8);
+  }
+
+  private record ResourceNote(String title, List<String> lines) {}
+
+  private record AppendixSection(
+    String title,
+    String notes,
+    List<ResourceNote> resources
+  ) {}
+
+  private List<AppendixSection> appendix(
+    Long novelId,
+    List<WritingChapter> chapters,
+    Map<String, String> titles
+  ) {
+    List<AppendixSection> sections = new ArrayList<>();
+    Map<String, ResourceNote> cache = new HashMap<>();
+    for (WritingChapter chapter : chapters) {
+      Map<String, List<JsonNode>> grouped = new LinkedHashMap<>();
+      for (JsonNode link : parse(chapter.getLinks())) {
+        String key =
+          link.path("type").asText() + ":" + link.path("targetId").asText();
+        if (link.path("missing").asBoolean()) key +=
+          ":missing:" + link.path("uid").asText();
+        grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(link);
+      }
+      List<ResourceNote> resources = new ArrayList<>();
+      for (var entry : grouped.entrySet()) {
+        List<JsonNode> links = entry.getValue();
+        ResourceNote card = cache.computeIfAbsent(entry.getKey(), ignored ->
+          resource(novelId, links.get(0))
+        );
+        List<String> lines = new ArrayList<>(card.lines());
+        Set<String> roles = new LinkedHashSet<>(),
+          excerpts = new LinkedHashSet<>();
+        for (JsonNode link : links) {
+          roles.add(linkRole(link.path("role").asText()));
+          String excerpt = link.path("excerpt").asText().strip();
+          if (!excerpt.isEmpty()) excerpts.add(excerpt);
+        }
+        field(lines, "关联用途", String.join("、", roles));
+        for (String excerpt : excerpts) field(lines, "正文摘录", excerpt);
+        resources.add(new ResourceNote(card.title(), lines));
+      }
+      String notes = Objects.requireNonNullElse(chapter.getNotes(), "");
+      if (!notes.isBlank() || !resources.isEmpty()) sections.add(
+        new AppendixSection(titles.get(chapter.getUid()), notes, resources)
+      );
+    }
+    return sections;
+  }
+
+  private ResourceNote resource(Long novelId, JsonNode link) {
+    String type = link.path("type").asText();
+    Class<? extends NovelOwned> entityType = WritingService.TYPES.get(type);
+    NovelOwned value = null;
+    long targetId = link.path("targetId").asLong(-1);
+    if (
+      entityType != null && targetId > 0 && !link.path("missing").asBoolean()
+    ) value = em
+      .createQuery(
+        "select resource from " +
+          entityType.getSimpleName() +
+          " resource where resource.id = :id and resource.novelId = :novelId",
+        entityType
+      )
+      .setParameter("id", targetId)
+      .setParameter("novelId", novelId)
+      .getResultStream()
+      .findFirst()
+      .orElse(null);
+    List<String> fields = new ArrayList<>();
+    String title;
+    if (value instanceof Character c) {
+      title = "人物卡 · " + c.getName();
+      field(fields, "身份", c.getRole());
+      field(fields, "简介", c.getDescription());
+      field(fields, "性格", c.getPersonality());
+      field(fields, "外貌", c.getAppearance());
+      field(fields, "背景", c.getBackground());
+    } else if (value instanceof Foreshadow f) {
+      title = "伏笔 · " + f.getTitle();
+      field(fields, "内容", f.getContent());
+      field(fields, "埋设位置", f.getLaidAt());
+      field(fields, "揭示位置", f.getRevealedAt());
+      field(
+        fields,
+        "状态",
+        switch (Objects.requireNonNullElse(f.getStatus(), "")) {
+          case "pending" -> "待回收";
+          case "revealed" -> "已揭示";
+          case "abandoned" -> "已废弃";
+          default -> f.getStatus();
+        }
+      );
+    } else if (value instanceof TimelineEvent event) {
+      title = "时间线 · " + event.getTitle();
+      field(fields, "发生时间", event.getEventTime());
+      field(fields, "故事顺序", event.getRealOrder());
+      field(fields, "事件", event.getDescription());
+    } else if (value instanceof Scene scene) {
+      title = "场景 · " + scene.getName();
+      field(fields, "位置", scene.getLocation());
+      field(fields, "氛围", scene.getAtmosphere());
+      field(fields, "描述", scene.getDescription());
+    } else if (value instanceof Outline outline) {
+      title = "大纲 · " + outline.getTitle();
+      field(fields, "内容", outline.getContent());
+      field(fields, "情节顺序", outline.getPlotOrder());
+    } else if (value instanceof WorldviewEntry world) {
+      title = "设定 · " + world.getName();
+      field(fields, "类别", world.getCategory());
+      field(fields, "内容", world.getContent());
+    } else if (value instanceof MapLocation location) {
+      title = "地点 · " + location.getName();
+      field(fields, "类型", location.getLocationType());
+      field(fields, "描述", location.getDescription());
+    } else if (value instanceof Tag tag) {
+      title = "标签 · " + tag.getName();
+      field(fields, "说明", tag.getDescription());
+    } else {
+      title = "失效关联 · " + link.path("title").asText("未命名资料");
+      fields.add(
+        "资料状态：资料已删除、关联失效或不属于当前作品，未导出其内容。"
+      );
+    }
+    if (fields.isEmpty()) fields.add("尚未填写详细资料。");
+    return new ResourceNote(title, fields);
+  }
+
+  private static void field(List<String> fields, String label, Object value) {
+    if (value != null && !value.toString().isBlank()) fields.add(
+      label + "：" + value.toString().strip()
+    );
+  }
+
+  private static String linkRole(String role) {
+    return switch (role) {
+      case "viewpoint" -> "视角人物";
+      case "current" -> "此刻事件";
+      case "laid" -> "埋设";
+      case "hint" -> "暗示";
+      case "developed" -> "推进";
+      case "revealed" -> "揭示";
+      default -> "涉及";
+    };
+  }
+
+  private static String markdownLiteral(String value) {
+    return value
+      .replace("\\", "\\\\")
+      .replace("*", "\\*")
+      .replace("_", "\\_")
+      .replace("[", "\\[")
+      .replace("#", "\\#")
+      .replace(">", "\\>");
   }
 
   private String markdown(JsonNode n) {
@@ -159,7 +323,8 @@ public class ManuscriptExportService {
     List<WritingChapter> chapters,
     Map<String, String> volumes,
     Map<String, String> titles,
-    JsonNode options
+    JsonNode options,
+    List<AppendixSection> appendix
   ) throws IOException {
     StringBuilder body = new StringBuilder();
     if (options.path("titlePage").asBoolean(true)) {
@@ -207,16 +372,20 @@ public class ManuscriptExportService {
       );
       index++;
       renderBlocks(body, parse(c.getDocument()), false);
-      if (options.path("includeNotes").asBoolean()) {
+    }
+    if (!appendix.isEmpty()) paragraph(body, "创作附录", "Heading1", true);
+    for (AppendixSection section : appendix) {
+      paragraph(body, section.title(), "Heading2", false);
+      if (!section.notes().isBlank()) {
         paragraph(body, "创作笔记", "Heading3", false);
-        paragraph(body, c.getNotes(), "Normal", false);
-        for (JsonNode l : parse(c.getLinks()))
-          paragraph(
-            body,
-            l.path("title").asText() + " · " + l.path("role").asText(),
-            "Normal",
-            false
-          );
+        for (String line : section.notes().split("\\R", -1))
+          paragraph(body, line, "Normal", false);
+      }
+      for (ResourceNote resource : section.resources()) {
+        paragraph(body, resource.title(), "Heading3", false);
+        for (String field : resource.lines())
+          for (String line : field.split("\\R", -1))
+            paragraph(body, line, "Normal", false);
       }
     }
     body.append(

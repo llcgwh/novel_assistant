@@ -13,6 +13,7 @@ export interface WritingLink {
   blockId?: string
   excerpt?: string
   role: string
+  plannedRole?: string
   missing?: boolean
 }
 export interface ChapterMeta {

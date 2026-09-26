@@ -17,7 +17,9 @@ public class NovelController {
 
     @Autowired private com.novelwriting.service.WritingService writing;
     @GetMapping("/writing-summary")
-    public com.fasterxml.jackson.databind.JsonNode writingSummary() { return writing.summaries(); }
+    public com.fasterxml.jackson.databind.JsonNode writingSummary(@RequestParam(required = false) String date) {
+        return date == null ? writing.summaries() : writing.summaries(date);
+    }
 
     @GetMapping
     public List<Novel> getAllNovels() {

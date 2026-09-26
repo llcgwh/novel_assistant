@@ -91,6 +91,12 @@
           <option value="serif">书卷宋体</option>
           <option value="sans-serif">清晰黑体</option>
         </select></label
+      ><label
+        >阅读宽度<select v-model="readingWidth" aria-label="阅读宽度">
+          <option value="narrow">窄幅 · 凝神</option>
+          <option value="balanced">适中 · 舒展</option>
+          <option value="wide">宽幅 · 开阔</option>
+        </select></label
       ><label><input v-model="indent" type="checkbox" />首行缩进</label
       ><label><input v-model="focusLine" type="checkbox" />段落聚焦</label
       ><label><input v-model="typewriter" type="checkbox" />打字机滚动</label>
@@ -106,15 +112,22 @@
             ? 'Noto Serif SC, Songti SC, STSong, serif'
             : 'system-ui, sans-serif',
         '--manuscript-indent': indent ? '2em' : '0',
+        '--manuscript-width': readingWidths[readingWidth],
       }"
     />
     <div class="writer-livebar" aria-label="本次写作统计">
       <span
         ><b>{{ count }}</b> 本章字数</span
       ><span
+        class="writer-secondary-count"
+        title="按 Unicode 字符计数，包含标点，不含空白与换行"
+        ><b>{{ characterCount }}</b> 字符（含标点）</span
+      ><span
         ><b>{{ rate }}</b> 字/分</span
       ><span
         ><b>{{ meter.record.typed }}</b> 手输</span
+      ><span
+        ><b>{{ meter.record.pasted }}</b> 粘贴</span
       ><span
         ><b>{{ meter.record.net > 0 ? '+' : '' }}{{ meter.record.net }}</b>
         净增</span
@@ -148,6 +161,7 @@ import { isHistoryTransaction } from '@tiptap/pm/history'
 import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { useWritingStore } from '@/stores/writing'
+import { characterCountWithPunctuation } from '@/utils/writingStatistics'
 import {
   documentText,
   wordCount,
@@ -167,17 +181,21 @@ const findOpen = ref(false),
   fontSize = ref(20),
   lineHeight = ref(2),
   font = ref('serif'),
+  readingWidth = ref<'narrow' | 'balanced' | 'wide'>('balanced'),
   indent = ref(true),
   focusLine = ref(false),
   typewriter = ref(false)
+const readingWidths = { narrow: '34rem', balanced: '46rem', wide: '62rem' }
 try {
   const p = JSON.parse(localStorage.getItem('ink-writing-appearance') || '{}')
   fontSize.value = p.fontSize || 20
   lineHeight.value = p.lineHeight || 2
   font.value = p.font || 'serif'
+  if (['narrow', 'balanced', 'wide'].includes(p.readingWidth))
+    readingWidth.value = p.readingWidth
   indent.value = p.indent !== false
 } catch {}
-watch([fontSize, lineHeight, font, indent], () => {
+watch([fontSize, lineHeight, font, indent, readingWidth], () => {
   try {
     localStorage.setItem(
       'ink-writing-appearance',
@@ -186,6 +204,7 @@ watch([fontSize, lineHeight, font, indent], () => {
         lineHeight: lineHeight.value,
         font: font.value,
         indent: indent.value,
+        readingWidth: readingWidth.value,
       }),
     )
   } catch {}
@@ -198,8 +217,12 @@ const meter = reactive(new WritingMeter(chapterUid, previous)),
   tick = ref(Date.now()),
   manualPause = ref(false),
   statsError = ref('')
-const count = computed(() =>
-    wordCount(documentText(writer.current?.doc || { type: 'doc' })),
+const chapterText = computed(() =>
+    documentText(writer.current?.doc || { type: 'doc' }),
+  ),
+  count = computed(() => wordCount(chapterText.value)),
+  characterCount = computed(() =>
+    characterCountWithPunctuation(chapterText.value),
   ),
   rate = computed(() => meter.rate(tick.value))
 const ActiveParagraph = Extension.create({
@@ -459,3 +482,14 @@ onBeforeUnmount(() => {
 })
 defineExpose({ editor, findNext, find, flushStats: persistMeter })
 </script>
+<style scoped>
+.manuscript-paper :deep(.tiptap) {
+  width: 100%;
+  max-width: var(--manuscript-width, 46rem);
+  min-width: 0;
+  margin-inline: auto;
+}
+.writer-secondary-count {
+  opacity: 0.8;
+}
+</style>

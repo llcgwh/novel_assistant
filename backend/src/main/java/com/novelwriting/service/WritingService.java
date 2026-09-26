@@ -67,6 +67,16 @@ public class WritingService {
 
   @Transactional(readOnly = true)
   public ObjectNode summaries() {
+    return summaries(java.time.LocalDate.now().toString());
+  }
+
+  @Transactional(readOnly = true)
+  public ObjectNode summaries(String date) {
+    try {
+      java.time.LocalDate.parse(date);
+    } catch (RuntimeException e) {
+      throw bad("日期格式无效");
+    }
     ObjectNode out = JSON.createObjectNode();
     for (Object[] row : em
       .createQuery(
@@ -79,6 +89,53 @@ public class WritingService {
         .put("chapters", ((Number) row[1]).longValue())
         .put("words", ((Number) row[2]).longValue())
         .put("updatedAt", row[3] == null ? null : row[3].toString());
+    for (Object[] row : em
+      .createQuery(
+        "select novelId,uid,title from WritingChapter where deleted=false order by updatedAt desc,id desc",
+        Object[].class
+      )
+      .getResultList()) {
+      if (
+        !(out.path(row[0].toString()) instanceof ObjectNode summary)
+      ) continue;
+      if (!summary.has("lastChapter")) summary
+        .putObject("lastChapter")
+        .put("uid", row[1].toString())
+        .put("title", row[2].toString());
+    }
+    for (WritingBook book : em
+      .createQuery("from WritingBook", WritingBook.class)
+      .getResultList()) {
+      ObjectNode summary = out.has(book.getNovelId().toString())
+        ? (ObjectNode) out.path(book.getNovelId().toString())
+        : out
+          .putObject(book.getNovelId().toString())
+          .put("words", 0)
+          .put("chapters", 0);
+      summary.put(
+        "dailyGoal",
+        parse(book.getPreferences()).path("dailyGoal").asInt(2000)
+      );
+      summary.put("todayNet", 0);
+    }
+    for (Object[] row : em
+      .createQuery(
+        "select novelId,payload from WritingSession where payload like :date",
+        Object[].class
+      )
+      .setParameter("date", "%\"date\":\"" + date + "\"%")
+      .getResultList()) {
+      JsonNode payload = parse((String) row[1]);
+      if (
+        !date.equals(payload.path("date").asText()) ||
+        !out.has(row[0].toString())
+      ) continue;
+      ObjectNode summary = (ObjectNode) out.path(row[0].toString());
+      summary.put(
+        "todayNet",
+        summary.path("todayNet").asLong() + payload.path("net").asLong()
+      );
+    }
     return out;
   }
 
@@ -258,6 +315,16 @@ public class WritingService {
       if (!ids.add(link.path("uid").asText())) throw bad("关联标识重复");
       String type = link.path("type").asText();
       if (!TYPES.containsKey(type)) throw bad("关联类型无效");
+      if (
+        link.has("plannedRole") &&
+        (!type.equals("foreshadows") ||
+          !Set.of("laid", "hint", "developed", "revealed").contains(
+            link.path("plannedRole").asText()
+          ) ||
+          !Set.of("reference", link.path("plannedRole").asText()).contains(
+            link.path("role").asText()
+          ))
+      ) throw bad("伏笔计划作用无效");
       if (
         link.path("missing").asBoolean() && link.path("targetId").isNull()
       ) continue;
@@ -576,27 +643,55 @@ public class WritingService {
   }
 
   public ArrayNode backlinks(Long id, String type, Long target) {
-    book(id);
+    WritingBook b = book(id);
+    Map<String, Integer> volumeOrder = new HashMap<>();
+    int rank = 0;
+    for (JsonNode volume : parse(b.getVolumes()))
+      volumeOrder.put(volume.path("uid").asText(), rank++);
+    List<WritingChapter> ordered = new ArrayList<>(chapters(id));
+    ordered.sort(
+      Comparator.comparingInt((WritingChapter c) ->
+        c.getVolumeId() == null
+          ? -1
+          : volumeOrder.getOrDefault(c.getVolumeId(), Integer.MAX_VALUE)
+      )
+        .thenComparingInt(WritingChapter::getPosition)
+        .thenComparing(WritingChapter::getId)
+    );
     ArrayNode out = JSON.createArrayNode();
-    for (WritingChapter c : chapters(id))
-      if (!c.isDeleted()) for (JsonNode link : parse(c.getLinks()))
+    for (WritingChapter c : ordered) {
+      if (c.isDeleted()) continue;
+      List<JsonNode> links = new ArrayList<>();
+      for (JsonNode link : parse(c.getLinks())) {
         if (
           link.path("type").asText().equals(type) &&
           link.path("targetId").asLong() == target
-        ) {
-          ObjectNode row = (ObjectNode) link.deepCopy();
-          row.put("chapterUid", c.getUid());
-          row.put("chapterTitle", c.getTitle());
-          row.put("position", c.getPosition());
-          row.put(
-            "anchorMissing",
-            !link.path("blockId").asText().isBlank() &&
-              !blocks(parse(c.getDocument())).contains(
-                link.path("blockId").asText()
-              )
-          );
-          out.add(row);
-        }
+        ) links.add(link);
+      }
+      if (links.isEmpty()) continue;
+      Map<String, Integer> blockOrder = new HashMap<>();
+      for (String block : parse(c.getDocument()).findValuesAsText("id"))
+        blockOrder.put(block, blockOrder.size());
+      links.sort(
+        Comparator.comparingInt(link -> {
+          String anchor = link.path("blockId").asText();
+          if (anchor.isBlank()) return -1;
+          return blockOrder.getOrDefault(anchor, Integer.MAX_VALUE);
+        })
+      );
+      for (JsonNode link : links) {
+        ObjectNode row = (ObjectNode) link.deepCopy();
+        row.put("chapterUid", c.getUid());
+        row.put("chapterTitle", c.getTitle());
+        row.put("position", c.getPosition());
+        row.put(
+          "anchorMissing",
+          !link.path("blockId").asText().isBlank() &&
+            !blockOrder.containsKey(link.path("blockId").asText())
+        );
+        out.add(row);
+      }
+    }
     return out;
   }
 

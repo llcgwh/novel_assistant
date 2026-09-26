@@ -94,6 +94,62 @@ class WritingServiceTest {
   }
 
   @Test
+  void bookshelfSummariesKeepDailyProgressAndResumeChapterWithinEachNovel() {
+    long first = novel(),
+      second = novel();
+    ObjectNode a = writing.create(first, draft("首作正文"));
+    writing.create(second, draft("另一作品"));
+    String session = UUID.randomUUID().toString();
+    ObjectNode data = JSON.createObjectNode()
+      .put("uid", session)
+      .put("sequence", 1)
+      .put("date", "2026-09-27")
+      .put("chapterUid", a.path("uid").asText())
+      .put("typed", 12)
+      .put("pasted", 0)
+      .put("net", 12)
+      .put("activeSeconds", 60)
+      .put("peak", 12);
+    writing.session(first, session, data);
+    ObjectNode summary = writing.summaries("2026-09-27");
+    assertEquals(
+      "首作正文",
+      summary
+        .path(String.valueOf(first))
+        .path("lastChapter")
+        .path("title")
+        .asText()
+    );
+    assertEquals(
+      12,
+      summary.path(String.valueOf(first)).path("todayNet").asInt()
+    );
+    assertEquals(
+      0,
+      summary.path(String.valueOf(second)).path("todayNet").asInt()
+    );
+    assertEquals(
+      0,
+      writing
+        .summaries("2026-09-28")
+        .path(String.valueOf(first))
+        .path("todayNet")
+        .asInt()
+    );
+    writing.save(
+      first,
+      a.path("uid").asText(),
+      mutation(a).put("deleted", true)
+    );
+    assertFalse(
+      writing
+        .summaries("2026-09-27")
+        .path(String.valueOf(first))
+        .has("lastChapter")
+    );
+  }
+
+  @Test
   void chapterDatesUseIsoStringsForWorkspaceAndDetail() {
     long id = novel();
     ObjectNode first = writing.create(id, draft("时间格式"));
