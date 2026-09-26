@@ -6,7 +6,7 @@
 
 面向本地使用的小说创作工作室，支持多部作品、篇卷章节、人物与世界设定、正文关联、WebDAV 同步和 Word 导出。
 
-[写作指南](docs/writing-guide.md) · [界面与快捷操作](docs/ink-studio.md) · [维护手册](docs/maintenance.md) · [反馈问题](https://github.com/llcgwh/novel_assistant/issues)
+[写作指南](docs/writing-guide.md) · [方案逐项核对](docs/writing-scope-audit.md) · [界面与快捷操作](docs/ink-studio.md) · [维护手册](docs/maintenance.md) · [反馈问题](https://github.com/llcgwh/novel_assistant/issues)
 
 ![墨境写作工作台](docs/screenshots/writing-desktop.png)
 
@@ -30,6 +30,10 @@
 ![空间折页实际浏览器转场](docs/screenshots/spatial-sheets.gif)
 
 同一张折页随模块切换翻转、移动和展开，显示当前模块的索引、进度或导览；进入写作页后成为「故事罗盘」。夜航 / 晨雾双主题、专注计时、快捷指令（⌘K / Ctrl+K）和响应式布局覆盖整套工作室，也提供减少动态效果适配。
+
+从书架进入作品，书封翻转并落入预留的折页位置；返回时又合回书架。码字日历以全年周网格呈现，绿色深浅表示每日净增，悬停或点击可查看手输、粘贴、活跃时间等详情。
+
+![全年码字热力图](docs/screenshots/writing-heatmap.png)
 
 截图和动图使用独立测试库中的虚构作品。更多操作见 [工作室说明](docs/ink-studio.md)。
 
@@ -116,13 +120,13 @@ npm run build
 
 ## 关于这个项目
 
-**llcg** 负责需求、创作方向与迭代反馈，AI 参与代码和文档的实现。不同阶段的协作构成了现在的墨境：
+**llcg** 负责需求、创作方向与迭代反馈，代码与文档由 AI 完成。不同阶段的模型协作构成了现在的墨境：
 
-| 协作工具 | 主要参与 |
+| 参与模型 | 主要参与 |
 | --- | --- |
 | Claude | 搭建项目基础框架，建立初始页面与故事资料管理模块。 |
 | DeepSeek | 在初始框架上进一步完善功能、交互与项目实现。 |
-| Codex | 持续修复保存与备份可靠性，建设 Ink Studio 视觉及写作工作台，补充资料联动、同步导出与回归验证。 |
+| GPT | 持续修复保存与备份可靠性，建设 Ink Studio 视觉及写作工作台，补充资料联动、同步导出与回归验证。 |
 
 欢迎通过 [GitHub Issues](https://github.com/llcgwh/novel_assistant/issues) 反馈问题与想法。
 
