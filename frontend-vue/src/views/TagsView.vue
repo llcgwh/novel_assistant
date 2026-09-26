@@ -31,7 +31,7 @@
       v-if="showCreateModal || editingTag"
       :title="editingTag ? '编辑标签' : '添加标签'"
       @close="closeModal"
-      @confirm="saveTag"
+      :submit="saveTag"
     >
       <div class="form-group">
         <label>标签名称 *</label>
@@ -52,7 +52,7 @@
       v-if="deletingTag"
       title="确认删除"
       @close="deletingTag = null"
-      @confirm="deleteTag"
+      :submit="deleteTag"
     >
       <p>确定要删除标签「{{ deletingTag.name }}」吗？</p>
     </BaseModal>
@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted } from 'vue'
 import { useTagsStore } from '@/stores/tags'
 import type { Tag } from '@/types/tag'
@@ -68,6 +69,7 @@ import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
 const tagsStore = useTagsStore()
+const saveTagForm = useFormSave('tags', () => tagsStore.tags)
 
 const showCreateModal = ref(false)
 const editingTag = ref<Tag | null>(null)
@@ -95,6 +97,7 @@ function confirmDelete(tag: Tag) {
 }
 
 function closeModal() {
+  saveTagForm.reset()
   showCreateModal.value = false
   editingTag.value = null
   form.name = ''
@@ -109,11 +112,7 @@ async function saveTag() {
   }
 
   try {
-    if (editingTag.value) {
-      await tagsStore.updateTag(editingTag.value.id, { ...form })
-    } else {
-      await tagsStore.createTag({ ...form })
-    }
+    await saveTagForm.save(editingTag.value?.id, { ...form })
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)

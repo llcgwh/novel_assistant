@@ -47,7 +47,7 @@
       :title="editingScene ? '编辑场景' : '添加场景'"
       @close="closeModal"
       :busy="saving"
-      @confirm="saveScene"
+      :submit="saveScene"
     >
       <div class="form-group">
         <label>📷 场景图片</label>
@@ -86,7 +86,7 @@
       v-if="taggingScene"
       title="管理标签"
       @close="taggingScene = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -96,7 +96,7 @@
       v-if="deletingScene"
       title="确认删除"
       @close="deletingScene = null"
-      @confirm="deleteScene"
+      :submit="deleteScene"
     >
       <p style="text-align:center; padding: 10px 0;">⚠️ 确定要删除场景「<strong>{{ deletingScene.name }}</strong>」吗？</p>
     </BaseModal>
@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useScenesStore } from '@/stores/scenes'
@@ -117,6 +118,7 @@ import TagList from '@/components/tags/TagList.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 
 const scenesStore = useScenesStore()
+const formSaver = useFormSave('scenes', () => scenesStore.scenes)
 const tagsStore = useTagsStore()
 const route = useRoute()
 
@@ -187,6 +189,7 @@ function confirmDelete(scene: Scene) {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingScene.value = null
   form.name = ''
@@ -202,19 +205,7 @@ async function saveScene() {
   if (!form.name.trim()) { alert('请输入场景名称'); return }
   saving.value = true
   try {
-    let sceneId: number
-    if (editingScene.value) {
-      await scenesStore.updateScene(editingScene.value.id, { ...form })
-      sceneId = editingScene.value.id
-    } else {
-      const newScene = await scenesStore.createScene({ ...form })
-      // 保留服务器已创建的记录，标签失败后重试改为更新。
-      editingScene.value = newScene
-      sceneId = newScene.id
-    }
-    if (formTagIds.value.length > 0 || editingScene.value) {
-      await scenesStore.setSceneTags(sceneId, formTagIds.value)
-    }
+    await formSaver.save(editingScene.value?.id, { ...form }, { tagIds: formTagIds.value })
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)

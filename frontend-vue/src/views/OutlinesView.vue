@@ -50,7 +50,7 @@
       :title="editingOutline ? '编辑大纲' : '添加大纲'"
       @close="closeModal"
       :busy="saving"
-      @confirm="saveOutline"
+      :submit="saveOutline"
     >
       <div class="form-group">
         <label>标题 *</label>
@@ -87,7 +87,7 @@
       v-if="taggingOutline"
       title="管理标签"
       @close="taggingOutline = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -97,7 +97,7 @@
       v-if="deletingOutline"
       title="确认删除"
       @close="deletingOutline = null"
-      @confirm="deleteOutline"
+      :submit="deleteOutline"
     >
       <p>确定要删除大纲「{{ deletingOutline.title }}」吗？</p>
     </BaseModal>
@@ -105,6 +105,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useOutlinesStore } from '@/stores/outlines'
@@ -119,6 +120,7 @@ import TagList from '@/components/tags/TagList.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const outlinesStore = useOutlinesStore()
+const formSaver = useFormSave('outlines', () => outlinesStore.outlines)
 const tagsStore = useTagsStore()
 const route = useRoute()
 
@@ -209,6 +211,7 @@ function confirmDelete(outline: Outline) {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingOutline.value = null
   form.title = ''
@@ -228,20 +231,7 @@ async function saveOutline() {
 
   saving.value = true
   try {
-    let outlineId: number
-    if (editingOutline.value) {
-      await outlinesStore.updateOutline(editingOutline.value.id, { ...form })
-      outlineId = editingOutline.value.id
-    } else {
-      const newOutline = await outlinesStore.createOutline({ ...form })
-      // 保留服务器已创建的记录，标签失败后重试改为更新。
-      editingOutline.value = newOutline
-      outlineId = newOutline.id
-    }
-    // 保存标签
-    if (formTagIds.value.length > 0 || editingOutline.value) {
-      await outlinesStore.setOutlineTags(outlineId, formTagIds.value)
-    }
+    await formSaver.save(editingOutline.value?.id, { ...form }, { tagIds: formTagIds.value })
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)

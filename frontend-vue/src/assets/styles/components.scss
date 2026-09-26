@@ -598,7 +598,15 @@ nav {
   }
 
   input {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+
+    &:focus-visible + .tag-label {
+      outline: 2px solid $primary-color;
+      outline-offset: 4px;
+    }
 
     &:checked + .tag-label {
       opacity: 1;

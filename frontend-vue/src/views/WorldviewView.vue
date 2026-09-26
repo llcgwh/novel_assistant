@@ -76,7 +76,7 @@
       v-if="showCreateModal || editingEntry"
       :title="editingEntry ? '编辑世界观条目' : '添加世界观条目'"
       @close="closeModal"
-      @confirm="saveEntry"
+      :submit="saveEntry"
     >
       <div class="form-group">
         <label>🖼️ 图片</label>
@@ -161,7 +161,7 @@
       v-if="taggingEntry"
       title="管理标签"
       @close="taggingEntry = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -171,7 +171,7 @@
       v-if="deletingEntry"
       title="确认删除"
       @close="deletingEntry = null"
-      @confirm="deleteEntry"
+      :submit="deleteEntry"
     >
       <p style="text-align:center; padding: 10px 0;">⚠️ 确定要删除世界观条目「<strong>{{ deletingEntry.name }}</strong>」吗？</p>
     </BaseModal>
@@ -179,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useWorldviewStore } from '@/stores/worldview'
@@ -195,9 +196,9 @@ import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
-import { worldviewApi } from '@/api/worldview'
 
 const worldviewStore = useWorldviewStore()
+const formSaver = useFormSave('worldview', () => worldviewStore.entries)
 const tagsStore = useTagsStore()
 const charactersStore = useCharactersStore()
 const scenesStore = useScenesStore()
@@ -275,6 +276,7 @@ function confirmDelete(entry: WorldviewEntry) {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingEntry.value = null
   resetForm()
@@ -302,81 +304,11 @@ async function saveEntry() {
   }
 
   try {
-    let entryId: number
-    if (editingEntry.value) {
-      const updated = await worldviewStore.updateEntry(editingEntry.value.id, {
-        name: form.name,
-        category: form.category as any,
-        content: form.content,
-        entryImage: form.entryImage
-      })
-      entryId = updated.id
-    } else {
-      const created = await worldviewStore.createEntry({
-        name: form.name,
-        category: form.category as any,
-        content: form.content,
-        entryImage: form.entryImage
-      })
-      entryId = created.id
-    }
-
-    // Save tags
-    await worldviewStore.setEntryTags(entryId, formTagIds.value)
-
-    // Save character relations
-    if (editingEntry.value) {
-      const prev = editingEntry.value
-      const prevCharIds = new Set(prev.characters?.map(c => c.id) || [])
-      const newCharIds = new Set(formCharacterIds.value)
-      for (const cid of formCharacterIds.value) {
-        if (!prevCharIds.has(cid)) {
-          await worldviewApi.addCharacterRelation(entryId, cid)
-        }
-      }
-      for (const cid of (prev.characters || [])) {
-        if (!newCharIds.has(cid.id)) {
-          await worldviewApi.removeCharacterRelation(entryId, cid.id)
-        }
-      }
-      const prevSceneIds = new Set(prev.scenes?.map(s => s.id) || [])
-      const newSceneIds = new Set(formSceneIds.value)
-      for (const sid of formSceneIds.value) {
-        if (!prevSceneIds.has(sid)) {
-          await worldviewApi.addSceneRelation(entryId, sid)
-        }
-      }
-      for (const sid of (prev.scenes || [])) {
-        if (!newSceneIds.has(sid.id)) {
-          await worldviewApi.removeSceneRelation(entryId, sid.id)
-        }
-      }
-      const prevLocIds = new Set(prev.mapLocations?.map(l => l.id) || [])
-      const newLocIds = new Set(formLocationIds.value)
-      for (const lid of formLocationIds.value) {
-        if (!prevLocIds.has(lid)) {
-          await worldviewApi.addMapLocationRelation(entryId, lid)
-        }
-      }
-      for (const lid of (prev.mapLocations || [])) {
-        if (!newLocIds.has(lid.id)) {
-          await worldviewApi.removeMapLocationRelation(entryId, lid.id)
-        }
-      }
-    } else {
-      for (const cid of formCharacterIds.value) {
-        await worldviewApi.addCharacterRelation(entryId, cid)
-      }
-      for (const sid of formSceneIds.value) {
-        await worldviewApi.addSceneRelation(entryId, sid)
-      }
-      for (const lid of formLocationIds.value) {
-        await worldviewApi.addMapLocationRelation(entryId, lid)
-      }
-    }
-
+    await formSaver.save(editingEntry.value?.id, { ...form }, {
+      tagIds: formTagIds.value, characterIds: formCharacterIds.value,
+      sceneIds: formSceneIds.value, mapLocationIds: formLocationIds.value
+    })
     closeModal()
-    await worldviewStore.fetchEntries()
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败，请重试')

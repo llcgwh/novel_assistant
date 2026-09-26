@@ -83,7 +83,7 @@
       :title="editingEvent ? '编辑事件' : '添加事件'"
       @close="closeModal"
       :busy="saving"
-      @confirm="saveEvent"
+      :submit="saveEvent"
     >
       <div class="form-group">
         <label>事件标题 *</label>
@@ -112,7 +112,7 @@
       v-if="relatingEvent"
       title="管理关联"
       @close="relatingEvent = null"
-      @confirm="saveRelations"
+      :submit="saveRelations"
     >
       <div class="form-group">
         <label>关联人物</label>
@@ -157,7 +157,7 @@
       v-if="taggingEvent"
       title="管理标签"
       @close="taggingEvent = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -167,7 +167,7 @@
       v-if="deletingEvent"
       title="确认删除"
       @close="deletingEvent = null"
-      @confirm="deleteEvent"
+      :submit="deleteEvent"
     >
       <p>确定要删除事件「{{ deletingEvent.title }}」吗？</p>
     </BaseModal>
@@ -175,6 +175,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -194,6 +195,7 @@ import TagList from '@/components/tags/TagList.vue'
 const router = useRouter()
 const route = useRoute()
 const timelineStore = useTimelineStore()
+const formSaver = useFormSave('timeline-events', () => timelineStore.events)
 const charactersStore = useCharactersStore()
 const scenesStore = useScenesStore()
 const foreshadowsStore = useForeshadowsStore()
@@ -273,6 +275,7 @@ function confirmDelete(event: TimelineEvent) {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingEvent.value = null
   form.title = ''; form.eventTime = ''; form.realOrder = 0; form.description = ''
@@ -284,20 +287,7 @@ async function saveEvent() {
   if (!form.title.trim()) { alert('请输入事件标题'); return }
   saving.value = true
   try {
-    let eventId: number
-    if (editingEvent.value) {
-      await timelineStore.updateEvent(editingEvent.value.id, { ...form })
-      eventId = editingEvent.value.id
-    } else {
-      const newEvent = await timelineStore.createEvent({ ...form })
-      // 保留服务器已创建的记录，标签失败后重试改为更新。
-      editingEvent.value = newEvent
-      eventId = newEvent.id
-    }
-    // 保存标签
-    if (formTagIds.value.length > 0 || editingEvent.value) {
-      await timelineStore.setEventTags(eventId, formTagIds.value)
-    }
+    await formSaver.save(editingEvent.value?.id, { ...form }, { tagIds: formTagIds.value })
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)

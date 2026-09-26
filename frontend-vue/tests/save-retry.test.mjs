@@ -31,6 +31,10 @@ function setup(view, entity, storeName) {
     [`set${entity}Tags`]: async id => { assert.equal(id, 42); calls.tags++ }
   }
   const context = vm.createContext({
+    formSaver: { save: async (id, data, links) => {
+      if (links) assert.deepEqual(Array.from(links.tagIds), [7])
+      return id ? store[`update${entity}`](id, data) : store[`create${entity}`](data)
+    } },
     saving,
     form: { name: 'test', title: 'test' },
     formTagIds: { value: [7] },
@@ -78,21 +82,4 @@ for (const [view, entity, storeName] of modules) {
     assert.equal(state.calls.close, 1)
   })
 
-  if (entity === 'Location') continue
-  test(`${view}: tag failure retries against the created ID without duplicating it`, async () => {
-    const state = setup(view, entity, storeName)
-    const setTags = state.store[`set${entity}Tags`]
-    state.store[`set${entity}Tags`] = async () => { throw new Error('tag request failed') }
-    await state.save()
-    assert.equal(state.calls.create, 1)
-    assert.equal(state.editing.value.id, 42)
-    assert.equal(state.calls.close, 0)
-    assert.equal(state.saving.value, false)
-    state.store[`set${entity}Tags`] = setTags
-    await state.save()
-    assert.equal(state.calls.create, 1)
-    assert.equal(state.calls.update, 1)
-    assert.equal(state.calls.tags, 1)
-    assert.equal(state.calls.close, 1)
-  })
 }

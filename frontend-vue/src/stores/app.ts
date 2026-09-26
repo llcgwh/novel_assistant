@@ -1,3 +1,4 @@
+import { parseAppearance, defaultAppearance } from '@/utils/appearance'
 import { defineStore } from 'pinia'
 import { ref, reactive, watch } from 'vue'
 
@@ -18,27 +19,26 @@ export const useAppStore = defineStore('app', () => {
 
   // Toast 状态
   const toast = reactive({
+    sequence: 0,
     message: '',
     type: 'info' as 'success' | 'error' | 'info' | 'warning',
     visible: false
   })
 
   // 全局设置 - 从 localStorage 恢复
-  const savedSettings = localStorage.getItem('app-settings')
-  const defaultSettings: AppSettings = {
-    backgroundImage: '',
-    backgroundOpacity: 0.55
-  }
-
-  const settings = reactive<AppSettings>(
-    savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings
-  )
+  let saved = { ...defaultAppearance }
+  try {
+    const raw = localStorage.getItem('app-settings')
+    if (raw) saved = parseAppearance(JSON.parse(raw))
+  } catch { /* A damaged or old preference must not prevent the app from opening. */ }
+  const settings = reactive<AppSettings>(saved)
 
   // 持久化设置
   watch(
     () => ({ ...settings }),
     (newSettings) => {
-      localStorage.setItem('app-settings', JSON.stringify(newSettings))
+      try { localStorage.setItem('app-settings', JSON.stringify(newSettings)) }
+      catch { showToast('浏览器存储空间不足，外观设置暂未保存', 'warning') }
     },
     { deep: true }
   )
@@ -69,6 +69,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function showToast(message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') {
+    toast.sequence++
     toast.message = message
     toast.type = type
     toast.visible = true

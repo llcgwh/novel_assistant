@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export function useModal<T = any>() {
+export function useModal<T = unknown>() {
   const isOpen = ref(false)
   const data = ref<T | null>(null)
 

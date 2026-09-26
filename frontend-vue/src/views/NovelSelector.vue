@@ -79,7 +79,7 @@
       v-if="showCreateModal || editingNovel"
       :title="editingNovel ? '编辑小说' : '创建新小说'"
       @close="closeModal"
-      @confirm="saveNovel"
+      :submit="saveNovel"
     >
       <div class="form-group">
         <label>📷 封面图片</label>
@@ -122,7 +122,7 @@
       v-if="deletingNovel"
       title="确认删除"
       @close="deletingNovel = null"
-      @confirm="deleteNovel"
+      :submit="deleteNovel"
     >
       <p style="text-align:center; padding: 10px 0;">
         ⚠️ 确定要删除小说「<strong>{{ deletingNovel.title }}</strong>」吗？此操作不可恢复。

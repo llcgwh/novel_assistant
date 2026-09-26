@@ -52,7 +52,7 @@
       :title="editingCharacter ? '编辑人物' : '添加人物'"
       @close="closeModal"
       :busy="saving"
-      @confirm="saveCharacter"
+      :submit="saveCharacter"
     >
       <div class="form-group">
         <label>📷 人物肖像</label>
@@ -95,7 +95,7 @@
       v-if="taggingCharacter"
       title="管理标签"
       @close="taggingCharacter = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -105,7 +105,7 @@
       v-if="deletingCharacter"
       title="确认删除"
       @close="deletingCharacter = null"
-      @confirm="deleteCharacter"
+      :submit="deleteCharacter"
     >
       <p style="text-align:center; padding: 10px 0;">⚠️ 确定要删除人物「<strong>{{ deletingCharacter.name }}</strong>」吗？</p>
     </BaseModal>
@@ -113,6 +113,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useCharactersStore } from '@/stores/characters'
@@ -126,6 +127,7 @@ import TagList from '@/components/tags/TagList.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 
 const charactersStore = useCharactersStore()
+const formSaver = useFormSave('characters', () => charactersStore.characters)
 const tagsStore = useTagsStore()
 const route = useRoute()
 
@@ -200,6 +202,7 @@ function confirmDelete(character: Character) {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingCharacter.value = null
   resetForm()
@@ -224,19 +227,7 @@ async function saveCharacter() {
 
   saving.value = true
   try {
-    let characterId: number
-    if (editingCharacter.value) {
-      await charactersStore.updateCharacter(editingCharacter.value.id, { ...form })
-      characterId = editingCharacter.value.id
-    } else {
-      const newCharacter = await charactersStore.createCharacter({ ...form })
-      // 保留服务器已创建的记录，标签失败后重试改为更新。
-      editingCharacter.value = newCharacter
-      characterId = newCharacter.id
-    }
-    if (formTagIds.value.length > 0 || editingCharacter.value) {
-      await charactersStore.setCharacterTags(characterId, formTagIds.value)
-    }
+    await formSaver.save(editingCharacter.value?.id, { ...form }, { tagIds: formTagIds.value })
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)

@@ -67,7 +67,7 @@
       :title="editingLocation ? '编辑位置' : '添加位置'"
       @close="closeModal"
       :busy="saving"
-      @confirm="saveLocation"
+      :submit="saveLocation"
     >
       <div class="form-group">
         <label>位置名称 *</label>
@@ -113,7 +113,7 @@
       v-if="taggingLocation"
       title="管理标签"
       @close="taggingLocation = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -123,7 +123,7 @@
       v-if="deletingLocation"
       title="确认删除"
       @close="deletingLocation = null"
-      @confirm="deleteLocation"
+      :submit="deleteLocation"
     >
       <p>确定要删除位置「{{ deletingLocation.name }}」吗？</p>
     </BaseModal>
@@ -131,6 +131,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
@@ -147,6 +148,7 @@ import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const route = useRoute()
 const mapStore = useMapStore()
+const formSaver = useFormSave('map-locations', () => mapStore.locations)
 const tagsStore = useTagsStore()
 const scenesStore = useScenesStore()
 
@@ -309,6 +311,7 @@ function onSceneSelect() {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingLocation.value = null
   clickedPosition.value = null
@@ -325,13 +328,9 @@ async function saveLocation() {
     const data = {
       name: form.name, locationType: form.locationType, description: form.description,
       positionX: form.positionX, positionY: form.positionY,
-      parentLocation: form.parentLocationId ? { id: Number(form.parentLocationId) } : undefined
+      parentLocation: form.parentLocationId ? { id: Number(form.parentLocationId) } : null
     }
-    if (editingLocation.value) {
-      await mapStore.updateLocation(editingLocation.value.id, data)
-    } else {
-      await mapStore.createLocation(data)
-    }
+    await formSaver.save(editingLocation.value?.id, data)
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)

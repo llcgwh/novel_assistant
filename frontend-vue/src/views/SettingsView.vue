@@ -48,6 +48,8 @@
       </div>
     </div>
 
+    <AppearanceTransfer />
+
     <!-- WebDAV 同步设置 -->
     <div v-if="inNovel" class="settings-section">
       <h3>☁️ WebDAV 同步</h3>
@@ -169,7 +171,7 @@
       v-if="showRemoteFiles"
       title="云端备份文件"
       @close="showRemoteFiles = false"
-      @confirm="restoreFromCloud"
+      :submit="restoreFromCloud"
     >
       <div v-if="remoteFilesLoading" class="loading">加载中...</div>
       <div v-else-if="remoteFiles.length === 0" class="empty-hint">
@@ -208,6 +210,7 @@
 </template>
 
 <script setup lang="ts">
+import AppearanceTransfer from '@/components/settings/AppearanceTransfer.vue'
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -248,6 +251,7 @@ const inNovel = computed(() => !!route.params.novelId)
 
 const bgImage = ref(appStore.settings.backgroundImage)
 const bgOpacity = ref(appStore.settings.backgroundOpacity)
+watch(() => [appStore.settings.backgroundImage, appStore.settings.backgroundOpacity] as const, ([image, opacity]) => { bgImage.value = image; bgOpacity.value = opacity })
 
 watch(bgImage, (val) => {
   appStore.updateSetting('backgroundImage', val)

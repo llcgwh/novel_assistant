@@ -1,6 +1,6 @@
 <template>
   <Transition name="toast">
-    <div v-if="appStore.toast.visible" :class="['toast', `toast-${appStore.toast.type}`]">
+    <div v-if="appStore.toast.visible" role="status" aria-live="polite" :class="['toast', `toast-${appStore.toast.type}`]">
       <span class="toast-icon">{{ icon }}</span>
       <span class="toast-message">{{ appStore.toast.message }}</span>
       <button class="toast-close" @click="appStore.hideToast">&times;</button>
@@ -9,7 +9,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, computed } from 'vue'
+import { watch, computed, onBeforeUnmount } from 'vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
@@ -27,8 +27,9 @@ const icon = computed(() => {
 let timer: ReturnType<typeof setTimeout> | null = null
 
 watch(
-  () => appStore.toast.visible,
-  (visible) => {
+  () => appStore.toast.sequence,
+  () => {
+    const visible = appStore.toast.visible
     if (visible) {
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
@@ -37,6 +38,7 @@ watch(
     }
   }
 )
+onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
 </script>
 
 <style scoped>

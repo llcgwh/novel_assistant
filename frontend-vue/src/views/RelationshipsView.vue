@@ -11,42 +11,8 @@
     <div class="relationships-layout">
       <!-- 左侧：关系图 -->
       <div class="canvas-panel">
-        <div class="canvas-container" id="relationship-canvas-container">
-          <canvas
-            ref="relationshipCanvas"
-            id="relationship-canvas"
-            width="800"
-            height="600"
-            @click="onCanvasClick"
-            @mousemove="onCanvasMouseMove"
-            @mouseleave="hoveredNode = null"
-            title="点击人物节点可编辑"
-          ></canvas>
-          <!-- Hover tooltip overlay -->
-          <div
-            v-if="hoveredNode"
-            class="canvas-tooltip"
-            :style="tooltipStyle"
-          >
-            <div class="tooltip-header">{{ hoveredNode.name }}</div>
-            <div v-if="hoveredNodeRelations.length" class="tooltip-section">
-              <div class="tooltip-label">关系 ({{ hoveredNodeRelations.length }})</div>
-              <div v-for="rel in hoveredNodeRelations" :key="rel.id" class="tooltip-item">
-                <span class="rel-other">{{ rel.otherName }}</span>
-                <span v-if="rel.relationshipType" class="rel-type"> · {{ rel.relationshipType }}</span>
-              </div>
-            </div>
-            <div v-if="hoveredNodeGroups.length" class="tooltip-section">
-              <div class="tooltip-label">所属关系组 ({{ hoveredNodeGroups.length }})</div>
-              <div v-for="g in hoveredNodeGroups" :key="g.id" class="tooltip-item group-item">
-                {{ g.name }}
-              </div>
-            </div>
-            <div v-if="!hoveredNodeRelations.length && !hoveredNodeGroups.length" class="tooltip-empty">
-              暂无关系和关系组
-            </div>
-          </div>
-        </div>
+        <RelationshipGraph :characters="charactersStore.characters" :relationships="relationshipsStore.relationships"
+          :groups="groupsStore.groups" @open-character="goToCharacter" />
 
         <LoadingState v-if="relationshipsStore.loading" />
 
@@ -129,7 +95,7 @@
       v-if="showCreateRelModal || editingRelationship"
       :title="editingRelationship ? '编辑关系' : '添加关系'"
       @close="closeRelModal"
-      @confirm="saveRelationship"
+      :submit="saveRelationship"
     >
       <div class="form-group">
         <label>人物1 *</label>
@@ -166,7 +132,7 @@
       v-if="deletingRelationship"
       title="确认删除"
       @close="deletingRelationship = null"
-      @confirm="deleteRelationship"
+      :submit="deleteRelationship"
     >
       <p>确定要删除这个关系吗？</p>
     </BaseModal>
@@ -176,7 +142,7 @@
       v-if="showGroupModal"
       :title="editingGroup ? '编辑关系组' : '创建关系组'"
       @close="closeGroupModal"
-      @confirm="saveGroup"
+      :submit="saveGroup"
     >
       <div class="form-group">
         <label>组名 *</label>
@@ -223,7 +189,7 @@
       v-if="deletingGroup"
       title="确认删除关系组"
       @close="deletingGroup = null"
-      @confirm="deleteGroup"
+      :submit="deleteGroup"
     >
       <p>确定要删除关系组「{{ deletingGroup.name }}」吗？</p>
       <p class="hint">这不会删除组内的角色，仅删除关系组本身。</p>
@@ -232,13 +198,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { useFormSave } from '@/composables/useFormSave'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useRelationshipsStore } from '@/stores/relationships'
 import { useRelationshipGroupsStore } from '@/stores/relationshipGroups'
 import { useCharactersStore } from '@/stores/characters'
 import type { Relationship, RelationshipGroup } from '@/types/relationship'
-import type { ID } from '@/types'
+import RelationshipGraph from '@/components/relationships/RelationshipGraph.vue'
+import { flattenGroupTree } from '@/utils/relationshipGroups'
 import BaseModal from '@/components/common/BaseModal.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -247,12 +215,10 @@ import BaseSelect from '@/components/common/BaseSelect.vue'
 const router = useRouter()
 const route = useRoute()
 const relationshipsStore = useRelationshipsStore()
+const saveRelationshipForm = useFormSave('relationships', () => relationshipsStore.relationships)
 const groupsStore = useRelationshipGroupsStore()
+const saveGroupForm = useFormSave('relationship-groups', () => groupsStore.groups)
 const charactersStore = useCharactersStore()
-
-// ========== Canvas refs & state ==========
-const relationshipCanvas = ref<HTMLCanvasElement | null>(null)
-const nodePositions = ref<Record<number, { x: number; y: number }>>({})
 
 // ========== 关系表单 state ==========
 const showCreateRelModal = ref(false)
@@ -275,10 +241,6 @@ const groupForm = reactive({
   parentGroupId: '' as string,
   characterIds: [] as number[]
 })
-
-// ========== Hover tooltip state ==========
-const hoveredNode = ref<{ id: number; name: string } | null>(null)
-const tooltipStyle = ref({ left: '0px', top: '0px' })
 
 // ========== Computed ==========
 const character1Options = computed(() => [
@@ -321,53 +283,7 @@ const parentGroupOptions = computed(() => {
   return options
 })
 
-// 构建组树（支持嵌套）
-interface GroupTreeNode extends RelationshipGroup {
-  children?: GroupTreeNode[]
-  _depth?: number
-}
-
-const groupTree = computed<GroupTreeNode[]>(() => {
-  const all = groupsStore.groups as GroupTreeNode[]
-  // 找出顶级节点（无父组）
-  const roots = all.filter(g => !g.parentGroupId)
-  const children = all.filter(g => g.parentGroupId)
-
-  function attachChildren(parent: GroupTreeNode, depth: number) {
-    parent._depth = depth
-    parent.children = children.filter(c => c.parentGroupId === parent.id)
-    parent.children.forEach(c => attachChildren(c, depth + 1))
-  }
-
-  roots.forEach(r => attachChildren(r, 0))
-
-  // 也处理那些父组被删除的孤立子组
-  const orphaned = children.filter(c => !all.some(a => a.id === c.parentGroupId))
-  orphaned.forEach(o => { o._depth = 0; o.children = [] })
-
-  return [...roots, ...orphaned]
-})
-
-// Hover 角色时计算的关系
-const hoveredNodeRelations = computed(() => {
-  if (!hoveredNode.value) return []
-  return relationshipsStore.relationships
-    .filter(r => r.characterId1 === hoveredNode.value!.id || r.characterId2 === hoveredNode.value!.id)
-    .map(r => {
-      const otherId = r.characterId1 === hoveredNode.value!.id ? r.characterId2 : r.characterId1
-      return {
-        id: r.id,
-        otherName: getCharacterName(otherId),
-        relationshipType: r.relationshipType
-      }
-    })
-})
-
-// Hover 角色时所属的关系组
-const hoveredNodeGroups = computed(() => {
-  if (!hoveredNode.value) return []
-  return groupsStore.getGroupsForCharacter(hoveredNode.value.id)
-})
+const groupTree = computed(() => flattenGroupTree(groupsStore.groups))
 
 // ========== Lifecycle ==========
 onMounted(async () => {
@@ -376,147 +292,10 @@ onMounted(async () => {
     charactersStore.fetchCharacters(),
     groupsStore.fetchGroups()
   ])
-  nextTick(() => drawGraph())
 })
 
-watch(() => [relationshipsStore.relationships, charactersStore.characters, groupsStore.groups], () => {
-  nextTick(() => drawGraph())
-}, { deep: true })
-
-// ========== Canvas 绘制 ==========
 function getCharacterName(id: number) {
   return charactersStore.characters.find(c => c.id === id)?.name || '未知'
-}
-
-function drawGraph() {
-  const canvas = relationshipCanvas.value
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#fafafa'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  const characters = charactersStore.characters
-  if (characters.length === 0) return
-
-  // 圆形布局
-  const centerX = canvas.width / 2
-  const centerY = canvas.height / 2
-  const radius = Math.min(centerX, centerY) - 60
-
-  const positions: Record<number, { x: number; y: number }> = {}
-  characters.forEach((char, i) => {
-    const angle = (2 * Math.PI * i) / characters.length - Math.PI / 2
-    positions[char.id] = {
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle)
-    }
-  })
-
-  nodePositions.value = positions
-
-  // 绘制关系连线
-  relationshipsStore.relationships.forEach(rel => {
-    const pos1 = positions[rel.characterId1]
-    const pos2 = positions[rel.characterId2]
-    if (pos1 && pos2) {
-      ctx.beginPath()
-      ctx.moveTo(pos1.x, pos1.y)
-      ctx.lineTo(pos2.x, pos2.y)
-      ctx.strokeStyle = getRelationColor(rel.relationshipType)
-      ctx.lineWidth = 2
-      ctx.stroke()
-
-      // 关系类型标签
-      const midX = (pos1.x + pos2.x) / 2
-      const midY = (pos1.y + pos2.y) / 2
-      if (rel.relationshipType) {
-        ctx.fillStyle = '#666'
-        ctx.font = '11px Microsoft YaHei'
-        ctx.textAlign = 'center'
-        ctx.fillText(rel.relationshipType, midX, midY)
-      }
-    }
-  })
-
-  // 绘制角色节点
-  characters.forEach(char => {
-    const pos = positions[char.id]
-    if (pos) {
-      ctx.beginPath()
-      ctx.arc(pos.x, pos.y, 25, 0, Math.PI * 2)
-      ctx.fillStyle = '#3498db'
-      ctx.fill()
-      ctx.strokeStyle = '#2980b9'
-      ctx.lineWidth = 3
-      ctx.stroke()
-
-      ctx.fillStyle = '#fff'
-      ctx.font = 'bold 12px Microsoft YaHei'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      const displayName = char.name.length > 4 ? char.name.slice(0, 4) + '..' : char.name
-      ctx.fillText(displayName, pos.x, pos.y)
-    }
-  })
-}
-
-function getRelationColor(type?: string) {
-  const colors: Record<string, string> = {
-    '朋友': '#27ae60', '敌人': '#e74c3c', '恋人': '#e91e63',
-    '亲属': '#9c27b0', '同事': '#3498db', '师徒': '#ff9800'
-  }
-  return colors[type || ''] || '#95a5a6'
-}
-
-// ========== Canvas 交互 ==========
-function onCanvasClick(e: MouseEvent) {
-  const node = hitTest(e)
-  if (node) {
-    const novelId = route.params.novelId
-    router.push({ path: `/novel/${novelId}/characters`, query: { edit: String(node.id) } })
-  }
-}
-
-function onCanvasMouseMove(e: MouseEvent) {
-  const node = hitTest(e)
-  if (node) {
-    hoveredNode.value = node
-    const canvas = relationshipCanvas.value!
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const x = (e.clientX - rect.left) * scaleX
-    const y = (e.clientY - rect.top) * scaleY
-    // 将 canvas 坐标映射回视口坐标
-    tooltipStyle.value = {
-      left: (x / scaleX + 15) + 'px',
-      top: (y / scaleY - 10) + 'px'
-    }
-  } else {
-    hoveredNode.value = null
-  }
-}
-
-function hitTest(e: MouseEvent): { id: number; name: string } | null {
-  const canvas = relationshipCanvas.value
-  if (!canvas) return null
-  const rect = canvas.getBoundingClientRect()
-  const scaleX = canvas.width / rect.width
-  const scaleY = canvas.height / rect.height
-  const x = (e.clientX - rect.left) * scaleX
-  const y = (e.clientY - rect.top) * scaleY
-
-  for (const [id, pos] of Object.entries(nodePositions.value)) {
-    const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2)
-    if (dist <= 25) {
-      const char = charactersStore.characters.find(c => c.id === Number(id))
-      return char ? { id: char.id, name: char.name } : null
-    }
-  }
-  return null
 }
 
 // ========== 关系 CRUD ==========
@@ -533,6 +312,7 @@ function confirmDelete(rel: Relationship) {
 }
 
 function closeRelModal() {
+  saveRelationshipForm.reset()
   showCreateRelModal.value = false
   editingRelationship.value = null
   form.characterId1 = ''; form.characterId2 = ''
@@ -553,11 +333,7 @@ async function saveRelationship() {
       relationshipType: form.relationshipType,
       description: form.description
     }
-    if (editingRelationship.value) {
-      await relationshipsStore.updateRelationship(editingRelationship.value.id, data)
-    } else {
-      await relationshipsStore.createRelationship(data)
-    }
+    await saveRelationshipForm.save(editingRelationship.value?.id, data)
     closeRelModal()
   } catch (error) {
     console.error('保存失败:', error)
@@ -599,6 +375,7 @@ function confirmDeleteGroup(group: RelationshipGroup) {
 }
 
 function closeGroupModal() {
+  saveGroupForm.reset()
   showGroupModal.value = false
   editingGroup.value = null
 }
@@ -610,15 +387,10 @@ async function saveGroup() {
   try {
     const data = {
       name: groupForm.name.trim(),
-      description: groupForm.description || undefined,
-      parentGroupId: groupForm.parentGroupId ? Number(groupForm.parentGroupId) : null,
-      characterIds: groupForm.characterIds
+      description: groupForm.description || null,
+      parentGroupId: groupForm.parentGroupId ? Number(groupForm.parentGroupId) : null
     }
-    if (editingGroup.value) {
-      await groupsStore.updateGroup(editingGroup.value.id, data)
-    } else {
-      await groupsStore.createGroup(data)
-    }
+    await saveGroupForm.save(editingGroup.value?.id, data, { characterIds: groupForm.characterIds })
     closeGroupModal()
   } catch (error) {
     console.error('保存关系组失败:', error)
@@ -646,11 +418,14 @@ function toggleGroupExpand(groupId: number) {
   expandedGroups.value = newSet
 }
 
-function isDescendantOf(groupId: ID, ancestorId: ID): boolean {
-  const group = groupsStore.groups.find(g => g.id === groupId)
-  if (!group) return false
-  if (group.parentGroupId === ancestorId) return true
-  if (group.parentGroupId) return isDescendantOf(group.parentGroupId, ancestorId)
+function isDescendantOf(groupId: number, ancestorId: number): boolean {
+  const seen = new Set<number>()
+  let current: number | null | undefined = groupId
+  while (current && !seen.has(current)) {
+    if (current === ancestorId) return true
+    seen.add(current)
+    current = groupsStore.groups.find(group => group.id === current)?.parentGroupId
+  }
   return false
 }
 
@@ -721,84 +496,6 @@ function goToCharacter(charId: number) {
   color: #2d3436;
 }
 
-/* ========== Canvas ========== */
-.canvas-container {
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  margin-bottom: 16px;
-}
-
-#relationship-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-.canvas-tooltip {
-  position: absolute;
-  pointer-events: none;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 10px;
-  padding: 12px 14px;
-  min-width: 180px;
-  max-width: 260px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  z-index: 500;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #2d3436;
-}
-
-.tooltip-header {
-  font-weight: 700;
-  font-size: 15px;
-  color: #6c5ce7;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.tooltip-section {
-  margin-top: 6px;
-}
-
-.tooltip-label {
-  font-size: 11px;
-  color: #7f8c8d;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.tooltip-item {
-  padding: 2px 0;
-  font-size: 13px;
-  color: #2d3436;
-}
-
-.tooltip-item .rel-other {
-  font-weight: 500;
-}
-
-.tooltip-item .rel-type {
-  color: #7f8c8d;
-  font-size: 12px;
-}
-
-.group-item {
-  color: #6c5ce7;
-}
-
-.tooltip-empty {
-  color: #95a5a6;
-  font-size: 12px;
-  font-style: italic;
-}
-
 /* ========== 关系组树 ========== */
 .groups-tree {
   display: flex;
@@ -866,7 +563,8 @@ function goToCharacter(charId: number) {
   transition: opacity 0.15s;
 }
 
-.group-node-header:hover .group-actions {
+.group-node-header:hover .group-actions,
+.group-node-header:focus-within .group-actions {
   opacity: 1;
 }
 
@@ -1076,9 +774,12 @@ function goToCharacter(charId: number) {
 
 /* ========== 响应式 ========== */
 @media (max-width: 768px) {
+  .canvas-panel { width: 100%; }
   .relationships-layout {
     flex-direction: column;
   }
+
+  .group-actions { opacity: 1; }
 
   .groups-panel {
     width: 100%;

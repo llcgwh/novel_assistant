@@ -2,14 +2,14 @@
   <div class="image-upload">
     <div v-if="previewUrl" class="image-preview">
       <img :src="previewUrl" alt="预览" />
-      <button class="remove-image-btn" @click="removeImage" title="移除图片">&times;</button>
+      <button type="button" class="remove-image-btn" :disabled="uploading" @click="removeImage" title="移除图片">&times;</button>
     </div>
-    <div v-else class="image-upload-area" @click="triggerUpload">
+    <button v-else type="button" class="image-upload-area" :disabled="uploading" @click="triggerUpload">
       <span class="upload-placeholder">
         <span class="upload-icon">🖼️</span>
         {{ placeholder || '点击上传图片' }}
       </span>
-    </div>
+    </button>
     <input
       ref="fileInput"
       type="file"
@@ -50,7 +50,7 @@ function triggerUpload() {
 async function handleFileChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file) return
+  if (!file || uploading.value) return
 
   // 本地预览
   const localPreview = URL.createObjectURL(file)
@@ -58,14 +58,24 @@ async function handleFileChange(event: Event) {
 
   uploading.value = true
   try {
-    const result = await imagesApi.upload(file, props.imageType || 'other')
-    const fileUrl = imagesApi.getFileUrl(result.id)
+    let fileUrl: string
+    if (props.imageType === 'background') {
+      if (file.size > 2 * 1024 * 1024 || !/^image\/(png|jpeg|gif|webp|bmp)$/.test(file.type)) throw new Error('请使用 2 MiB 以内的 PNG、JPEG、GIF 或 WebP 图片')
+      fileUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file)
+      })
+    } else {
+      const result = await imagesApi.upload(file, props.imageType || 'other')
+      fileUrl = imagesApi.getFileUrl(result.id)
+    }
+    previewUrl.value = fileUrl
     emit('update:modelValue', fileUrl)
   } catch (error) {
     console.error('Image upload failed:', error)
     previewUrl.value = props.modelValue || ''
-    alert('图片上传失败，请重试')
+    alert(error instanceof Error ? error.message : '图片上传失败，请重试')
   } finally {
+    URL.revokeObjectURL(localPreview)
     uploading.value = false
     // 清理 input
     if (input) input.value = ''

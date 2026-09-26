@@ -50,7 +50,7 @@
       :title="editingForeshadow ? '编辑伏笔' : '添加伏笔'"
       @close="closeModal"
       :busy="saving"
-      @confirm="saveForeshadow"
+      :submit="saveForeshadow"
     >
       <div class="form-group">
         <label>标题 *</label>
@@ -87,7 +87,7 @@
       v-if="taggingForeshadow"
       title="管理标签"
       @close="taggingForeshadow = null"
-      @confirm="saveTags"
+      :submit="saveTags"
     >
       <TagSelector v-model="selectedTagIds" :tags="tagsStore.tags" />
     </BaseModal>
@@ -97,7 +97,7 @@
       v-if="deletingForeshadow"
       title="确认删除"
       @close="deletingForeshadow = null"
-      @confirm="deleteForeshadow"
+      :submit="deleteForeshadow"
     >
       <p>确定要删除伏笔「{{ deletingForeshadow.title }}」吗？</p>
     </BaseModal>
@@ -105,6 +105,7 @@
 </template>
 
 <script setup lang="ts">
+import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useForeshadowsStore } from '@/stores/foreshadows'
@@ -119,6 +120,7 @@ import TagList from '@/components/tags/TagList.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const foreshadowsStore = useForeshadowsStore()
+const formSaver = useFormSave('foreshadows', () => foreshadowsStore.foreshadows)
 const tagsStore = useTagsStore()
 const route = useRoute()
 
@@ -204,6 +206,7 @@ function confirmDelete(foreshadow: Foreshadow) {
 }
 
 function closeModal() {
+  formSaver.reset()
   showCreateModal.value = false
   editingForeshadow.value = null
   form.title = ''; form.content = ''; form.status = 'pending'
@@ -216,20 +219,7 @@ async function saveForeshadow() {
   if (!form.title.trim()) { alert('请输入伏笔标题'); return }
   saving.value = true
   try {
-    let foreshadowId: number
-    if (editingForeshadow.value) {
-      await foreshadowsStore.updateForeshadow(editingForeshadow.value.id, { ...form })
-      foreshadowId = editingForeshadow.value.id
-    } else {
-      const newForeshadow = await foreshadowsStore.createForeshadow({ ...form })
-      // 保留服务器已创建的记录，标签失败后重试改为更新。
-      editingForeshadow.value = newForeshadow
-      foreshadowId = newForeshadow.id
-    }
-    // 保存标签
-    if (formTagIds.value.length > 0 || editingForeshadow.value) {
-      await foreshadowsStore.setForeshadowTags(foreshadowId, formTagIds.value)
-    }
+    await formSaver.save(editingForeshadow.value?.id, { ...form }, { tagIds: formTagIds.value })
     closeModal()
   } catch (error) {
     console.error('保存失败:', error)
