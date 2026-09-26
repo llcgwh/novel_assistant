@@ -13,6 +13,8 @@
     :style="{ opacity: appStore.settings.backgroundOpacity }"
   ></div>
   <router-view :key="String(route.params.novelId || 'global')" />
+  <BookPassage />
+  <ProjectSignature />
   <Toast />
 </template>
 
@@ -21,12 +23,16 @@ import { useRoute } from 'vue-router'
 import { watchEffect } from 'vue'
 import { useStudioStore } from '@/stores/studio'
 import Toast from '@/components/common/Toast.vue'
+import BookPassage from '@/components/studio/BookPassage.vue'
+import ProjectSignature from '@/components/studio/ProjectSignature.vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const route = useRoute()
 const studio = useStudioStore()
-watchEffect(() => { document.documentElement.dataset.studioTheme = studio.theme })
+watchEffect(() => {
+  document.documentElement.dataset.studioTheme = studio.theme
+})
 </script>
 
 <style lang="scss">

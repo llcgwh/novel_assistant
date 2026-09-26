@@ -1,5 +1,10 @@
 <template>
-  <BaseModal :busy="busy" :title="titles[mode]" @close="$emit('close')">
+  <BaseModal
+    :busy="busy"
+    :wide="mode === 'stats'"
+    :title="titles[mode]"
+    @close="$emit('close')"
+  >
     <template v-if="mode === 'export'">
       <div class="writer-options">
         <label
@@ -32,7 +37,7 @@
         ><input
           v-model="includeNotes"
           type="checkbox"
-        />附加创作便笺与关联资料清单</label
+        />附加创作笔记与关联资料</label
       >
       <template v-if="format === 'docx'"
         ><label class="writer-check"
@@ -138,6 +143,22 @@
           ><span>字 · {{ chapters.length }} 章</span>
         </article>
         <article>
+          <small>{{ currentVolumeTitle }}</small
+          ><b>{{ volumeWords?.toLocaleString() ?? '—' }}</b>
+          <span>{{
+            writer.current ? '字 · 排除回收站' : '打开章节后查看所在篇卷'
+          }}</span>
+        </article>
+        <article>
+          <small>当前章节</small
+          ><b>{{ writer.current?.wordCount.toLocaleString() ?? '—' }}</b>
+          <span>{{
+            writer.current
+              ? `字 · 含标点 ${currentCharacters.toLocaleString()} 字符（不含空白）`
+              : '尚未打开章节'
+          }}</span>
+        </article>
+        <article>
           <small>今日净增</small
           ><b>{{ today.net > 0 ? '+' : '' }}{{ today.net }}</b
           ><span>手输 {{ today.typed }} · 粘贴 {{ today.pasted }}</span>
@@ -175,22 +196,7 @@
         }}
         · 今日进度
       </p>
-      <div class="writer-calendar" aria-label="最近三十天写作">
-        <div
-          v-for="day in days"
-          :key="day.date"
-          :title="day.date + '：净增 ' + day.net + ' 字'"
-          :style="{
-            opacity:
-              day.net > 0
-                ? Math.min(1, 0.35 + day.net / Math.max(1, dailyGoal))
-                : 0.16,
-          }"
-        >
-          <small>{{ day.date.slice(5) }}</small
-          ><b>{{ day.net }}</b>
-        </div>
-      </div>
+      <WritingHeatmap :sessions="sessions" :daily-goal="dailyGoal" />
       <p>
         汉字按字，英文按词，数字按组；标点与空白不计。粘贴、撤销和恢复不抬高速率。正文不包含回收站、资料和便笺。
       </p>
@@ -280,6 +286,7 @@
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingHeatmap from '@/components/writing/WritingHeatmap.vue'
 import { useWritingStore } from '@/stores/writing'
 import { writingApi } from '@/api/writing'
 import {
@@ -291,6 +298,10 @@ import {
   linkRoles,
 } from '@/utils/writing'
 import type { Chapter, DocNode } from '@/types/writing'
+import {
+  characterCountWithPunctuation,
+  currentVolumeWords,
+} from '@/utils/writingStatistics'
 const props = defineProps<{ mode: string }>(),
   emit = defineEmits<{ close: [] }>(),
   writer = useWritingStore(),
@@ -337,6 +348,24 @@ const dailyGoal = ref(writer.workspace?.preferences.dailyGoal ?? 2000),
     () => writer.workspace?.chapters.filter((c) => !c.deleted) || [],
   )
 const sessions = computed(() => writer.workspace?.sessions || [])
+const volumeWords = computed(() =>
+  currentVolumeWords(chapters.value, writer.current),
+)
+const currentVolumeTitle = computed(() => {
+  if (!writer.current) return '当前篇卷'
+  if (!writer.current.volumeId) return '未分卷章节合计'
+  return (
+    '当前卷 · ' +
+    (writer.workspace?.volumes.find(
+      (volume) => volume.uid === writer.current!.volumeId,
+    )?.title || '未命名篇卷')
+  )
+})
+const currentCharacters = computed(() =>
+  characterCountWithPunctuation(
+    writer.current ? documentText(writer.current.doc) : '',
+  ),
+)
 const today = computed(() =>
   sessions.value
     .filter((s) => s.date === localDate())
@@ -351,19 +380,6 @@ const today = computed(() =>
     ),
 )
 const peak = computed(() => Math.max(0, ...sessions.value.map((s) => s.peak)))
-const days = computed(() =>
-  Array.from({ length: 30 }, (_, i) => {
-    const date = new Date()
-    date.setDate(date.getDate() - 29 + i)
-    const key = localDate(date)
-    return {
-      date: key,
-      net: sessions.value
-        .filter((s) => s.date === key)
-        .reduce((n, s) => n + s.net, 0),
-    }
-  }),
-)
 const linkedResources = computed(() => {
   const seen = new Map<string, string>()
   chapters.value.forEach((c) =>

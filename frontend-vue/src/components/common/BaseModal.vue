@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="modal" @click.self="close">
-      <div ref="panel" class="modal-content" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="pending" tabindex="-1">
+      <div ref="panel" class="modal-content" :class="{ 'modal-wide': wide }" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="pending" tabindex="-1">
         <h2>{{ title }}</h2>
         <fieldset class="modal-fields" :disabled="pending" :inert="pending">
           <slot></slot>
@@ -23,6 +23,7 @@ import { ref, computed } from 'vue'
 import { useDialog } from '@/composables/useDialog'
 const props = withDefaults(defineProps<{
   title: string
+  wide?: boolean
   busy?: boolean
   submit?: () => unknown | Promise<unknown>
 }>(), { busy: false })
@@ -50,6 +51,7 @@ useDialog(panel, () => pending.value, close)
 .modal-fields:not(.modal-actions) { margin: 0; }
 .modal-fields:disabled { pointer-events: none; }
 .modal-content:focus { outline: none; }
+.modal-content.modal-wide { width: min(960px, calc(100vw - 32px)); max-width: 960px; }
 .modal-content :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .modal-error { color: var(--danger); font-size: 14px; margin-top: 12px; }
 </style>

@@ -73,10 +73,13 @@
           作品加载失败。<button @click="loadNovels">重试</button>
         </div>
         <LoadingState
-          v-else-if="novelStore.loading"
+          v-if="novelStore.loading && !novelStore.novels.length"
           message="正在打开你的作品书架…"
         />
-        <div v-else-if="!visibleNovels.length" class="empty-state">
+        <div
+          v-else-if="!loadError && !visibleNovels.length"
+          class="empty-state"
+        >
           <div class="empty-art"><StudioIcon name="book" /></div>
           <h3>
             {{
@@ -100,7 +103,7 @@
             创建第一部作品
           </button>
         </div>
-        <div v-else class="book-grid">
+        <div v-else-if="visibleNovels.length" class="book-grid">
           <article
             v-for="(novel, index) in visibleNovels"
             :key="novel.id"
@@ -109,6 +112,12 @@
             <RouterLink
               :to="`/novel/${novel.id}/overview`"
               class="book-cover"
+              :class="{
+                'is-book-arriving':
+                  studio.bookArrival?.direction === 'close' &&
+                  studio.bookArrival.novelId === novel.id,
+              }"
+              :data-book-portal="novel.id"
               :style="{ '--cover-hue': ((novel.id * 37) % 120) + 145 }"
               @click="rememberNovel(novel.id)"
               :aria-label="`打开作品：${novel.title}`"
@@ -144,15 +153,50 @@
               <p>{{ novel.description || '故事正在酝酿，世界即将展开。' }}</p>
               <RouterLink
                 class="book-writing-summary"
-                :to="`/novel/${novel.id}/writing`"
+                :to="{
+                  path: `/novel/${novel.id}/writing`,
+                  query: writingSummaries[novel.id]?.lastChapter
+                    ? { chapter: writingSummaries[novel.id].lastChapter!.uid }
+                    : {},
+                }"
                 @click="rememberNovel(novel.id)"
-                ><span
-                  >{{
-                    writingSummaries[novel.id]?.words.toLocaleString() || '0'
-                  }}
-                  字 · {{ writingSummaries[novel.id]?.chapters || 0 }} 章</span
-                ><span>落笔 ↗</span></RouterLink
+                ><span>{{
+                  summaryFailed
+                    ? '统计暂不可用'
+                    : (writingSummaries[novel.id]?.words.toLocaleString() ||
+                        '0') +
+                      ' 字 · ' +
+                      (writingSummaries[novel.id]?.chapters || 0) +
+                      ' 章'
+                }}</span
+                ><span>{{
+                  writingSummaries[novel.id]?.lastChapter
+                    ? '续写 ↗'
+                    : '落笔 ↗'
+                }}</span></RouterLink
               >
+              <div v-if="!summaryFailed" class="book-writing-progress">
+                <span>{{
+                  writingSummaries[novel.id]?.lastChapter?.title ||
+                  '第一章，等你落笔'
+                }}</span>
+                <small
+                  >今日
+                  {{ (writingSummaries[novel.id]?.todayNet || 0) > 0 ? '+' : ''
+                  }}{{ writingSummaries[novel.id]?.todayNet || 0 }} 字
+                  <span v-if="writingSummaries[novel.id]?.dailyGoal"
+                    >/ {{ writingSummaries[novel.id]?.dailyGoal }} 目标</span
+                  ></small
+                >
+                <progress
+                  v-if="writingSummaries[novel.id]?.dailyGoal"
+                  :max="writingSummaries[novel.id]?.dailyGoal"
+                  :value="
+                    Math.max(0, writingSummaries[novel.id]?.todayNet || 0)
+                  "
+                  :aria-label="`${novel.title}今日写作进度`"
+                ></progress>
+              </div>
               <div class="book-card-footer">
                 <span>{{ novel.author || '未署名' }}</span>
                 <div>
@@ -254,9 +298,16 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { request } from '@/api/request'
-const writingSummaries = ref<
-  Record<number, { words: number; chapters: number }>
->({})
+import { localDate } from '@/utils/writing'
+interface BookSummary {
+  words: number
+  chapters: number
+  todayNet: number
+  dailyGoal: number
+  lastChapter?: { uid: string; title: string }
+}
+const writingSummaries = ref<Record<number, BookSummary>>({})
+const summaryFailed = ref(false)
 import { useNovelStore } from '@/stores/novel'
 import { useStudioStore } from '@/stores/studio'
 import { filterNovels } from '@/utils/studio'
@@ -316,12 +367,16 @@ async function loadNovels() {
   loadError.value = false
   try {
     await novelStore.fetchNovels()
+    summaryFailed.value = false
     writingSummaries.value = await request
       .get<
         any,
-        Record<number, { words: number; chapters: number }>
-      >('/novels/writing-summary')
-      .catch(() => ({}))
+        Record<number, BookSummary>
+      >('/novels/writing-summary', { params: { date: localDate() } })
+      .catch(() => {
+        summaryFailed.value = true
+        return {}
+      })
   } catch {
     loadError.value = true
   }

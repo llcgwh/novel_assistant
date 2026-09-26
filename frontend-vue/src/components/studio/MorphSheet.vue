@@ -2,12 +2,17 @@
   <section
     ref="panel"
     class="morph-sheet"
-    :class="{ 'is-flying': moving, 'is-placed': placed }"
+    :class="{
+      'is-flying': moving,
+      'is-placed': placed,
+      'is-book-arriving': studio.bookArrival?.direction === 'open',
+    }"
     :data-sheet="displayed"
     :data-destination="sheetId"
     :data-motion="moving ? 'flying' : 'settled'"
     :style="{ '--sheet-tint': sheetFor(displayed).tint }"
-    :inert="moving || !placed"
+    :inert="moving || !placed || studio.bookArrival?.direction === 'open'"
+    :aria-hidden="studio.bookArrival?.direction === 'open' || undefined"
     :aria-label="`${sheetFor(displayed).caption}折页`"
     @pointermove="shine"
     @pointerleave="clearShine"

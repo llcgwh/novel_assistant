@@ -11,6 +11,10 @@ export const useStudioStore = defineStore('studio', () => {
     focused = ref(false),
     commandsOpen = ref(false)
   const spatialMotion = ref(true)
+  const bookArrival = ref<{
+    direction: 'open' | 'close'
+    novelId: number
+  } | null>(null)
   try {
     spatialMotion.value = localStorage.getItem('ink-spatial-motion') !== 'off'
   } catch {
@@ -33,5 +37,12 @@ export const useStudioStore = defineStore('studio', () => {
   function toggleTheme() {
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
   }
-  return { theme, focused, commandsOpen, spatialMotion, toggleTheme }
+  return {
+    theme,
+    focused,
+    commandsOpen,
+    spatialMotion,
+    bookArrival,
+    toggleTheme,
+  }
 })
