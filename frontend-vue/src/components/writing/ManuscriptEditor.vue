@@ -212,7 +212,8 @@ watch([fontSize, lineHeight, font, indent, readingWidth], () => {
 let previous = documentText(writer.current!.doc),
   composing = false,
   source: 'typed' | 'paste' = 'typed',
-  disposed = false
+  disposed = false,
+  contextFrame = 0
 const meter = reactive(new WritingMeter(chapterUid, previous)),
   tick = ref(Date.now()),
   manualPause = ref(false),
@@ -319,8 +320,15 @@ function capture(kind: 'typed' | 'paste' | 'history' | 'restore') {
   updateContext()
 }
 function updateContext() {
-  if (!editor.value || !writer.current) return
-  const { from, to, $from } = editor.value.state.selection
+  const currentEditor = editor.value
+  if (
+    disposed ||
+    !currentEditor ||
+    currentEditor.isDestroyed ||
+    writer.current?.uid !== chapterUid
+  )
+    return
+  const { from, to, $from } = currentEditor.state.selection
   let id = ''
   for (let depth = $from.depth; depth > 0; depth--) {
     if ($from.node(depth).attrs.id) {
@@ -330,10 +338,17 @@ function updateContext() {
   }
   writer.activeBlock = id
   writer.contextText = $from.parent.textContent
-  writer.selectedText = editor.value.state.doc.textBetween(from, to, '\n')
-  requestAnimationFrame(() => {
-    const root = editor.value?.view.dom
-    if (!root) return
+  writer.selectedText = currentEditor.state.doc.textBetween(from, to, '\n')
+  cancelAnimationFrame(contextFrame)
+  contextFrame = requestAnimationFrame(() => {
+    if (
+      disposed ||
+      currentEditor !== editor.value ||
+      currentEditor.isDestroyed ||
+      writer.current?.uid !== chapterUid
+    )
+      return
+    const root = currentEditor.view.dom
     const block = [...root.querySelectorAll('[data-id]')].find(
       (n) => n.getAttribute('data-id') === id,
     )
@@ -477,6 +492,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  cancelAnimationFrame(contextFrame)
   clearInterval(interval)
   void persistMeter()
 })
