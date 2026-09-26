@@ -75,7 +75,7 @@ npm ci
 npm run dev
 ```
 
-打开 **http://localhost:3000**，创建作品后进入「写作工作台」。开发服务器将 `/api` 代理到后端；后端使用其他地址时，通过 `VITE_API_PROXY_TARGET` 配置。停止服务时，在各自终端按 Ctrl+C。
+打开 [http://localhost:3000](http://localhost:3000)，创建作品后进入「写作工作台」。开发服务器将 `/api` 代理到后端；后端使用其他地址时，通过 `VITE_API_PROXY_TARGET` 配置。停止服务时，在各自终端按 Ctrl+C。
 
 生产静态资源通过 `npm run build` 输出到 `frontend-vue/dist/`。部署时仍需运行 Java 后端，并为前端配置 API 访问或反向代理。
 
