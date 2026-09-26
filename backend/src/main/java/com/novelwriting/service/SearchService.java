@@ -34,9 +34,14 @@ public class SearchService {
     @Autowired
     private TagRepository tagRepository;
 
+    @Autowired
+    private WorldviewEntryRepository worldviewEntryRepository;
+
     public Map<String, Object> globalSearch(Long novelId, String keyword) {
         Map<String, Object> results = new HashMap<>();
 
+        keyword = keyword.trim();
+        results.put("worldviewEntries", worldviewEntryRepository.searchByNovelIdAndKeyword(novelId, keyword));
         results.put("characters", characterRepository.searchByNovelIdAndKeyword(novelId, keyword));
         results.put("scenes", sceneRepository.searchByNovelIdAndKeyword(novelId, keyword));
         results.put("foreshadows", foreshadowRepository.searchByNovelIdAndKeyword(novelId, keyword));
@@ -50,6 +55,7 @@ public class SearchService {
     public Map<String, Object> searchByTag(Long novelId, Long tagId) {
         Map<String, Object> results = new HashMap<>();
 
+        results.put("worldviewEntries", worldviewEntryRepository.findByNovelIdAndTagId(novelId, tagId));
         results.put("characters", characterRepository.findByNovelIdAndTagId(novelId, tagId));
         results.put("scenes", sceneRepository.findByNovelIdAndTagId(novelId, tagId));
         results.put("foreshadows", foreshadowRepository.findByNovelIdAndTagId(novelId, tagId));
@@ -69,6 +75,7 @@ public class SearchService {
         results.put("matchingTags", matchingTags);
 
         if (matchingTags.isEmpty()) {
+            results.put("worldviewEntries", List.of());
             results.put("characters", List.of());
             results.put("scenes", List.of());
             results.put("foreshadows", List.of());
@@ -82,6 +89,7 @@ public class SearchService {
         List<Long> tagIds = matchingTags.stream().map(Tag::getId).collect(Collectors.toList());
 
         // 搜索所有包含这些标签的元素
+        results.put("worldviewEntries", worldviewEntryRepository.findByNovelIdAndTagIds(novelId, tagIds));
         results.put("characters", characterRepository.findByNovelIdAndTagIds(novelId, tagIds));
         results.put("scenes", sceneRepository.findByNovelIdAndTagIds(novelId, tagIds));
         results.put("foreshadows", foreshadowRepository.findByNovelIdAndTagIds(novelId, tagIds));

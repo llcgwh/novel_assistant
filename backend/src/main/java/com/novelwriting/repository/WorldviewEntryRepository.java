@@ -29,6 +29,9 @@ public interface WorldviewEntryRepository extends JpaRepository<WorldviewEntry, 
 
     @Query("SELECT DISTINCT w FROM WorldviewEntry w JOIN w.tags t WHERE w.novelId = :novelId AND t.id = :tagId")
     List<WorldviewEntry> findByNovelIdAndTagId(@Param("novelId") Long novelId, @Param("tagId") Long tagId);
+    @Query("SELECT DISTINCT w FROM WorldviewEntry w JOIN w.tags t WHERE w.novelId = :novelId AND t.id IN :tagIds")
+    List<WorldviewEntry> findByNovelIdAndTagIds(@Param("novelId") Long novelId, @Param("tagIds") List<Long> tagIds);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("DELETE FROM WorldviewEntry w WHERE w.novelId = :novelId")
     void deleteByNovelId(@org.springframework.data.repository.query.Param("novelId") Long novelId);

@@ -1,171 +1,153 @@
 <template>
-  <div>
-    <div class="view-header">
-      <h2>搜索结果</h2>
-      <div class="view-actions">
-        <input
-          v-model="keyword"
-          type="text"
-          class="search-input"
-          placeholder="搜索..."
-          @keyup.enter="doSearch"
-        />
-        <button class="btn-primary" @click="doSearch">搜索</button>
+  <section class="search-workspace" aria-labelledby="search-heading">
+    <div class="search-intro">
+      <div>
+        <p class="search-eyebrow">创作资料库</p>
+        <h2 id="search-heading">让每一条线索，都有迹可循</h2>
+        <p class="search-description">在当前小说的人物、场景与世界设定中，找到你需要的那一页。</p>
       </div>
+      <span class="search-scope">仅搜索当前小说</span>
     </div>
 
-    <LoadingState v-if="loading" message="搜索中..." />
+    <form class="search-form" role="search" @submit.prevent="doSearch">
+      <span class="search-symbol" aria-hidden="true">⌕</span>
+      <label class="visually-hidden" for="library-query">搜索创作资料</label>
+      <input id="library-query" v-model="keyword" type="search" placeholder="输入人物名、地点或设定关键词…" autocomplete="off" />
+      <button class="btn-primary" type="submit">搜索资料 <span aria-hidden="true">↗</span></button>
+    </form>
 
-    <div v-else-if="hasResults" class="search-results-container">
-      <p class="search-summary">找到 {{ totalCount }} 个结果</p>
-
-      <!-- 人物 -->
-      <div v-if="results.characters?.length" class="search-category">
-        <h3>人物 ({{ results.characters.length }})</h3>
-        <div class="search-items">
-          <div v-for="char in results.characters" :key="'c-' + char.id" class="search-item" @click="goTo('characters')">
-            <h4>{{ char.name }}</h4>
-            <p v-if="char.role">{{ char.role }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 场景 -->
-      <div v-if="results.scenes?.length" class="search-category">
-        <h3>场景 ({{ results.scenes.length }})</h3>
-        <div class="search-items">
-          <div v-for="scene in results.scenes" :key="'s-' + scene.id" class="search-item" @click="goTo('scenes')">
-            <h4>{{ scene.name }}</h4>
-            <p v-if="scene.location">{{ scene.location }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 伏笔 -->
-      <div v-if="results.foreshadows?.length" class="search-category">
-        <h3>伏笔 ({{ results.foreshadows.length }})</h3>
-        <div class="search-items">
-          <div v-for="fs in results.foreshadows" :key="'f-' + fs.id" class="search-item" @click="goTo('foreshadows')">
-            <h4>{{ fs.title }}</h4>
-            <p v-if="fs.content">{{ fs.content?.slice(0, 100) }}...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 大纲 -->
-      <div v-if="results.outlines?.length" class="search-category">
-        <h3>大纲 ({{ results.outlines.length }})</h3>
-        <div class="search-items">
-          <div v-for="ol in results.outlines" :key="'o-' + ol.id" class="search-item" @click="goTo('outlines')">
-            <h4>{{ ol.title }}</h4>
-            <p v-if="ol.content">{{ ol.content?.slice(0, 100) }}...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 时间轴事件 -->
-      <div v-if="results.timelineEvents?.length" class="search-category">
-        <h3>时间轴事件 ({{ results.timelineEvents.length }})</h3>
-        <div class="search-items">
-          <div v-for="event in results.timelineEvents" :key="'t-' + event.id" class="search-item" @click="goTo('timeline')">
-            <h4>{{ event.title }}</h4>
-            <p v-if="event.description">{{ event.description?.slice(0, 100) }}...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 地图位置 -->
-      <div v-if="results.mapLocations?.length" class="search-category">
-        <h3>地图位置 ({{ results.mapLocations.length }})</h3>
-        <div class="search-items">
-          <div v-for="loc in results.mapLocations" :key="'m-' + loc.id" class="search-item" @click="goTo('map')">
-            <h4>{{ loc.name }}</h4>
-            <p v-if="loc.locationType">{{ loc.locationType }}</p>
-          </div>
-        </div>
-      </div>
+    <div class="search-filters" aria-label="按资料类型筛选">
+      <button type="button" :aria-pressed="activeCategory === 'all'" @click="activeCategory = 'all'">全部 <span>{{ totalCount }}</span></button>
+      <button v-for="group in groups" :key="group.key" type="button" :aria-pressed="activeCategory === group.key" @click="activeCategory = group.key">
+        {{ group.label }} <span>{{ group.items.length }}</span>
+      </button>
     </div>
 
-    <EmptyState
-      v-else-if="searched"
-      title="未找到结果"
-      message="尝试使用其他关键词搜索"
-    />
-
-    <EmptyState
-      v-else
-      title="输入关键词搜索"
-      message="搜索人物、场景、伏笔、大纲、时间轴事件等"
-    />
-  </div>
+    <div class="search-body" :aria-busy="loading">
+      <LoadingState v-if="loading" message="正在查找相关资料…" />
+      <div v-else-if="error" class="search-error" role="alert">
+        <h3>这次搜索没有完成</h3>
+        <p>{{ error }}</p>
+        <button class="btn-secondary" type="button" @click="search(query)">重新搜索</button>
+      </div>
+      <template v-else-if="query && totalCount">
+        <p class="result-summary" role="status">关于「{{ query }}」共找到 <strong>{{ totalCount }}</strong> 条资料<span v-if="activeCategory !== 'all'"> · 当前分类 {{ visibleCount }} 条</span></p>
+        <section v-for="group in visibleGroups" :key="group.key" class="result-section" :aria-label="group.label">
+          <div class="result-section-heading"><h3>{{ group.label }}</h3><span>{{ group.items.length }} 条资料</span></div>
+          <div class="result-grid">
+            <RouterLink v-for="item in group.items" :key="item.id" class="result-card" :to="{ path: `/novel/${route.params.novelId}/${group.path}`, query: { edit: String(item.id) } }">
+              <div class="result-card-top"><span class="result-icon" aria-hidden="true">{{ group.icon }}</span><span class="result-type">{{ group.label }}</span><span class="result-arrow" aria-hidden="true">↗</span></div>
+              <h4><HighlightedText :text="item.title" :keyword="query" /></h4>
+              <p v-if="item.excerpt"><HighlightedText :text="item.excerpt" :keyword="query" /></p>
+              <p v-else class="result-no-description">暂未填写详细描述</p>
+              <span class="result-open">打开条目 <span aria-hidden="true">→</span></span>
+            </RouterLink>
+          </div>
+        </section>
+        <EmptyState v-if="!visibleCount" title="这个分类中还没有匹配资料" message="切换到其他分类，或查看全部搜索结果。">
+          <button class="btn-secondary" type="button" @click="activeCategory = 'all'">查看全部结果</button>
+        </EmptyState>
+      </template>
+      <EmptyState v-else-if="query" title="暂时没有找到这条线索" :message="`没有与「${query}」匹配的资料，试试更短的关键词。`" />
+      <div v-else class="search-welcome">
+        <div class="welcome-emblem" aria-hidden="true">⌕</div>
+        <h3>从一个关键词，回到你的故事</h3>
+        <p>支持搜索名称和正文内容。找到后，点击卡片即可继续编辑。</p>
+        <div class="search-hints"><span>人物与场景</span><span>情节与时间线</span><span>地图与世界观</span></div>
+      </div>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { searchApi } from '@/api/search'
-import type { SearchResult } from '@/types'
+import { useSearch } from '@/composables/useSearch'
+import { searchGroups, type SearchCategory } from '@/utils/searchResults'
+import HighlightedText from '@/components/common/HighlightedText.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 
 const route = useRoute()
 const router = useRouter()
-
 const keyword = ref('')
-const loading = ref(false)
-const searched = ref(false)
-const results = ref<SearchResult>({
-  characters: [], scenes: [], foreshadows: [],
-  outlines: [], timelineEvents: [], mapLocations: [], tags: []
-})
+const activeCategory = ref<SearchCategory | 'all'>('all')
+const { results, loading, query, error, search } = useSearch()
+const groups = computed(() => searchGroups(results.value, query.value))
+const totalCount = computed(() => groups.value.reduce((sum, group) => sum + group.items.length, 0))
+const visibleGroups = computed(() => groups.value.filter(group => group.items.length && (activeCategory.value === 'all' || activeCategory.value === group.key)))
+const visibleCount = computed(() => visibleGroups.value.reduce((sum, group) => sum + group.items.length, 0))
 
-const hasResults = computed(() => {
-  return (results.value.characters?.length || 0) +
-         (results.value.scenes?.length || 0) +
-         (results.value.foreshadows?.length || 0) +
-         (results.value.outlines?.length || 0) +
-         (results.value.timelineEvents?.length || 0) +
-         (results.value.mapLocations?.length || 0) > 0
-})
+watch(() => route.query.keyword, value => {
+  keyword.value = typeof value === 'string' ? value : ''
+  activeCategory.value = 'all'
+  void search(keyword.value)
+}, { immediate: true })
 
-const totalCount = computed(() => {
-  return (results.value.characters?.length || 0) +
-         (results.value.scenes?.length || 0) +
-         (results.value.foreshadows?.length || 0) +
-         (results.value.outlines?.length || 0) +
-         (results.value.timelineEvents?.length || 0) +
-         (results.value.mapLocations?.length || 0)
-})
-
-onMounted(() => {
-  if (route.query.keyword) {
-    keyword.value = route.query.keyword as string
-    doSearch()
+function doSearch() {
+  const value = keyword.value.trim()
+  keyword.value = value
+  if (value === (route.query.keyword || '')) {
+    void search(value)
+  } else {
+    void router.push({ query: { ...route.query, keyword: value || undefined } })
   }
-})
-
-watch(() => route.query.keyword, (newKeyword) => {
-  if (newKeyword && newKeyword !== keyword.value) {
-    keyword.value = newKeyword as string
-    doSearch()
-  }
-})
-
-async function doSearch() {
-  if (!keyword.value.trim()) return
-  loading.value = true
-  searched.value = true
-  try {
-    results.value = await searchApi.global(keyword.value)
-  } catch (error) {
-    console.error('搜索失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-function goTo(view: string) {
-  const novelId = route.params.novelId
-  router.push(`/novel/${novelId}/${view}`)
 }
 </script>
+
+<style scoped>
+.search-workspace { max-width: 1120px; margin: 12px auto 48px; color: #273044; }
+.search-intro { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 28px; }
+.search-eyebrow { font-size: 12px; color: #71618e; font-weight: 600; letter-spacing: .16em; margin: 0 0 10px; }
+.search-intro h2 { font-size: clamp(22px, 3vw, 30px); line-height: 1.45; margin: 0 0 10px; letter-spacing: -.025em; }
+.search-description { color: #667083; font-size: 14px; line-height: 1.8; margin: 0; }
+.search-scope { white-space: nowrap; color: #5e687a; font-size: 12px; background: #ffffffb8; border: 1px solid #dfe3eb; border-radius: 30px; padding: 7px 12px; }
+.search-form { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #dedce9; border-radius: 16px; padding: 10px 12px 10px 20px; box-shadow: 0 6px 22px #30264a08; }
+.search-form:focus-within { border-color: #8470cd; box-shadow: 0 0 0 3px #8e78dc1f; }
+.search-symbol { font-size: 30px; color: #80728d; }
+.search-form input { flex: 1; min-width: 0; width: auto; border: 0; outline: none; box-shadow: none; background: transparent; color: #273044; padding: 10px 0; font-size: 15px; }
+.search-form .btn-primary { white-space: nowrap; box-shadow: none; border-radius: 10px; }
+.search-filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 20px 0; border-bottom: 1px solid #dce0e9; margin-bottom: 24px; }
+.search-filters button { display: inline-flex; align-items: center; gap: 8px; background: #ffffff8c; border: 1px solid #dfe2ea; color: #606a7b; border-radius: 9px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+.search-filters button span { font-size: 11px; opacity: .85; }
+.search-filters button[aria-pressed="true"] { background: #6850ac; border-color: #6850ac; color: #fff; }
+.search-filters button:focus-visible, .result-card:focus-visible { outline: 3px solid #8d75ca; outline-offset: 3px; }
+.result-summary { font-size: 13px; color: #616b7d; line-height: 1.8; margin-bottom: 28px; overflow-wrap: anywhere; }
+.result-summary strong { color: #554086; }
+.result-section { margin-bottom: 30px; }
+.result-section-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.result-section-heading h3 { margin: 0; font-size: 16px; }
+.result-section-heading > span { font-size: 12px; color: #758095; }
+.result-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.result-card { display: flex; flex-direction: column; text-decoration: none; color: inherit; background: #fffffff0; border: 1px solid #e0e3eb; border-radius: 14px; padding: 20px; transition: border-color .18s, box-shadow .18s; min-width: 0; }
+.result-card:hover { border-color: #b3a4d0; box-shadow: 0 8px 24px #4532590d; }
+.result-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.result-icon { display: grid; place-items: center; width: 28px; height: 28px; font-size: 12px; border-radius: 8px; color: #70578d; background: #f1edf8; }
+.result-type { color: #788193; font-size: 11px; }
+.result-arrow { margin-left: auto; color: #827397; }
+.result-card h4 { font-size: 16px; line-height: 1.6; margin: 0 0 8px; overflow-wrap: anywhere; }
+.result-card p { font-size: 13px; line-height: 1.85; color: #626c7e; margin: 0 0 20px; overflow-wrap: anywhere; white-space: pre-line; }
+.result-card .result-no-description { color: #8991a1; }
+.result-open { display: flex; justify-content: space-between; color: #70558e; font-size: 12px; margin-top: auto; padding-top: 14px; border-top: 1px solid #eceef3; }
+.search-welcome, .search-error { text-align: center; padding: 48px 20px; border-radius: 16px; background: #ffffff8c; border: 1px dashed #d4d5e3; }
+.welcome-emblem { font-size: 42px; color: #a18fb8; margin-bottom: 16px; }
+.search-welcome h3, .search-error h3 { font-size: 18px; margin-bottom: 12px; }
+.search-welcome p, .search-error p { color: #6f7889; font-size: 14px; line-height: 1.9; margin-bottom: 20px; }
+.search-hints { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.search-hints span { color: #7c7190; background: #f2eff8; border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 960px) { .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .search-intro { display: block; }
+  .search-scope { display: inline-block; margin-top: 14px; }
+  .result-grid { grid-template-columns: 1fr; }
+  .search-form { gap: 8px; padding: 8px 10px; }
+  .search-symbol { display: none; }
+  .search-form input { font-size: 14px; }
+  .search-form .btn-primary { padding: 10px 12px; font-size: 13px; }
+  .search-filters { gap: 6px; }
+  .search-filters button { padding: 7px 9px; }
+  .search-welcome { padding: 32px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .result-card { transition: none; } }
+</style>

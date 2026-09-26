@@ -131,6 +131,7 @@
 </template>
 
 <script setup lang="ts">
+import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMapStore } from '@/stores/map'
@@ -199,6 +200,8 @@ const availableParents = computed(() => {
   if (!editingLocation.value) return mapStore.locations
   return mapStore.locations.filter(l => l.id !== editingLocation.value!.id)
 })
+
+useEditQuery(() => mapStore.locations, editLocation)
 
 onMounted(async () => {
   const novelId = Number(route.params.novelId)

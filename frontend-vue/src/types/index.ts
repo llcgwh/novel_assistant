@@ -21,6 +21,7 @@ export interface PaginatedResponse<T> {
 
 // 搜索结果
 export interface SearchResult {
+  worldviewEntries?: import('./worldview').WorldviewEntry[]
   characters: import('./character').Character[]
   scenes: import('./scene').Scene[]
   foreshadows: import('./foreshadow').Foreshadow[]

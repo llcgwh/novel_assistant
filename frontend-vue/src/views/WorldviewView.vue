@@ -179,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useWorldviewStore } from '@/stores/worldview'
 import { useTagsStore } from '@/stores/tags'
@@ -230,6 +231,8 @@ const form = reactive({
 })
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+useEditQuery(() => worldviewStore.entries, editEntry)
 
 onMounted(async () => {
   await worldviewStore.fetchEntries()

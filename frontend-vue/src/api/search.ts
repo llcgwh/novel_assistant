@@ -3,8 +3,8 @@ import type { SearchResult } from '@/types'
 import type { ID } from '@/types'
 
 export const searchApi = {
-  global(keyword: string): Promise<SearchResult> {
-    return request.get(withNovelId('/search'), { params: { keyword } })
+  global(keyword: string, signal?: AbortSignal): Promise<SearchResult> {
+    return request.get(withNovelId('/search'), { params: { keyword }, signal })
   },
 
   byTag(tagId: ID): Promise<SearchResult> {

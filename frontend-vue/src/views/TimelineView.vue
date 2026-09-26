@@ -175,6 +175,7 @@
 </template>
 
 <script setup lang="ts">
+import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTimelineStore } from '@/stores/timeline'
@@ -216,6 +217,8 @@ const relations = reactive({
   foreshadowIds: [] as number[],
   outlineIds: [] as number[]
 })
+
+useEditQuery(() => timelineStore.events, editEvent)
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
