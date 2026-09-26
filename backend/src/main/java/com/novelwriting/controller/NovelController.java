@@ -15,6 +15,10 @@ public class NovelController {
     @Autowired
     private NovelService novelService;
 
+    @Autowired private com.novelwriting.service.WritingService writing;
+    @GetMapping("/writing-summary")
+    public com.fasterxml.jackson.databind.JsonNode writingSummary() { return writing.summaries(); }
+
     @GetMapping
     public List<Novel> getAllNovels() {
         return novelService.getAllNovels();

@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 @Service
 public class SearchService {
 
+    @Autowired private WritingService writing;
+
     @Autowired
     private CharacterRepository characterRepository;
 
@@ -41,6 +43,9 @@ public class SearchService {
         Map<String, Object> results = new HashMap<>();
 
         keyword = keyword.trim();
+        var manuscripts=writing.search(novelId,keyword);
+        manuscripts.forEach(row->((com.fasterxml.jackson.databind.node.ObjectNode)row).put("id",row.path("uid").asText()));
+        results.put("manuscripts",manuscripts);
         results.put("worldviewEntries", worldviewEntryRepository.searchByNovelIdAndKeyword(novelId, keyword));
         results.put("characters", characterRepository.searchByNovelIdAndKeyword(novelId, keyword));
         results.put("scenes", sceneRepository.searchByNovelIdAndKeyword(novelId, keyword));

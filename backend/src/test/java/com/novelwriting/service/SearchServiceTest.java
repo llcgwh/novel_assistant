@@ -13,7 +13,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(showSql = false, properties = "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect")
-@Import({com.novelwriting.security.TestCredentials.class, SearchService.class})
+@Import({com.novelwriting.security.TestCredentials.class, SearchService.class, WritingService.class})
 class SearchServiceTest {
     @Autowired EntityManager em;
     @Autowired SearchService search;

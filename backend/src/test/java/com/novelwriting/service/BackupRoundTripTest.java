@@ -100,7 +100,9 @@ class BackupRoundTripTest {
         var input=mapper.createObjectNode().put("uid",java.util.UUID.randomUUID().toString()).put("title","正文第一章");
         input.set("doc",WritingDocuments.empty());
         input.putArray("links").addObject().put("uid",java.util.UUID.randomUUID().toString()).put("type","characters").put("targetId",one(Character.class,id,"Hero").getId()).put("role","reference");
-        var original=writing.create(id,input); ObjectNode backup=(ObjectNode)mapper.readTree(exporter.exportNovelToJson(id));
+        var original=writing.create(id,input);
+        var preferences=writing.workspace(id); ((ObjectNode)preferences.path("preferences")).putObject("aliases").putArray(one(Character.class,id,"Hero").getId().toString()).add("英雄"); writing.preferences(id,preferences);
+        ObjectNode backup=(ObjectNode)mapper.readTree(exporter.exportNovelToJson(id));
         ObjectNode legacy=backup.deepCopy(); legacy.remove("writing"); legacy.put("schemaVersion",2);
         assertThrows(org.springframework.web.server.ResponseStatusException.class,()->importer.importFromJson(id,mapper.writeValueAsBytes(legacy)));
         importer.importFromJson(id,mapper.writeValueAsBytes(backup)); em.flush(); em.clear();
@@ -108,6 +110,11 @@ class BackupRoundTripTest {
         assertEquals(one(Character.class,id,"Hero").getId().longValue(),restored.path("links").get(0).path("targetId").asLong());
         assertTrue(restored.path("revision").asLong()>original.path("revision").asLong());
         assertEquals("正文第一章",restored.path("title").asText());
+        assertEquals("英雄",writing.workspace(id).path("preferences").path("aliases").path(one(Character.class,id,"Hero").getId().toString()).get(0).asText());
+        for(var history:writing.revisions(id,original.path("uid").asText())) {
+            var link=writing.revision(id,original.path("uid").asText(),history.path("id").asLong()).path("links").get(0);
+            assertTrue(link.path("missing").asBoolean()||link.path("targetId").asLong()==one(Character.class,id,"Hero").getId());
+        }
     }
 
     @Test void rejectsInvalidBackupsBeforeDeletingAnything() throws Exception {

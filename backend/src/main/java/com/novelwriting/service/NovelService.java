@@ -10,6 +10,8 @@ import java.util.Optional;
 @Service
 public class NovelService {
 
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
+
     @Autowired
     private NovelRepository novelRepository;
 
@@ -39,7 +41,10 @@ public class NovelService {
         return novelRepository.save(novel);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void deleteNovel(Long id) {
+        for(String entity : List.of("WritingRevision","WritingSession","WritingChapter","WritingBook"))
+            em.createQuery("delete from "+entity+" where novelId=:id").setParameter("id",id).executeUpdate();
         novelRepository.deleteById(id);
     }
 
