@@ -239,8 +239,7 @@ html[data-studio-theme]
         [type='file']
       ),
     textarea,
-    select,
-    .base-select
+    select
   ) {
   background-color: var(--field);
   color: var(--text);
@@ -474,7 +473,7 @@ input[type='radio'] {
   padding: 32px 38px 25px;
   animation: page-arrive 0.35s ease-out;
 }
-.mobile-navigation {
+.studio-topbar .base-select.mobile-navigation {
   display: none;
 }
 .is-focused {
@@ -486,7 +485,7 @@ input[type='radio'] {
 .is-focused .studio-content {
   max-width: 1280px;
 }
-.is-focused .mobile-navigation {
+.is-focused .studio-topbar .base-select.mobile-navigation {
   display: block;
   width: 170px;
 }
@@ -1005,7 +1004,7 @@ input[type='radio'] {
 .view-actions .search-input {
   width: 220px;
 }
-.view-actions select {
+.view-actions .base-select {
   width: auto !important;
   max-width: 170px !important;
 }
@@ -1660,7 +1659,7 @@ body > #app > .settings-view {
   .studio-sidebar {
     display: none;
   }
-  .mobile-navigation {
+  .studio-topbar .base-select.mobile-navigation {
     display: block;
     width: 150px;
   }
@@ -1974,7 +1973,7 @@ body > #app > .settings-view {
   width: 230px;
 }
 .shelf-controls .base-select {
-  width: 125px;
+  --select-width: 140px;
 }
 .book-grid {
   display: grid;
@@ -2258,7 +2257,7 @@ body > #app > .settings-view {
   .shelf-controls input {
     flex: 1 0 100%;
   }
-  .shelf-controls select {
+  .shelf-controls .base-select {
     flex: 1;
   }
   .book-card {
@@ -2448,7 +2447,7 @@ mark {
     flex: 1;
     min-width: 0;
     width: 125px;
-    padding: 9px 6px;
+    --select-padding-y: 9px;
   }
   .studio-topbar .topbar-actions {
     flex-shrink: 0;

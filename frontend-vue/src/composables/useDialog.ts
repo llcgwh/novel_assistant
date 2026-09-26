@@ -12,6 +12,8 @@ export function useDialog(panel: Ref<HTMLElement | null>, busy: () => boolean, c
   function keydown(event: KeyboardEvent) {
     if (dialogs.at(-1) !== panel.value) return
     if (event.key === 'Escape') {
+      // Close the select popup before dismissing its parent dialog.
+      if ((event.target as Element)?.closest('[role="combobox"][aria-expanded="true"]')) return
       event.preventDefault(); event.stopPropagation()
       if (!busy()) close()
     }

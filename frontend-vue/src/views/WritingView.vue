@@ -189,47 +189,23 @@
               @input="writer.changed()"
             />
             <div class="writer-chapter-meta">
-              <select
+              <BaseSelect
                 v-model="writer.current.status"
                 aria-label="章节状态"
+                :options="chapterStatusOptions"
                 @change="writer.changed()"
-              >
-                <option
-                  v-for="(label, key) in chapterStatuses"
-                  :key="key"
-                  :value="key"
-                >
-                  {{ label }}
-                </option></select
-              ><select
-                v-model="writer.current.volumeId"
+              /><BaseSelect
+                :model-value="writer.current.volumeId || ''"
                 aria-label="章节所属篇卷"
-                @change="writer.changed()"
-              >
-                <option :value="null">未分卷</option>
-                <option
-                  v-for="v in writer.workspace?.volumes"
-                  :key="v.uid"
-                  :value="v.uid"
-                >
-                  {{ v.title }}
-                </option></select
-              ><select
+                :options="volumeOptions"
+                @update:model-value="setCurrentVolume"
+              /><BaseSelect
                 aria-label="章节操作"
-                :value="''"
-                @change="chapterAction($event)"
-              >
-                <option disabled value="">章节操作</option>
-                <option value="copy">复制章节</option>
-                <option value="split">从当前段落拆分</option>
-                <option value="merge">与下一章合并</option>
-                <option value="up">向前移动</option>
-                <option value="down">向后移动</option>
-                <option value="history">历史版本</option>
-                <option value="trash">
-                  {{ writer.current.deleted ? '从回收站恢复' : '移入回收站' }}
-                </option>
-              </select>
+                :model-value="''"
+                :options="chapterActionOptions"
+                placeholder="章节操作"
+                @change="chapterAction"
+              />
             </div>
             <details class="writer-chapter-settings">
               <summary>本章目标与编号</summary>
@@ -289,17 +265,12 @@
       @close="dialog = ''"
       ><label>标题<input v-model="dialogTitle" maxlength="200" /></label
       ><label v-if="dialog === 'chapter'"
-        >篇卷<select v-model="dialogVolume">
-          <option :value="null">未分卷</option>
-          <option
-            v-for="v in writer.workspace?.volumes"
-            :key="v.uid"
-            :value="v.uid"
-          >
-            {{ v.title }}
-          </option>
-        </select></label
-      >
+        >篇卷<BaseSelect
+          :model-value="dialogVolume || ''"
+          :options="volumeOptions"
+          aria-label="篇卷"
+          @update:model-value="dialogVolume = $event || null"
+      /></label>
       <p v-if="dialog === 'split'">
         当前段落及之后的内容移入新章，段落关联一起迁移。
       </p>
@@ -326,6 +297,7 @@ import ManuscriptEditor from '@/components/writing/ManuscriptEditor.vue'
 import WritingTools from '@/components/writing/WritingTools.vue'
 import WritingSync from '@/components/writing/WritingSync.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 const writer = useWritingStore(),
   studio = useStudioStore(),
   app = useAppStore(),
@@ -356,6 +328,32 @@ const volumeGroups = computed(() => [
   { uid: '', title: '未分卷' },
   ...(writer.workspace?.volumes || []),
 ])
+const volumeOptions = computed(() =>
+  volumeGroups.value.map((volume) => ({
+    value: volume.uid,
+    label: volume.title,
+  })),
+)
+const chapterStatusOptions = Object.entries(chapterStatuses).map(
+  ([value, label]) => ({ value, label }),
+)
+const chapterActionOptions = computed(() => [
+  { value: 'copy', label: '复制章节' },
+  { value: 'split', label: '从当前段落拆分' },
+  { value: 'merge', label: '与下一章合并' },
+  { value: 'up', label: '向前移动' },
+  { value: 'down', label: '向后移动' },
+  { value: 'history', label: '历史版本' },
+  {
+    value: 'trash',
+    label: writer.current?.deleted ? '从回收站恢复' : '移入回收站',
+  },
+])
+function setCurrentVolume(value: string) {
+  if (!writer.current) return
+  writer.current.volumeId = value || null
+  writer.changed()
+}
 function rows(volume: string) {
   return (
     writer.workspace?.chapters.filter(
@@ -500,10 +498,7 @@ function dropBefore(uid: string) {
     void moveChapter(dragged, uid, row.volumeId)
   dragged = ''
 }
-async function chapterAction(event: Event) {
-  const select = event.target as HTMLSelectElement,
-    action = select.value
-  select.value = ''
+async function chapterAction(action: string) {
   if (!writer.current) return
   await run(async () => {
     if (action === 'history') {

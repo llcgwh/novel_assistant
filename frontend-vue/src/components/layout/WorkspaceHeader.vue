@@ -59,18 +59,13 @@
         (route.name === 'SearchResults' ? '全局搜索' : '设置与备份')
       }}</strong>
     </div>
-    <select
+    <BaseSelect
       class="mobile-navigation"
       aria-label="切换创作模块"
-      :value="String(route.path.split('/').at(-1))"
-      @change="router.push(base + ($event.target as HTMLSelectElement).value)"
-    >
-      <option v-for="item in studioModules" :key="item.path" :value="item.path">
-        {{ item.name }}
-      </option>
-      <option value="search">全局搜索</option>
-      <option value="settings">设置与备份</option>
-    </select>
+      :model-value="String(route.path.split('/').at(-1))"
+      :options="navigationOptions"
+      @change="router.push(base + $event)"
+    />
     <div class="topbar-actions">
       <button
         class="command-trigger"
@@ -107,6 +102,7 @@ import { useStudioStore } from '@/stores/studio'
 import { useAppStore } from '@/stores/app'
 import { studioModules } from '@/utils/studio'
 import StudioIcon from '@/components/common/StudioIcon.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 import CommandPalette from '@/components/studio/CommandPalette.vue'
 const route = useRoute(),
   router = useRouter(),
@@ -118,6 +114,11 @@ const current = computed(() =>
   studioModules.find((item) => route.path === base.value + item.path),
 )
 const groups = ['工作台', '故事脉络', '世界构建']
+const navigationOptions = [
+  ...studioModules.map((item) => ({ value: item.path, label: item.name })),
+  { value: 'search', label: '全局搜索' },
+  { value: 'settings', label: '设置与备份' },
+]
 const navigation = ref<HTMLElement | null>(null)
 const marker = ref({ transform: 'translateY(0px)', height: '39px', opacity: 0 })
 let markerObserver: ResizeObserver | undefined

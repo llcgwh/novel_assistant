@@ -45,11 +45,12 @@
       >
         —
       </button>
-      <select aria-label="段落样式" @change="styleParagraph($event)">
-        <option value="paragraph">正文</option>
-        <option value="heading">小标题</option>
-        <option value="list">项目列表</option></select
-      ><i></i
+      <BaseSelect
+        aria-label="段落样式"
+        :model-value="paragraphStyle"
+        :options="paragraphStyleOptions"
+        @change="styleParagraph"
+      /><i></i
       ><button :aria-expanded="findOpen" @click="findOpen = !findOpen">
         查找</button
       ><button :aria-expanded="appearance" @click="appearance = !appearance">
@@ -87,16 +88,15 @@
           max="2.8"
           step="0.1" /></label
       ><label
-        >字体<select v-model="font">
-          <option value="serif">书卷宋体</option>
-          <option value="sans-serif">清晰黑体</option>
-        </select></label
+        >字体<BaseSelect
+          v-model="font"
+          aria-label="字体"
+          :options="fontOptions" /></label
       ><label
-        >阅读宽度<select v-model="readingWidth" aria-label="阅读宽度">
-          <option value="narrow">窄幅 · 凝神</option>
-          <option value="balanced">适中 · 舒展</option>
-          <option value="wide">宽幅 · 开阔</option>
-        </select></label
+        >阅读宽度<BaseSelect
+          v-model="readingWidth"
+          aria-label="阅读宽度"
+          :options="readingWidthOptions" /></label
       ><label><input v-model="indent" type="checkbox" />首行缩进</label
       ><label><input v-model="focusLine" type="checkbox" />段落聚焦</label
       ><label><input v-model="typewriter" type="checkbox" />打字机滚动</label>
@@ -161,6 +161,7 @@ import { isHistoryTransaction } from '@tiptap/pm/history'
 import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { useWritingStore } from '@/stores/writing'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 import { characterCountWithPunctuation } from '@/utils/writingStatistics'
 import {
   documentText,
@@ -186,6 +187,20 @@ const findOpen = ref(false),
   focusLine = ref(false),
   typewriter = ref(false)
 const readingWidths = { narrow: '34rem', balanced: '46rem', wide: '62rem' }
+const paragraphStyleOptions = [
+  { value: 'paragraph', label: '正文' },
+  { value: 'heading', label: '小标题' },
+  { value: 'list', label: '项目列表' },
+]
+const fontOptions = [
+  { value: 'serif', label: '书卷宋体' },
+  { value: 'sans-serif', label: '清晰黑体' },
+]
+const readingWidthOptions = [
+  { value: 'narrow', label: '窄幅 · 凝神' },
+  { value: 'balanced', label: '适中 · 舒展' },
+  { value: 'wide', label: '宽幅 · 开阔' },
+]
 try {
   const p = JSON.parse(localStorage.getItem('ink-writing-appearance') || '{}')
   fontSize.value = p.fontSize || 20
@@ -371,8 +386,14 @@ watch(
     }
   },
 )
-function styleParagraph(e: Event) {
-  const value = (e.target as HTMLSelectElement).value
+const paragraphStyle = computed(() =>
+  editor.value?.isActive('bulletList')
+    ? 'list'
+    : editor.value?.isActive('heading')
+      ? 'heading'
+      : 'paragraph',
+)
+function styleParagraph(value: string) {
   if (value === 'heading')
     editor.value?.chain().focus().toggleHeading({ level: 2 }).run()
   else if (value === 'list')

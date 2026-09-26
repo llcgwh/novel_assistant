@@ -93,11 +93,11 @@
       <div class="form-row">
         <div class="form-group form-half">
           <label>类别 *</label>
-          <select v-model="form.category">
-            <option v-for="cat in WORLDVIEW_CATEGORIES" :key="cat.value" :value="cat.value">
-              {{ cat.icon }} {{ cat.label }}
-            </option>
-          </select>
+          <BaseSelect
+            v-model="form.category"
+            aria-label="类别"
+            :options="entryCategoryOptions"
+          />
         </div>
       </div>
       <div class="form-group">
@@ -219,12 +219,13 @@ const formCharacterIds = ref<number[]>([])
 const formSceneIds = ref<number[]>([])
 const formLocationIds = ref<number[]>([])
 
+const entryCategoryOptions = WORLDVIEW_CATEGORIES.map(c => ({
+  value: c.value,
+  label: `${c.icon} ${c.label}`
+}))
 const categoryOptions = computed(() => [
   { value: '', label: '全部类别' },
-  ...WORLDVIEW_CATEGORIES.map(c => ({
-    value: c.value,
-    label: `${c.icon} ${c.label}`
-  }))
+  ...entryCategoryOptions
 ])
 
 const form = reactive({

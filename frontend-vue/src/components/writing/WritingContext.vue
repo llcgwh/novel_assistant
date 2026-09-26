@@ -216,32 +216,22 @@
           </template>
           <template v-else-if="writer.contextTab === 'links' && writer.current">
             <label
-              >资料类型<select v-model="kind">
-                <option
-                  v-for="(label, key) in resourceNames"
-                  :key="key"
-                  :value="key"
-                >
-                  {{ label }}
-                </option>
-              </select></label
-            >
+              >资料类型<BaseSelect
+                v-model="kind"
+                aria-label="资料类型"
+                :options="resourceTypeOptions"
+            /></label>
             <input
               v-model="query"
               placeholder="搜索当前作品资料"
               aria-label="搜索当前作品资料"
             />
             <label
-              >关联作用<select v-model="role">
-                <option
-                  v-for="(label, key) in allowedRoles"
-                  :key="key"
-                  :value="key"
-                >
-                  {{ label }}
-                </option>
-              </select></label
-            >
+              >关联作用<BaseSelect
+                v-model="role"
+                aria-label="关联作用"
+                :options="roleOptions"
+            /></label>
             <label class="writer-check"
               ><input
                 v-model="atParagraph"
@@ -401,13 +391,10 @@
       :submit="createResource"
       @close="createOpen = false"
       ><label
-        >类型<select v-model="createKind">
-          <option value="characters">人物</option>
-          <option value="foreshadows">伏笔</option>
-          <option value="scenes">场景</option>
-          <option value="worldview">世界设定</option>
-          <option value="note">修订便签</option>
-        </select></label
+        >类型<BaseSelect
+          v-model="createKind"
+          aria-label="创建类型"
+          :options="creationTypeOptions" /></label
       ><label>名称<input v-model="createTitle" maxlength="100" /></label
       ><label>内容<textarea v-model="createText" rows="6" /></label>
       <p>
@@ -449,6 +436,7 @@ import {
 import type { Resource, WritingLink } from '@/types/writing'
 import { request } from '@/api/request'
 import BaseModal from '@/components/common/BaseModal.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 const writer = useWritingStore(),
   app = useAppStore(),
   studio = useStudioStore(),
@@ -472,6 +460,16 @@ const createOpen = ref(false),
   modalError = ref(''),
   aliasPerson = ref<Resource | null>(null),
   aliasText = ref('')
+const resourceTypeOptions = Object.entries(resourceNames).map(
+  ([value, label]) => ({ value, label }),
+)
+const creationTypeOptions = [
+  { value: 'characters', label: '人物' },
+  { value: 'foreshadows', label: '伏笔' },
+  { value: 'scenes', label: '场景' },
+  { value: 'worldview', label: '世界设定' },
+  { value: 'note', label: '修订便签' },
+]
 let token = ''
 let selectionSource = {
   novelId: 0,
@@ -619,6 +617,12 @@ const allowedRoles = computed(() =>
       : kind.value === 'timeline'
         ? { current: '此刻事件', reference: '涉及' }
         : { reference: '涉及' },
+)
+const roleOptions = computed(() =>
+  Object.entries(allowedRoles.value).map(([value, label]) => ({
+    value,
+    label: label!,
+  })),
 )
 watch(kind, () => {
   role.value = Object.keys(allowedRoles.value)[0]

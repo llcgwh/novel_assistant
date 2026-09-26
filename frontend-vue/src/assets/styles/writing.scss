@@ -258,9 +258,10 @@
   gap: 6px;
   padding-bottom: 16px;
 }
-.writer-chapter-meta select {
-  font-size: 10px;
-  padding: 5px 6px;
+.writer-chapter-meta .base-select {
+  --select-font-size: 11px;
+  --select-height: 34px;
+  --select-padding-y: 6px;
   max-width: 155px;
   flex: 1;
   min-width: 70px;
@@ -301,8 +302,7 @@
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 40%, transparent);
 }
-.writer-formatbar button,
-.writer-formatbar select {
+.writer-formatbar button:not(.base-select) {
   font-size: 11px;
   padding: 6px 8px;
   min-height: 28px;
@@ -310,6 +310,13 @@
   border: 0;
   border-radius: 5px;
   color: var(--muted);
+}
+.writer-formatbar > .base-select {
+  --select-width: auto;
+  --select-height: 32px;
+  --select-padding-y: 5px;
+  --select-font-size: 11px;
+  margin-inline: 3px;
 }
 .writer-formatbar button:hover,
 .writer-formatbar button.active {
@@ -432,8 +439,10 @@
 .writer-appearance input[type='range'] {
   width: 75px;
 }
-.writer-appearance select {
-  font-size: 10px;
+.writer-appearance .base-select {
+  --select-font-size: 11px;
+  --select-height: 36px;
+  --select-padding-y: 7px;
 }
 .writer-warning {
   border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
@@ -574,7 +583,7 @@
   margin-bottom: 14px;
 }
 .writer-context-body > label > textarea,
-.writer-context-body > label > select,
+.writer-context-body > label > .base-select,
 .writer-context-body > input {
   display: block;
   width: 100%;
@@ -1363,8 +1372,7 @@
     min-height: 36px;
     font-size: 12px;
   }
-  .writer-formatbar button,
-  .writer-formatbar select {
+  .writer-formatbar button:not(.base-select) {
     min-height: 36px;
     font-size: 12px;
   }
@@ -1372,9 +1380,9 @@
     min-height: 38px;
     font-size: 12px;
   }
-  .writer-chapter-meta select {
-    font-size: 12px;
-    min-height: 36px;
+  .writer-chapter-meta .base-select {
+    --select-font-size: 12px;
+    --select-height: 36px;
   }
   .writer-livebar,
   .writer-livebar button {

@@ -4,7 +4,15 @@
     <p>单独备份背景图片、透明度和当前小说的地图背景选择。外部图片保留链接；导入会替换本浏览器的外观设置。</p>
     <div class="appearance-actions">
       <button class="btn-secondary" :disabled="busy" @click="exportAppearance">导出外观偏好</button>
-      <label class="btn-secondary">导入外观偏好<input type="file" accept=".json,application/json" :disabled="busy" @change="importAppearance" /></label>
+      <BaseFilePicker
+        label="导入外观偏好"
+        accept=".json,application/json"
+        hint="JSON 外观文件 · 最大 16 MiB"
+        :busy="importBusy"
+        :disabled="busy"
+        busy-label="正在导入…"
+        @change="importAppearance"
+      />
     </div>
     <p role="status">{{ message }}</p>
   </section>
@@ -16,9 +24,11 @@ import { useAppStore } from '@/stores/app'
 import { getApiBaseUrl, request } from '@/api/request'
 import { imagesApi } from '@/api/images'
 import { parseAppearanceBackup } from '@/utils/appearance'
+import BaseFilePicker from '@/components/common/BaseFilePicker.vue'
 const route = useRoute()
 const app = useAppStore()
 const busy = ref(false)
+const importBusy = ref(false)
 const message = ref('')
 async function embeddedImage(url: string): Promise<string> {
   if (!/^https?:.*\/api\/novels\/\d+\/images\/\d+\/file$/.test(url) && !url.startsWith('/api/novels/')) return url
@@ -45,7 +55,7 @@ async function exportAppearance() {
 async function importAppearance(event: Event) {
   const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = ''
   if (!file || busy.value) return
-  busy.value = true; message.value = ''
+  busy.value = true; importBusy.value = true; message.value = ''
   try {
     if (file.size > 16 * 1024 * 1024) throw new Error('外观文件超过 16 MiB')
     const data = parseAppearanceBackup(JSON.parse(await file.text()))
@@ -67,11 +77,14 @@ async function importAppearance(event: Event) {
     Object.assign(app.settings, data.settings)
     message.value = '外观偏好已恢复；地图背景将在下次打开地图时生效'
   } catch (error) { message.value = error instanceof Error ? error.message : '导入失败，请检查文件和浏览器存储空间' }
-  finally { busy.value = false }
+  finally { busy.value = false; importBusy.value = false }
 }
 </script>
 <style scoped>
 p { font-size: 14px; line-height: 1.8; color: var(--muted); }
-.appearance-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-input[type="file"] { display: block; max-width: 230px; margin-top: 8px; font-size: 12px; }
+.appearance-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.appearance-actions > button { min-height: 40px; }
+@media (max-width: 600px) {
+  .appearance-actions > button { width: 100%; }
+}
 </style>

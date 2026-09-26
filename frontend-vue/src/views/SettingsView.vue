@@ -17,11 +17,17 @@
       <h3>备份与恢复</h3>
       <p>包含小说数据和已上传图片。恢复会替换当前小说数据及封面；外部图片链接和浏览器外观设置不打包。</p>
       <p>每张图片最多 8 MiB，图片总计最多 32 MiB，备份文件最多 48 MiB。</p>
-      <button class="btn-primary" :disabled="backupBusy" @click="backupApi.download(Number(route.params.novelId))">下载含图片备份</button>
-      <label class="btn-secondary">
-        从备份恢复
-        <input type="file" accept=".json,application/json" :disabled="backupBusy" @change="restoreLocalBackup" />
-      </label>
+      <div class="backup-actions">
+        <button class="btn-primary" :disabled="backupBusy" @click="backupApi.download(Number(route.params.novelId))">下载含图片备份</button>
+        <BaseFilePicker
+          label="从备份恢复"
+          accept=".json,application/json"
+          hint="JSON 备份 · 最大 48 MiB"
+          :busy="backupBusy"
+          busy-label="正在恢复…"
+          @change="restoreLocalBackup"
+        />
+      </div>
       <p role="status">{{ backupMessage }}</p>
     </div>
 
@@ -227,6 +233,7 @@ import { useStudioStore } from '@/stores/studio'
 import { exportApi } from '@/api/export'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
+import BaseFilePicker from '@/components/common/BaseFilePicker.vue'
 import { webdavApi } from '@/api/webdav'
 import { backupApi } from '@/api/backup'
 import type { RemoteFile } from '@/types/webdav'
@@ -481,6 +488,24 @@ function formatFileSize(bytes: number): string {
 
 <style lang="scss" scoped>
 @import '@/assets/styles/variables.scss';
+
+.backup-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+
+  > button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .backup-actions > button {
+    width: 100%;
+  }
+}
 
 .opacity-slider {
   width: 100%;

@@ -8,23 +8,16 @@
     <template v-if="mode === 'export'">
       <div class="writer-options">
         <label
-          >格式<select v-model="format">
-            <option value="docx">Word 文档 .docx</option>
-            <option value="txt">纯文本 .txt</option>
-            <option value="md">Markdown .md</option>
-          </select></label
+          >格式<BaseSelect
+            v-model="format"
+            aria-label="导出格式"
+            :options="formatOptions" /></label
         ><label
-          >范围<select v-model="scope">
-            <option value="all">整部作品</option>
-            <option value="chapter" :disabled="!writer.current">
-              当前章节
-            </option>
-            <option value="volume" :disabled="!writer.current?.volumeId">
-              当前篇卷
-            </option>
-            <option value="selected">选择章节</option>
-          </select></label
-        >
+          >范围<BaseSelect
+            v-model="scope"
+            aria-label="导出范围"
+            :options="scopeOptions"
+        /></label>
       </div>
       <div v-if="scope === 'selected'" class="writer-export-checks">
         <label v-for="chapter in chapters" :key="chapter.uid"
@@ -54,24 +47,22 @@
       </p>
     </template>
     <template v-else-if="mode === 'import'">
-      <input
-        type="file"
+      <BaseFilePicker
+        class="writer-import-file"
+        label="选择旧稿"
         accept=".txt,.md,.markdown,text/plain,text/markdown"
-        aria-label="选择旧稿"
+        hint="TXT 或 Markdown · 最大 4 MB"
+        :disabled="busy"
+        :busy="readingImport"
+        busy-label="正在读取旧稿…"
         @change="readImport"
       />
       <label
-        >导入篇卷<select v-model="importVolume">
-          <option value="">未分卷</option>
-          <option
-            v-for="volume in writer.workspace?.volumes"
-            :key="volume.uid"
-            :value="volume.uid"
-          >
-            {{ volume.title }}
-          </option>
-        </select></label
-      >
+        >导入篇卷<BaseSelect
+          v-model="importVolume"
+          aria-label="导入篇卷"
+          :options="volumeOptions"
+      /></label>
       <p>
         识别“第…章”、序章、番外和 Markdown
         标题。以下章节会作为新稿加入，不替换已有内容。
@@ -91,18 +82,12 @@
     </template>
     <template v-else-if="mode === 'history'">
       <p>自动历史约每 5 分钟保留一次；手动存档、拆分、合并及恢复前也会留档。</p>
-      <select
+      <BaseSelect
         aria-label="选择历史版本"
-        @change="
-          loadRevision(Number(($event.target as HTMLSelectElement).value))
-        "
-      >
-        <option value="">选择版本进行比较</option>
-        <option v-for="row in history" :key="row.id" :value="row.id">
-          {{ row.createdAt.replace('T', ' ').slice(0, 19) }} · {{ row.label }} ·
-          v{{ row.revision }}
-        </option>
-      </select>
+        v-model="historyId"
+        :options="historyOptions"
+        @change="loadRevision(Number($event))"
+      />
       <div v-if="revision" class="writer-compare">
         <label
           >当前正文 · {{ writer.current?.wordCount }} 字<textarea
@@ -204,17 +189,11 @@
     <template v-else-if="mode === 'connections'">
       <p>沿着人物、事件和伏笔，看看章节如何互相呼应。</p>
       <label
-        >追踪资料<select v-model="traceKey">
-          <option value="">所有已关联资料</option>
-          <option
-            v-for="resource in linkedResources"
-            :key="resource.key"
-            :value="resource.key"
-          >
-            {{ resource.label }}
-          </option>
-        </select></label
-      >
+        >追踪资料<BaseSelect
+          v-model="traceKey"
+          aria-label="追踪资料"
+          :options="traceOptions"
+      /></label>
       <div class="writer-chapter-flow">
         <article v-for="chapter in traced" :key="chapter.uid">
           <button @click="jump(chapter.uid)">
@@ -286,6 +265,8 @@
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/common/BaseModal.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
+import BaseFilePicker from '@/components/common/BaseFilePicker.vue'
 import WritingHeatmap from '@/components/writing/WritingHeatmap.vue'
 import { useWritingStore } from '@/stores/writing'
 import { writingApi } from '@/api/writing'
@@ -332,9 +313,28 @@ const format = ref('docx'),
   pageBreak = ref(true),
   error = ref(''),
   busy = ref(false)
+const formatOptions = [
+  { value: 'docx', label: 'Word 文档 .docx' },
+  { value: 'txt', label: '纯文本 .txt' },
+  { value: 'md', label: 'Markdown .md' },
+]
+const scopeOptions = computed(() => [
+  { value: 'all', label: '整部作品' },
+  { value: 'chapter', label: '当前章节', disabled: !writer.current },
+  { value: 'volume', label: '当前篇卷', disabled: !writer.current?.volumeId },
+  { value: 'selected', label: '选择章节' },
+])
+const volumeOptions = computed(() => [
+  { value: '', label: '未分卷' },
+  ...(writer.workspace?.volumes || []).map((volume) => ({
+    value: volume.uid,
+    label: volume.title,
+  })),
+])
 const imported = ref<{ uid: string; title: string; doc: DocNode }[]>([]),
   importVolume = ref(writer.current?.volumeId || ''),
   importedCount = ref(0)
+const readingImport = ref(false)
 const history = ref<
     { id: number; revision: number; label: string; createdAt: string }[]
   >([]),
@@ -343,6 +343,14 @@ const history = ref<
   searched = ref(false),
   results = ref<any[]>([]),
   traceKey = ref('')
+const historyId = ref<string | number>('')
+const historyOptions = computed(() => [
+  { value: '', label: '选择版本进行比较' },
+  ...history.value.map((row) => ({
+    value: row.id,
+    label: `${row.createdAt.replace('T', ' ').slice(0, 19)} · ${row.label} · v${row.revision}`,
+  })),
+])
 const dailyGoal = ref(writer.workspace?.preferences.dailyGoal ?? 2000),
   chapters = computed(
     () => writer.workspace?.chapters.filter((c) => !c.deleted) || [],
@@ -387,6 +395,13 @@ const linkedResources = computed(() => {
   )
   return [...seen].map(([key, label]) => ({ key, label }))
 })
+const traceOptions = computed(() => [
+  { value: '', label: '所有已关联资料' },
+  ...linkedResources.value.map((resource) => ({
+    value: resource.key,
+    label: resource.label,
+  })),
+])
 const traced = computed(() =>
   chapters.value.filter(
     (c) =>
@@ -420,17 +435,30 @@ const unresolved = computed(() =>
 )
 async function readImport(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
+  if (!file || busy.value || readingImport.value) return
+  error.value = ''
+  imported.value = []
+  importedCount.value = 0
   if (file.size > 4 * 1024 * 1024) {
     error.value = '请将文稿分为每个不超过 4 MB 的文件再导入'
     return
   }
-  const text = await file.text()
-  imported.value = parseManuscript(text, file.name).map((c) => ({
-    ...c,
-    uid: crypto.randomUUID(),
-  }))
-  importedCount.value = 0
+  readingImport.value = true
+  try {
+    const text = await file.text()
+    ensureActive()
+    imported.value = parseManuscript(text, file.name).map((c) => ({
+      ...c,
+      uid: crypto.randomUUID(),
+    }))
+  } catch (failure) {
+    error.value =
+      failure instanceof Error
+        ? failure.message
+        : '旧稿读取失败，请重新选择文件'
+  } finally {
+    readingImport.value = false
+  }
 }
 let revisionRequest = 0
 async function loadRevision(id: number) {
@@ -564,3 +592,9 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.writer-import-file {
+  margin-bottom: 18px;
+}
+</style>

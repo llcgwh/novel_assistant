@@ -63,10 +63,14 @@
               v-model="statusFilter"
               :options="novelStatusFilterOptions"
               placeholder="按状态筛选"
-            /><select v-model="sortOrder" aria-label="作品排序">
-              <option value="updated">最近更新</option>
-              <option value="title">标题排序</option>
-            </select>
+            /><BaseSelect
+              v-model="sortOrder"
+              aria-label="作品排序"
+              :options="[
+                { value: 'updated', label: '最近更新' },
+                { value: 'title', label: '标题排序' },
+              ]"
+            />
           </div>
         </div>
         <div v-if="loadError" class="studio-warning" role="alert">
