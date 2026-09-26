@@ -18,14 +18,14 @@ final class BackupValidator {
             require(root.get("schemaVersion").isIntegralNumber(), "Invalid schemaVersion");
             require(root.get("schemaVersion").canConvertToInt(), "Invalid schemaVersion");
             version = root.get("schemaVersion").asInt();
-            require(version == 1 || version == 2, "Unsupported backup version");
+            require(version >= 1 && version <= 3, "Unsupported backup version");
         }
         List<String> sections = new ArrayList<>(REQUIRED);
         sections.addAll(OPTIONAL);
         Map<String, Set<Long>> ids = new HashMap<>();
         for (String section : sections) {
             JsonNode rows = root.path(section);
-            boolean required = REQUIRED.contains(section) || version == 2;
+            boolean required = REQUIRED.contains(section) || version >= 2;
             require(!rows.isMissingNode() || !required, "Missing section: " + section);
             require(rows.isMissingNode() || rows.isArray(), "Invalid section: " + section);
             Set<Long> seen = new HashSet<>();
@@ -68,6 +68,7 @@ final class BackupValidator {
         }
         parents(root.path("relationshipGroups"), "parentGroupId", false, ids.get("relationshipGroups"));
         parents(root.path("mapLocations"), "parentLocation", true, ids.get("mapLocations"));
+        if(version>=3 || root.has("writing")) WritingService.validateBackup(root.path("writing"));
     }
 
     private static void references(JsonNode row, String field, Set<Long> targets) {

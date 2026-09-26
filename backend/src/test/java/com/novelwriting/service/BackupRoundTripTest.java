@@ -18,11 +18,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 @DataJpaTest(showSql = false, properties = "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect")
-@Import({com.novelwriting.security.TestCredentials.class, ImportService.class, ExportService.class})
+@Import({com.novelwriting.security.TestCredentials.class, ImportService.class, ExportService.class, WritingService.class})
 class BackupRoundTripTest {
     @Autowired EntityManager em;
     @Autowired ImportService importer;
     @Autowired ExportService exporter;
+    @Autowired WritingService writing;
     @SpyBean SceneRepository scenes;
     final ObjectMapper mapper = new ObjectMapper();
 
@@ -92,6 +93,21 @@ class BackupRoundTripTest {
         assertEquals(1, world.getScenes().size());
         // Re-exported data must itself be a valid backup.
         BackupValidator.validate(mapper.readTree(exporter.exportNovelToJson(id)));
+    }
+
+    @Test void manuscriptRoundTripRemapsLinksAndProtectsExistingTextFromLegacyRestore() throws Exception {
+        Novel novel=seed(); long id=novel.getId();
+        var input=mapper.createObjectNode().put("uid",java.util.UUID.randomUUID().toString()).put("title","正文第一章");
+        input.set("doc",WritingDocuments.empty());
+        input.putArray("links").addObject().put("uid",java.util.UUID.randomUUID().toString()).put("type","characters").put("targetId",one(Character.class,id,"Hero").getId()).put("role","reference");
+        var original=writing.create(id,input); ObjectNode backup=(ObjectNode)mapper.readTree(exporter.exportNovelToJson(id));
+        ObjectNode legacy=backup.deepCopy(); legacy.remove("writing"); legacy.put("schemaVersion",2);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->importer.importFromJson(id,mapper.writeValueAsBytes(legacy)));
+        importer.importFromJson(id,mapper.writeValueAsBytes(backup)); em.flush(); em.clear();
+        var restored=writing.get(id,original.path("uid").asText());
+        assertEquals(one(Character.class,id,"Hero").getId().longValue(),restored.path("links").get(0).path("targetId").asLong());
+        assertTrue(restored.path("revision").asLong()>original.path("revision").asLong());
+        assertEquals("正文第一章",restored.path("title").asText());
     }
 
     @Test void rejectsInvalidBackupsBeforeDeletingAnything() throws Exception {

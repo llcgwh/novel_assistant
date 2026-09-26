@@ -18,6 +18,8 @@ import java.util.*;
 @Service
 public class ExportService {
 
+    @Autowired private WritingService writingService;
+
     @Autowired
     private NovelRepository novelRepository;
 
@@ -405,7 +407,8 @@ public class ExportService {
 
         Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new RuntimeException("Novel not found"));
-        data.put("schemaVersion", 2);
+        data.put("schemaVersion", 3);
+        data.put("writing", writingService.exportBackup(novelId));
         data.put("novel", novel);
 
         data.put("characters", characterRepository.findByNovelId(novelId));
