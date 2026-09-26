@@ -94,6 +94,36 @@ class WritingServiceTest {
   }
 
   @Test
+  void manualCheckpointIncludesTheJustSubmittedTextAndKeepsThePreviousVersion() {
+    long id = novel();
+    ObjectNode first = writing.create(id, draft("旧标题"));
+    String uid = first.path("uid").asText();
+    ObjectNode change = mutation(first)
+      .put("checkpoint", true)
+      .put("title", "新标题");
+    change.set("doc", draft("正文").path("doc").deepCopy());
+    ((ObjectNode) change
+        .path("doc")
+        .path("content")
+        .get(0)
+        .path("content")
+        .get(0)).put("text", "刚刚输入，还未自动保存的正文");
+    ObjectNode saved = writing.save(id, uid, change);
+    ArrayNode history = writing.revisions(id, uid);
+    var current = writing.revision(id, uid, history.get(0).path("id").asLong());
+    var previous = writing.revision(
+      id,
+      uid,
+      history.get(1).path("id").asLong()
+    );
+    assertEquals(saved.path("doc"), current.path("doc"));
+    assertEquals("新标题", current.path("title").asText());
+    assertEquals(first.path("doc"), previous.path("doc"));
+    writing.save(id, uid, change);
+    assertEquals(history.size(), writing.revisions(id, uid).size());
+  }
+
+  @Test
   void ownershipAppliesToChaptersAndEveryTypedReference() {
     long a = novel(),
       b = novel();

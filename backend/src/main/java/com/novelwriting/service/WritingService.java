@@ -206,11 +206,14 @@ public class WritingService {
       !input.has("revision") ||
       input.path("revision").asLong(-1) != c.getRevision()
     ) throw conflict();
-    snapshotIfDue(c, input.path("checkpoint").asBoolean());
+    boolean checkpoint = input.path("checkpoint").asBoolean();
+    if (checkpoint) snapshot(c, "手动存档前");
+    else snapshotIfDue(c, false);
     apply(c, input, b);
     c.setRevision(c.getRevision() + 1);
     c.setMutationId(mutation);
     c.setUpdatedAt(LocalDateTime.now());
+    if (checkpoint) snapshot(c, "手动存档");
     touch(b, false);
     return detail(c);
   }
