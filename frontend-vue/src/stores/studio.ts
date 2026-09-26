@@ -10,6 +10,19 @@ export const useStudioStore = defineStore('studio', () => {
   const theme = ref(initial),
     focused = ref(false),
     commandsOpen = ref(false)
+  const spatialMotion = ref(true)
+  try {
+    spatialMotion.value = localStorage.getItem('ink-spatial-motion') !== 'off'
+  } catch {
+    /* optional preference */
+  }
+  watch(spatialMotion, (value) => {
+    try {
+      localStorage.setItem('ink-spatial-motion', value ? 'on' : 'off')
+    } catch {
+      /* session only */
+    }
+  })
   watch(theme, (value) => {
     try {
       localStorage.setItem('ink-studio-theme', value)
@@ -20,5 +33,5 @@ export const useStudioStore = defineStore('studio', () => {
   function toggleTheme() {
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
   }
-  return { theme, focused, commandsOpen, toggleTheme }
+  return { theme, focused, commandsOpen, spatialMotion, toggleTheme }
 })

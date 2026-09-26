@@ -13,7 +13,22 @@
         }}<small>切换作品 ↗</small></span
       ></RouterLink
     >
-    <nav aria-label="创作模块">
+    <nav
+      ref="navigation"
+      class="sheet-navigation"
+      aria-label="创作模块"
+      :style="{
+        '--nav-tint': sheetFor(String(route.path.split('/').at(-1))).tint,
+      }"
+    >
+      <span
+        class="sheet-nav-marker"
+        :style="{
+          ...marker,
+          transition: studio.spatialMotion ? undefined : 'none',
+        }"
+        aria-hidden="true"
+      ></span>
       <template v-for="group in groups" :key="group"
         ><p class="nav-label">{{ group }}</p>
         <RouterLink
@@ -84,7 +99,8 @@
   <CommandPalette v-if="studio.commandsOpen" />
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, nextTick, ref, watch } from 'vue'
+import { sheetFor } from '@/utils/sheets'
 import { useRoute, useRouter } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
 import { useStudioStore } from '@/stores/studio'
@@ -102,6 +118,24 @@ const current = computed(() =>
   studioModules.find((item) => route.path === base.value + item.path),
 )
 const groups = ['工作台', '故事脉络', '世界构建']
+const navigation = ref<HTMLElement | null>(null)
+const marker = ref({ transform: 'translateY(0px)', height: '39px', opacity: 0 })
+let markerObserver: ResizeObserver | undefined
+async function positionMarker() {
+  await nextTick()
+  const nav = navigation.value,
+    active = nav?.querySelector<HTMLElement>('.studio-nav-item.active')
+  if (!nav || !active || !nav.clientWidth) {
+    marker.value.opacity = 0
+    return
+  }
+  marker.value = {
+    transform: `translateY(${active.getBoundingClientRect().top - nav.getBoundingClientRect().top}px)`,
+    height: `${active.offsetHeight}px`,
+    opacity: 1,
+  }
+}
+watch(() => route.path, positionMarker, { flush: 'post' })
 function shortcut(event: KeyboardEvent) {
   if (
     (event.metaKey || event.ctrlKey) &&
@@ -113,6 +147,9 @@ function shortcut(event: KeyboardEvent) {
   }
 }
 onMounted(() => {
+  markerObserver = new ResizeObserver(positionMarker)
+  if (navigation.value) markerObserver.observe(navigation.value)
+  void positionMarker()
   document.addEventListener('keydown', shortcut)
   if (!novel.novels.length)
     void novel
@@ -120,6 +157,7 @@ onMounted(() => {
       .catch(() => app.showToast('作品信息加载失败，请回书架重试', 'error'))
 })
 onUnmounted(() => {
+  markerObserver?.disconnect()
   document.removeEventListener('keydown', shortcut)
   studio.commandsOpen = false
 })

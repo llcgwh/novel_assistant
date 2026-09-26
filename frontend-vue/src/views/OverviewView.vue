@@ -32,7 +32,7 @@
           }}</span>
         </div>
       </div>
-      <StoryOrbit />
+      <SheetDock />
     </section>
     <div v-if="failed.length" class="studio-warning" role="alert">
       {{ failed.join('、') }}加载失败，对应统计暂不显示。<button
@@ -171,7 +171,7 @@ import { useNovelStore } from '@/stores/novel'
 import { useStudioStore } from '@/stores/studio'
 import { studioModules, recentRecords, type StudioRecord } from '@/utils/studio'
 import StudioIcon from '@/components/common/StudioIcon.vue'
-import StoryOrbit from '@/components/studio/StoryOrbit.vue'
+import SheetDock from '@/components/studio/SheetDock.vue'
 import IdeaNotebook from '@/components/studio/IdeaNotebook.vue'
 import FocusTimer from '@/components/studio/FocusTimer.vue'
 const route = useRoute(),

@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import { useEditQuery } from '@/composables/useEditQuery'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted } from 'vue'
 import { useTagsStore } from '@/stores/tags'
@@ -80,6 +81,8 @@ const form = reactive({
   color: '#3498db',
   description: ''
 })
+
+useEditQuery(() => tagsStore.tags, editTag)
 
 onMounted(() => {
   tagsStore.fetchTags()
