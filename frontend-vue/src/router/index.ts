@@ -24,6 +24,7 @@ const routes: RouteRecordRaw[] = [
         redirect: { name: 'Overview' }
       },
       { path: 'overview', name: 'Overview', component: () => import('@/views/OverviewView.vue') },
+      { path: 'writing', name: 'Writing', component: () => import('@/views/WritingView.vue') },
       {
         path: 'timeline',
         name: 'Timeline',

@@ -79,6 +79,7 @@
         <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
+      <WritingBacklinks v-if="editingScene" type="scenes" :target-id="editingScene.id"/>
     </BaseModal>
 
     <!-- 标签管理模态框 -->
@@ -112,6 +113,7 @@ import { useScenesStore } from '@/stores/scenes'
 import { useTagsStore } from '@/stores/tags'
 import type { Scene } from '@/types/scene'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'

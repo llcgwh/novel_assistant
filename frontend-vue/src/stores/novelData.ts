@@ -8,8 +8,10 @@ import { useRelationshipsStore } from './relationships'
 import { useRelationshipGroupsStore } from './relationshipGroups'
 import { useTagsStore } from './tags'
 import { useWorldviewStore } from './worldview'
+import { useWritingStore } from './writing'
 
 export function resetNovelData() {
+  useWritingStore().$reset()
   useCharactersStore().$reset()
   useScenesStore().$reset()
   useForeshadowsStore().$reset()

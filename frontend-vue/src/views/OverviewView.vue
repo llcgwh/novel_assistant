@@ -18,8 +18,8 @@
           }}
         </p>
         <div class="hero-actions">
-          <RouterLink :to="base + 'outlines'" class="btn-primary"
-            >继续构思<StudioIcon name="arrow" /></RouterLink
+          <RouterLink :to="base + 'writing'" class="btn-primary"
+            >继续写作<StudioIcon name="arrow" /></RouterLink
           ><button class="text-button" @click="studio.commandsOpen = true">
             探索创作空间 <span>↗</span>
           </button>
@@ -42,6 +42,24 @@
         重新加载
       </button>
     </div>
+    <RouterLink
+      v-if="manuscript"
+      :to="base + 'writing'"
+      class="writer-resume-card"
+    >
+      <span class="writer-resume-symbol">✎</span
+      ><span
+        ><small>正在写下的世界</small
+        ><strong>{{ lastChapter?.title || '写下第一章' }}</strong
+        ><span
+          >{{ manuscriptWords.toLocaleString() }} 字 ·
+          {{ manuscript.chapters.filter((c) => !c.deleted).length }} 章</span
+        ></span
+      ><span class="writer-resume-today"
+        ><small>今日净增</small
+        ><b>{{ todayWords > 0 ? '+' : '' }}{{ todayWords }}</b></span
+      ><span>继续落笔 ↗</span>
+    </RouterLink>
     <div class="stat-grid" :aria-busy="loading">
       <RouterLink
         v-for="metric in metrics"
@@ -174,6 +192,25 @@ import StudioIcon from '@/components/common/StudioIcon.vue'
 import SheetDock from '@/components/studio/SheetDock.vue'
 import IdeaNotebook from '@/components/studio/IdeaNotebook.vue'
 import FocusTimer from '@/components/studio/FocusTimer.vue'
+import { writingApi } from '@/api/writing'
+import { localDate, latestChapter } from '@/utils/writing'
+import type { WritingWorkspace } from '@/types/writing'
+const manuscript = ref<WritingWorkspace | null>(null)
+const manuscriptWords = computed(
+  () =>
+    manuscript.value?.chapters
+      .filter((c) => !c.deleted)
+      .reduce((n, c) => n + c.wordCount, 0) || 0,
+)
+const todayWords = computed(
+  () =>
+    manuscript.value?.sessions
+      .filter((s) => s.date === localDate())
+      .reduce((n, s) => n + s.net, 0) || 0,
+)
+const lastChapter = computed(() =>
+  latestChapter(manuscript.value?.chapters || []),
+)
 const route = useRoute(),
   novel = useNovelStore(),
   studio = useStudioStore()
@@ -219,7 +256,15 @@ async function load() {
   })
   loading.value = false
 }
-onMounted(load)
+onMounted(() => {
+  void load()
+  void writingApi
+    .workspace(novelId)
+    .then((data) => {
+      if (alive) manuscript.value = data
+    })
+    .catch(() => {})
+})
 onBeforeUnmount(() => {
   alive = false
 })

@@ -35,7 +35,7 @@
         <section v-for="group in visibleGroups" :key="group.key" class="result-section" :aria-label="group.label">
           <div class="result-section-heading"><h3>{{ group.label }}</h3><span>{{ group.items.length }} 条资料</span></div>
           <div class="result-grid">
-            <RouterLink v-for="item in group.items" :key="item.id" class="result-card" :to="{ path: `/novel/${route.params.novelId}/${group.path}`, query: { edit: String(item.id) } }">
+            <RouterLink v-for="item in group.items" :key="item.id" class="result-card" :to="{ path: `/novel/${route.params.novelId}/${group.path}`, query: group.path === 'writing' ? { chapter: String(item.id), find: query } : { edit: String(item.id) } }">
               <div class="result-card-top"><span class="result-icon" aria-hidden="true">{{ group.icon }}</span><span class="result-type">{{ group.label }}</span><span class="result-arrow" aria-hidden="true">↗</span></div>
               <h4><HighlightedText :text="item.title" :keyword="query" /></h4>
               <p v-if="item.excerpt"><HighlightedText :text="item.excerpt" :keyword="query" /></p>

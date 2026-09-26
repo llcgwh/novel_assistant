@@ -106,6 +106,7 @@
         <label>坐标 Y</label>
         <input v-model.number="form.positionY" type="number" />
       </div>
+      <WritingBacklinks v-if="editingLocation" type="map" :target-id="editingLocation.id"/>
     </BaseModal>
 
     <!-- 标签管理模态框 -->
@@ -143,6 +144,7 @@ import { useScenesStore } from '@/stores/scenes'
 import { useStudioStore } from '@/stores/studio'
 import type { MapLocation } from '@/types/map'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'

@@ -154,6 +154,7 @@
           <span v-if="mapStore.locations.length === 0" class="empty-hint">暂无地图位置</span>
         </div>
       </div>
+      <WritingBacklinks v-if="editingEntry" type="worldview" :target-id="editingEntry.id"/>
     </BaseModal>
 
     <!-- 标签管理模态框 -->
@@ -191,6 +192,7 @@ import { useMapStore } from '@/stores/map'
 import type { WorldviewEntry } from '@/types/worldview'
 import { WORLDVIEW_CATEGORIES, getCategoryLabel } from '@/types/worldview'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'

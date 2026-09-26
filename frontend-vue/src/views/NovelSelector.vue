@@ -142,6 +142,17 @@
                 }}</span>
               </div>
               <p>{{ novel.description || '故事正在酝酿，世界即将展开。' }}</p>
+              <RouterLink
+                class="book-writing-summary"
+                :to="`/novel/${novel.id}/writing`"
+                @click="rememberNovel(novel.id)"
+                ><span
+                  >{{
+                    writingSummaries[novel.id]?.words.toLocaleString() || '0'
+                  }}
+                  字 · {{ writingSummaries[novel.id]?.chapters || 0 }} 章</span
+                ><span>落笔 ↗</span></RouterLink
+              >
               <div class="book-card-footer">
                 <span>{{ novel.author || '未署名' }}</span>
                 <div>
@@ -242,6 +253,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { request } from '@/api/request'
+const writingSummaries = ref<
+  Record<number, { words: number; chapters: number }>
+>({})
 import { useNovelStore } from '@/stores/novel'
 import { useStudioStore } from '@/stores/studio'
 import { filterNovels } from '@/utils/studio'
@@ -301,6 +316,12 @@ async function loadNovels() {
   loadError.value = false
   try {
     await novelStore.fetchNovels()
+    writingSummaries.value = await request
+      .get<
+        any,
+        Record<number, { words: number; chapters: number }>
+      >('/novels/writing-summary')
+      .catch(() => ({}))
   } catch {
     loadError.value = true
   }

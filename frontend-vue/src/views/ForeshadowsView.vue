@@ -80,6 +80,7 @@
         <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
+      <WritingBacklinks v-if="editingForeshadow" type="foreshadows" :target-id="editingForeshadow.id"/>
     </BaseModal>
 
     <!-- 标签管理模态框 -->
@@ -112,6 +113,7 @@ import { useForeshadowsStore } from '@/stores/foreshadows'
 import { useTagsStore } from '@/stores/tags'
 import type { Foreshadow, ForeshadowStatus } from '@/types/foreshadow'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'

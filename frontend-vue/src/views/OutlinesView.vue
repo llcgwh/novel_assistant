@@ -80,6 +80,7 @@
         <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
+      <WritingBacklinks v-if="editingOutline" type="outlines" :target-id="editingOutline.id" :title="editingOutline.title" :summary="editingOutline.content"/>
     </BaseModal>
 
     <!-- 标签管理模态框 -->
@@ -112,6 +113,7 @@ import { useOutlinesStore } from '@/stores/outlines'
 import { useTagsStore } from '@/stores/tags'
 import type { Outline, OutlineStatus } from '@/types/outline'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'

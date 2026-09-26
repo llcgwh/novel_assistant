@@ -105,6 +105,7 @@
         <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
+      <WritingBacklinks v-if="editingEvent" type="timeline" :target-id="editingEvent.id"/>
     </BaseModal>
 
     <!-- 关联管理模态框 -->
@@ -187,6 +188,7 @@ import { useOutlinesStore } from '@/stores/outlines'
 import { useTagsStore } from '@/stores/tags'
 import type { TimelineEvent } from '@/types/timeline'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'

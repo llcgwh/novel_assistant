@@ -15,6 +15,7 @@
 <script setup lang="ts">
 defineProps<{ name: string }>()
 const paths: Record<string, string> = {
+  writing: 'M16 3l5 5-12 12-6 1 1-6L16 3ZM13 6l5 5M14 21h7',
   book: 'M4 4h7a3 3 0 0 1 3 3v14a4 4 0 0 0-4-2H4V4Zm10 3a3 3 0 0 1 3-3h3v15h-3a3 3 0 0 0-3 2M7 8h3M7 12h3',
   overview: 'M3 3h7v7H3zM14 3h7v4h-7zM14 11h7v10h-7zM3 14h7v7H3z',
   outlines: 'M8 4h12M8 10h12M8 16h8M3 4h.01M3 10h.01M3 16h.01M18 19l2 2 3-4',

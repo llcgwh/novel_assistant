@@ -109,6 +109,7 @@
             <span class="toggle-slider"></span>
             <span class="toggle-label">{{ webdavForm.autoSync ? '已开启' : '已关闭' }}</span>
           </label>
+          <p class="status-text">后端运行时约每 5 分钟上传有改动的完整作品。云端分歧请在「写作工作台 → 云端同步」比较处理。</p>
         </div>
       </div>
 

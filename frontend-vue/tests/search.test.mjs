@@ -92,12 +92,16 @@ test('snippets show a match in long content without adding ellipses to short tex
   assert.ok(snippet.length <= 132)
 })
 
-test('all seven categories preserve target IDs and older API responses remain usable', () => {
+test('manuscripts and seven reference categories preserve targets and tolerate older API responses', () => {
   const data = { ...emptySearchResults(), worldviewEntries: [{ id: 7, name: '月门', content: '月门的历史' }] }
   const group = searchGroups(data, '月门').find(group => group.key === 'worldviewEntries')
   assert.equal(group.path, 'worldview')
   assert.equal(group.items[0].id, 7)
   assert.equal(group.items[0].excerpt, '月门的历史')
   delete data.worldviewEntries
-  assert.equal(searchGroups(data, '月门').length, 7)
+  assert.equal(searchGroups(data, '月门').length, 8)
+  data.manuscripts = [{id:'chapter-uid',title:'月门来信',excerpt:'正文命中月门'}]
+  const manuscript = searchGroups(data,'月门').find(group=>group.key==='manuscripts')
+  assert.equal(manuscript.path,'writing')
+  assert.equal(manuscript.items[0].id,'chapter-uid')
 })

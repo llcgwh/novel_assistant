@@ -1,5 +1,7 @@
 <template>
+  <WritingContext v-if="sheetId === 'writing'" />
   <div
+    v-else
     class="sheet-contents"
     :class="[`motif-${profile.motif}`, `format-${profile.layout}`]"
   >
@@ -169,7 +171,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
+const WritingContext = defineAsyncComponent(() => import('@/components/writing/WritingContext.vue'))
 import { useRoute, useRouter } from 'vue-router'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import { sheetFor, adjacentSheet, sheets, type SheetId } from '@/utils/sheets'

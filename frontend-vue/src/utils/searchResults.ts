@@ -1,6 +1,7 @@
 import type { SearchResult } from '@/types'
 
 export const SEARCH_CATEGORIES = [
+  { key: 'manuscripts', label: '正文', path: 'writing', icon: '文' },
   { key: 'characters', label: '人物', path: 'characters', icon: '人' },
   { key: 'scenes', label: '场景', path: 'scenes', icon: '景' },
   { key: 'foreshadows', label: '伏笔', path: 'foreshadows', icon: '线' },
@@ -45,7 +46,7 @@ export function searchGroups(results: SearchResult, keyword: string) {
   return SEARCH_CATEGORIES.map(category => ({
     ...category,
     items: (results[category.key] || []).map(item => {
-      const details = ['role', 'location', 'content', 'description', 'personality', 'appearance', 'background', 'locationType', 'eventTime']
+      const details = ['excerpt', 'role', 'location', 'content', 'description', 'personality', 'appearance', 'background', 'locationType', 'eventTime']
         .map(field => field in item ? (item as unknown as Record<string, unknown>)[field] : null)
         .filter((value): value is string => typeof value === 'string' && value.length > 0)
       const description = details.find(value => value.toLocaleLowerCase().includes(keyword.toLocaleLowerCase())) || details[0] || ''

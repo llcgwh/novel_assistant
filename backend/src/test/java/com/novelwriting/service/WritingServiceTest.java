@@ -94,6 +94,20 @@ class WritingServiceTest {
   }
 
   @Test
+  void chapterDatesUseIsoStringsForWorkspaceAndDetail() {
+    long id = novel();
+    ObjectNode first = writing.create(id, draft("时间格式"));
+    assertTrue(first.path("updatedAt").isTextual());
+    assertDoesNotThrow(() ->
+      java.time.LocalDateTime.parse(first.path("updatedAt").asText())
+    );
+    assertEquals(
+      first.path("updatedAt"),
+      writing.workspace(id).path("chapters").get(0).path("updatedAt")
+    );
+  }
+
+  @Test
   void manualCheckpointIncludesTheJustSubmittedTextAndKeepsThePreviousVersion() {
     long id = novel();
     ObjectNode first = writing.create(id, draft("旧标题"));

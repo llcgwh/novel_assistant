@@ -1,0 +1,1402 @@
+.sheet-stage[data-active-sheet='writing'] {
+  grid-template-columns: minmax(0, 1fr) 292px;
+  gap: 22px;
+  align-items: start;
+  .sheet-dock-column {
+    padding-top: 0;
+    position: sticky;
+    top: 92px;
+    align-self: start;
+  }
+  .sheet-dock {
+    height: min(760px, calc(100vh - 120px));
+    min-height: 500px;
+  }
+}
+.writing-view {
+  --writer-accent: #dec492;
+  min-width: 0;
+}
+:root[data-studio-theme='light'] .writing-view {
+  --writer-accent: #86652b;
+}
+.writer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.writer-heading p {
+  font: 9px var(--font-mono, monospace);
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+.writer-heading h1 {
+  font:
+    500 clamp(26px, 2.6vw, 38px) / 1.2 'Songti SC',
+    serif;
+  letter-spacing: 0.09em;
+  margin: 0;
+}
+.writer-heading h1 span {
+  font-size: 19px;
+  margin-left: 14px;
+  color: var(--writer-accent);
+}
+.writer-heading-actions,
+.writer-global-tools,
+.writer-cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.writer-heading-actions button,
+.writer-global-tools button,
+.writer-cloud-actions button {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 11px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.writer-heading-actions button:last-child {
+  color: var(--writer-accent);
+  border-color: color-mix(in srgb, var(--writer-accent) 35%, transparent);
+}
+.writer-global-tools {
+  padding: 0 0 17px;
+  gap: 6px;
+}
+.writer-global-tools button {
+  border-color: transparent;
+  background: transparent;
+  padding: 6px 8px;
+}
+.writer-global-tools button:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+.writer-desk {
+  display: grid;
+  grid-template-columns: 174px minmax(0, 1fr);
+  gap: 15px;
+  align-items: start;
+}
+.writer-desk.tree-closed {
+  grid-template-columns: minmax(0, 1fr);
+}
+.writer-tree {
+  position: sticky;
+  top: 90px;
+  max-height: calc(100vh - 110px);
+  overflow: auto;
+  scrollbar-width: thin;
+  border-right: 1px solid var(--line);
+  padding: 14px 11px 20px 0;
+}
+.writer-tree > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.writer-tree header button {
+  font-size: 22px;
+  background: transparent;
+  color: var(--writer-accent);
+  border: 0;
+}
+.writer-tree-actions {
+  display: flex;
+  justify-content: space-between;
+  margin: 16px 0 12px;
+}
+.writer-tree-actions button {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 0;
+}
+.writer-tree > input {
+  font-size: 11px;
+  width: 100%;
+  padding: 8px;
+}
+.writer-volume {
+  display: flex;
+  justify-content: space-between;
+  margin: 21px 0 9px;
+}
+.writer-volume button {
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font-size: 10px;
+  padding: 0;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.writer-volume button:last-child {
+  flex-shrink: 0;
+}
+.writer-chapter-list {
+  min-height: 30px;
+}
+.writer-chapter-item {
+  display: flex;
+  gap: 8px;
+  text-align: left;
+  align-items: start;
+  padding: 12px 8px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  margin: 2px 0;
+  color: var(--muted);
+}
+.writer-chapter-item.active {
+  background: color-mix(in srgb, var(--writer-accent) 9%, transparent);
+  border-color: color-mix(in srgb, var(--writer-accent) 24%, transparent);
+  color: var(--text);
+}
+.writer-chapter-item > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+.writer-chapter-item strong {
+  font-size: 11px;
+  font-weight: 500;
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.writer-chapter-item small {
+  display: block;
+  font-size: 9px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.writer-chapter-item small i {
+  margin: 0 4px;
+  font-style: normal;
+}
+.writer-chapter-number {
+  font: 10px monospace;
+  opacity: 0.4;
+  margin-top: 5px;
+}
+.writer-dirty-dot {
+  font-size: 7px;
+  color: var(--writer-accent);
+}
+.writer-new-chapter {
+  padding: 10px 6px;
+  background: none;
+  border: 0;
+  font-size: 10px;
+  color: var(--muted);
+  width: 100%;
+  text-align: left;
+}
+.writer-main {
+  min-width: 0;
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: clip;
+}
+.writer-chapter-heading {
+  padding: 23px 26px 0;
+}
+.writer-save-state {
+  font-size: 9px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+.writer-save-state > span {
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+.writer-save-state > span.is-dirty {
+  background: var(--writer-accent);
+}
+.writer-save-state button {
+  margin-left: auto;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  font-size: 9px;
+}
+.writer-title-input {
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  font:
+    500 26px/1.5 'Songti SC',
+    serif !important;
+  padding: 25px 0 14px !important;
+  width: 100%;
+}
+.writer-chapter-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 16px;
+}
+.writer-chapter-meta select {
+  font-size: 10px;
+  padding: 5px 6px;
+  max-width: 155px;
+  flex: 1;
+  min-width: 70px;
+  background: transparent;
+}
+.writer-chapter-settings {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 0 0 15px;
+}
+.writer-chapter-settings summary {
+  cursor: pointer;
+}
+.writer-chapter-settings > label {
+  margin: 10px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.writer-chapter-settings input[type='number'] {
+  width: 100px;
+  padding: 5px;
+  font-size: 11px;
+}
+.writing-view progress,
+.modal-content progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--accent);
+}
+.writer-formatbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 40%, transparent);
+}
+.writer-formatbar button,
+.writer-formatbar select {
+  font-size: 11px;
+  padding: 6px 8px;
+  min-height: 28px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.writer-formatbar button:hover,
+.writer-formatbar button.active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+.writer-formatbar i {
+  height: 15px;
+  width: 1px;
+  background: var(--line);
+  margin: 0 3px;
+}
+.writer-formatbar em {
+  font-family: serif;
+}
+.manuscript-paper {
+  padding: 30px clamp(20px, 3.2vw, 55px) 70px;
+  min-height: 570px;
+}
+.manuscript-paper .tiptap {
+  outline: none;
+  min-height: 460px;
+  color: var(--text);
+  font-size: var(--manuscript-size);
+  font-family: var(--manuscript-font);
+  line-height: var(--manuscript-leading);
+  overflow-wrap: anywhere;
+  caret-color: var(--writer-accent);
+}
+.manuscript-paper .tiptap p {
+  margin: 0 0 1em;
+  text-indent: var(--manuscript-indent);
+  transition: opacity 0.2s;
+}
+.manuscript-paper .tiptap p.is-editor-empty:first-child:before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted);
+  opacity: 0.45;
+  pointer-events: none;
+  height: 0;
+}
+.manuscript-paper .tiptap blockquote {
+  border-left: 2px solid var(--writer-accent);
+  margin: 1em 0;
+  padding: 0 1em;
+  color: var(--muted);
+}
+.manuscript-paper .tiptap li p {
+  text-indent: 0;
+}
+.manuscript-paper .tiptap h2 {
+  font: 600 1.25em/1.8 var(--manuscript-font);
+  margin: 1.3em 0 0.8em;
+}
+.manuscript-paper .tiptap hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  width: 60px;
+  margin: 2em auto;
+}
+.paragraph-focus .tiptap:focus > p:not(.writer-active-block) {
+  opacity: 0.32;
+}
+.writer-livebar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 13px 18px;
+  font-size: 9px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.writer-livebar b {
+  color: var(--writer-accent);
+  font-weight: 500;
+}
+.writer-livebar button {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+.writer-find {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  padding: 12px;
+}
+.writer-find input {
+  width: 100px;
+  flex: 1;
+  min-width: 90px;
+  font-size: 11px;
+  padding: 8px;
+}
+.writer-find button {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.writer-find small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.writer-appearance {
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 10px;
+}
+.writer-appearance label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.writer-appearance input[type='range'] {
+  width: 75px;
+}
+.writer-appearance select {
+  font-size: 10px;
+}
+.writer-warning {
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
+  padding: 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  line-height: 1.8;
+}
+.writer-recovery {
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  background: var(--panel);
+}
+.writer-recovery p {
+  color: var(--muted);
+  line-height: 1.8;
+}
+.writer-recovery button {
+  margin: 8px 8px 0 0;
+  font-size: 11px;
+}
+.writer-welcome {
+  min-height: 610px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px;
+}
+.writer-welcome-mark {
+  display: grid;
+  place-items: center;
+  width: 90px;
+  height: 100px;
+  font: 60px serif;
+  color: var(--writer-accent);
+  border: 1px solid var(--line);
+  transform: rotate(-8deg);
+  border-radius: 8px;
+  margin-bottom: 30px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--writer-accent) 10%, transparent),
+    transparent
+  );
+}
+.writer-welcome small {
+  font: 8px monospace;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.writer-welcome h2 {
+  font:
+    400 29px/1.65 'Songti SC',
+    serif;
+  letter-spacing: 0.08em;
+  margin: 20px 0;
+}
+.writer-welcome p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.writer-welcome button {
+  margin-top: 18px;
+  font-size: 12px;
+}
+.writer-welcome button:last-of-type {
+  background: none;
+  border: 0;
+  color: var(--muted);
+}
+.writing-context {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 21px 18px 12px;
+  overflow: hidden;
+  color: var(--text);
+}
+.writer-context-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 20px;
+}
+.writer-context-header > span {
+  font: 8px monospace;
+  letter-spacing: 0.13em;
+  color: var(--muted);
+}
+.writer-context-header > b {
+  font:
+    500 22px/1.5 'Songti SC',
+    serif;
+  letter-spacing: 0.08em;
+}
+.writer-context-header > small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.writer-context-tabs {
+  display: flex;
+  gap: 5px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 9px;
+}
+.writer-context-tabs button {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  padding: 7px 2px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.writer-context-tabs button.active {
+  color: var(--sheet-tint);
+  background: color-mix(in srgb, var(--sheet-tint) 10%, transparent);
+}
+.writer-context-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  padding: 15px 2px 20px;
+}
+.writer-context-body > label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.writer-context-body > label > textarea,
+.writer-context-body > label > select,
+.writer-context-body > input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 9px;
+}
+.writer-context-intro > span {
+  font: 8px monospace;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.writer-context-intro h3 {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 8px 0;
+}
+.writer-context-intro p,
+.writer-empty-note {
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--muted);
+}
+.writer-person-card {
+  padding: 15px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-top: 16px;
+  background: color-mix(in srgb, var(--panel) 50%, transparent);
+}
+.writer-person-top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.writer-person-top > img,
+.writer-person-monogram {
+  height: 36px;
+  width: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.writer-person-monogram {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--sheet-tint) 12%, transparent);
+  font:
+    21px 'Songti SC',
+    serif;
+  color: var(--sheet-tint);
+}
+.writer-person-top h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+.writer-person-top small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.writer-person-top button {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--sheet-tint);
+}
+.writer-person-card dl {
+  margin: 14px 0;
+  font-size: 10px;
+  line-height: 1.85;
+}
+.writer-person-card dt {
+  color: var(--sheet-tint);
+  margin-top: 8px;
+}
+.writer-person-card dd {
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 130px;
+  overflow: auto;
+}
+.writer-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.writer-card-actions button,
+.writer-card-actions a,
+.writer-bound-link button,
+.writer-bound-link a {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 9px;
+  color: var(--muted);
+}
+.writer-relation-line {
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.writer-selection {
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--sheet-tint) 30%, transparent);
+  margin: 12px 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sheet-tint) 6%, transparent);
+}
+.writer-selection p {
+  font:
+    13px/1.7 'Songti SC',
+    serif;
+}
+.writer-selection button {
+  font-size: 10px;
+  color: var(--sheet-tint);
+  border: 0;
+  background: none;
+  padding: 0;
+}
+.writer-context-link {
+  margin: 16px 0;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+.writer-context-link small {
+  font-size: 9px;
+  color: var(--sheet-tint);
+}
+.writer-context-link h4 {
+  margin: 9px 0;
+  font-size: 13px;
+}
+.writer-context-link p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.writer-context-link a {
+  font-size: 10px;
+}
+.writer-resource-list {
+  max-height: 210px;
+  overflow: auto;
+  margin: 12px 0 23px;
+}
+.writer-resource-list > div {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+.writer-resource-list button {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  text-align: left;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 9px 4px;
+  font-size: 11px;
+  color: var(--text);
+}
+.writer-resource-list > div > button:nth-child(2) {
+  flex: 0;
+  color: var(--sheet-tint);
+}
+.writer-resource-list span {
+  color: var(--sheet-tint);
+}
+.writer-bound-link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.writer-bound-link small,
+.writer-bound-link > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.writer-bound-link strong {
+  font-weight: 500;
+  font-size: 12px;
+}
+.writer-bound-link p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.writer-bound-link > div {
+  display: flex;
+  gap: 15px;
+}
+.writer-context-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 13px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 9px;
+}
+.writer-context-footer button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+.writer-check,
+.writer-task label {
+  display: flex !important;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px !important;
+}
+.writer-check input,
+.writer-task input,
+.writer-appearance input[type='checkbox'],
+.writer-export-checks input {
+  width: auto !important;
+  accent-color: var(--accent);
+}
+.writer-task {
+  margin: 10px 0;
+}
+.writer-context-body > small {
+  display: block;
+  font-size: 9px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-top: 15px;
+}
+.writer-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.writer-export-checks {
+  max-height: 240px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  margin: 20px 0;
+}
+.writer-export-checks label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.writer-import-preview {
+  max-height: 380px;
+  overflow: auto;
+  margin-top: 15px;
+}
+.writer-import-preview article {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.writer-import-preview input {
+  font-size: 13px;
+}
+.writer-import-preview small,
+.writer-import-preview p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.writer-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 18px 0;
+}
+.writer-compare label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.writer-compare textarea {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.writer-search-results {
+  display: grid;
+  gap: 10px;
+  max-height: 440px;
+  overflow: auto;
+}
+.writer-search-results > button {
+  text-align: left;
+  padding: 17px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  color: var(--text);
+}
+.writer-search-results p,
+.writer-search-results small {
+  color: var(--muted);
+  line-height: 1.8;
+  font-size: 12px;
+}
+.writer-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 25px;
+}
+.writer-stats-grid article {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  gap: 9px;
+}
+.writer-stats-grid b {
+  font: 32px monospace;
+  color: var(--accent);
+}
+.writer-stats-grid small,
+.writer-stats-grid span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.writer-calendar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin: 22px 0;
+}
+.writer-calendar > div {
+  background: color-mix(in srgb, var(--accent) 24%, var(--panel));
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  padding: 7px 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+.writer-calendar small {
+  font: 9px monospace;
+}
+.writer-calendar b {
+  font: 11px monospace;
+}
+.writer-chapter-flow {
+  max-height: 410px;
+  overflow: auto;
+  padding: 10px 0;
+}
+.writer-chapter-flow article {
+  border-left: 1px solid var(--accent);
+  margin-left: 8px;
+  padding: 8px 0 18px 17px;
+}
+.writer-chapter-flow article > button {
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text);
+}
+.writer-chapter-flow h3 {
+  font-size: 15px;
+  margin: 9px 0;
+}
+.writer-chapter-flow small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.writer-flow-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.writer-flow-tags button {
+  font-size: 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+.writer-flow-tags button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.writer-cloud {
+  border: 1px solid var(--line);
+  padding: 20px;
+  background: var(--panel);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.writer-cloud > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+.writer-cloud h3 {
+  font:
+    22px 'Songti SC',
+    serif;
+  margin: 13px 0;
+}
+.writer-cloud small {
+  font: 9px monospace;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.writer-cloud p,
+.writer-cloud details {
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--muted);
+}
+.writer-cloud details {
+  margin-top: 15px;
+}
+.writer-cloud code {
+  overflow-wrap: anywhere;
+}
+.writer-cloud-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+.writer-cloud-versions {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 15px;
+}
+.writer-cloud-versions article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 13px 0;
+  font-size: 11px;
+}
+.writer-cloud-versions article > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.writer-cloud-comparison {
+  max-height: 300px;
+  overflow: auto;
+}
+.writer-cloud-comparison article {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.writer-cloud-comparison span,
+.writer-cloud-comparison small {
+  color: var(--muted);
+}
+.writing-backlinks {
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+}
+.writing-backlinks h4 {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+.writing-backlinks a {
+  display: block;
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 7px 0;
+}
+.writing-backlinks small {
+  font-size: 10px;
+  color: var(--muted);
+}
+@media (min-width: 1600px) {
+  .sheet-stage[data-active-sheet='writing'] {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+  .writer-desk {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+  .writer-chapter-item strong {
+    font-size: 12px;
+  }
+}
+@media (max-width: 1150px) {
+  .writer-desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .writer-tree {
+    position: static;
+    max-height: 220px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .writer-chapter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .writer-chapter-item {
+    width: 160px;
+  }
+  .writer-new-chapter {
+    width: auto;
+  }
+  .writer-heading {
+    align-items: start;
+  }
+  .writer-heading-actions {
+    flex-direction: column;
+    align-items: end;
+  }
+}
+@media (max-width: 960px) {
+  .sheet-stage[data-active-sheet='writing'] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .sheet-stage[data-active-sheet='writing'] .sheet-dock-column {
+    position: static;
+    grid-row: 1;
+    padding: 0;
+  }
+  .sheet-stage[data-active-sheet='writing'] .sheet-dock {
+    height: 280px;
+    min-height: 0;
+  }
+  .writing-context {
+    padding: 15px;
+  }
+  .writer-context-header {
+    padding: 0 0 9px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .writer-context-header > b {
+    font-size: 18px;
+  }
+  .writer-context-header > small {
+    display: none;
+  }
+  .writer-context-body {
+    padding: 10px 0;
+  }
+  .writer-context-intro {
+    display: none;
+  }
+  .writer-person-card {
+    margin-top: 0;
+  }
+  .writer-person-card dl {
+    max-height: 120px;
+    overflow: auto;
+  }
+  .writer-context-footer {
+    padding-top: 7px;
+  }
+  .writer-desk {
+    grid-template-columns: 185px minmax(0, 1fr);
+  }
+  .writer-tree {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    border: 0;
+    border-right: 1px solid var(--line);
+    padding: 12px 10px 12px 0;
+  }
+  .writer-chapter-list {
+    display: block;
+  }
+  .writer-chapter-item {
+    width: 100%;
+  }
+}
+@media (max-width: 680px) {
+  .writer-heading h1 {
+    font-size: 28px;
+  }
+  .writer-heading-actions button {
+    font-size: 9px;
+    padding: 7px;
+  }
+  .writer-heading-actions {
+    gap: 5px;
+  }
+  .writer-global-tools {
+    gap: 2px;
+  }
+  .writer-global-tools button {
+    font-size: 10px;
+    padding: 7px;
+  }
+  .writer-desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .writer-tree {
+    position: static;
+    max-height: 190px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .writer-chapter-list {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .writer-chapter-item {
+    width: 145px;
+  }
+  .writer-new-chapter {
+    width: auto;
+  }
+  .writer-chapter-heading {
+    padding: 18px 18px 0;
+  }
+  .writer-title-input {
+    font-size: 23px !important;
+  }
+  .manuscript-paper {
+    padding: 26px 19px 45px;
+    min-height: 420px;
+  }
+  .manuscript-paper .tiptap {
+    min-height: 330px;
+  }
+  .writer-formatbar {
+    padding: 8px 10px;
+  }
+  .writer-livebar {
+    gap: 10px;
+    padding: 12px;
+  }
+  .writer-welcome {
+    min-height: 440px;
+    padding: 22px;
+  }
+  .writer-welcome h2 {
+    font-size: 25px;
+  }
+  .writer-compare {
+    grid-template-columns: 1fr;
+  }
+  .writer-stats-grid {
+    gap: 8px;
+  }
+  .writer-stats-grid article {
+    padding: 12px;
+  }
+  .writer-stats-grid b {
+    font-size: 26px;
+  }
+  .writer-calendar {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .writer-options {
+    grid-template-columns: 1fr;
+  }
+  .writer-context-tabs button {
+    font-size: 11px;
+  }
+  .writer-cloud {
+    padding: 15px;
+  }
+  .writer-cloud h3 {
+    font-size: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .manuscript-paper .tiptap p {
+    transition: none;
+  }
+}
+
+.writer-resume-card {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 0 0 24px;
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--accent) 8%, var(--panel)),
+    var(--panel)
+  );
+  color: var(--text);
+}
+.writer-resume-card > span:nth-child(2) {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+.writer-resume-card small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.writer-resume-card strong {
+  font:
+    500 20px 'Songti SC',
+    serif;
+  overflow-wrap: anywhere;
+}
+.writer-resume-card > span:nth-child(2) > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.writer-resume-symbol {
+  font-size: 36px;
+  color: var(--accent);
+}
+.writer-resume-today {
+  display: grid;
+  gap: 5px;
+  padding-right: 24px;
+}
+.writer-resume-today b {
+  font: 500 25px monospace;
+  color: var(--accent);
+}
+.writer-resume-card > span:last-child {
+  font-size: 11px;
+  color: var(--accent);
+}
+.book-writing-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--accent);
+  padding: 8px 0 16px;
+}
+.is-focused .sheet-stage[data-active-sheet='writing'] {
+  grid-template-areas: 'page';
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 900px;
+  margin: 0 auto;
+  .sheet-dock-column {
+    display: none;
+  }
+  .writer-desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .writer-tree,
+  .writer-global-tools > button:first-child {
+    display: none;
+  }
+}
+.is-focused .morph-sheet[data-destination='writing'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+.writer-livebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--panel);
+}
+@media (max-width: 680px) {
+  .writer-heading-actions button,
+  .writer-global-tools button {
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .writer-formatbar button,
+  .writer-formatbar select {
+    min-height: 36px;
+    font-size: 12px;
+  }
+  .writer-context-tabs button {
+    min-height: 38px;
+    font-size: 12px;
+  }
+  .writer-chapter-meta select {
+    font-size: 12px;
+    min-height: 36px;
+  }
+  .writer-livebar,
+  .writer-livebar button {
+    font-size: 11px;
+  }
+  .writer-save-state,
+  .writer-save-state button {
+    font-size: 10px;
+  }
+}
+@media (max-width: 600px) {
+  .writer-resume-card {
+    padding: 18px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .writer-resume-today {
+    padding: 0;
+  }
+  .writer-resume-symbol {
+    display: none;
+  }
+  .writer-resume-card > span:last-child {
+    width: 100%;
+  }
+}

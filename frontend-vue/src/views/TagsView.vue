@@ -45,6 +45,7 @@
         <label>描述</label>
         <textarea v-model="form.description" placeholder="标签描述（可选）"></textarea>
       </div>
+      <WritingBacklinks v-if="editingTag" type="tags" :target-id="editingTag.id"/>
     </BaseModal>
 
     <!-- 删除确认模态框 -->
@@ -66,6 +67,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useTagsStore } from '@/stores/tags'
 import type { Tag } from '@/types/tag'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 

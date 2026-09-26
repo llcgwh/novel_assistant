@@ -88,6 +88,7 @@
         <label>标签</label>
         <TagSelector v-model="formTagIds" :tags="tagsStore.tags" />
       </div>
+      <WritingBacklinks v-if="editingCharacter" type="characters" :target-id="editingCharacter.id"/>
     </BaseModal>
 
     <!-- 标签管理模态框 -->
@@ -120,6 +121,7 @@ import { useCharactersStore } from '@/stores/characters'
 import { useTagsStore } from '@/stores/tags'
 import type { Character } from '@/types/character'
 import BaseModal from '@/components/common/BaseModal.vue'
+import WritingBacklinks from '@/components/writing/WritingBacklinks.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'

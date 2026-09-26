@@ -21,6 +21,7 @@ export interface PaginatedResponse<T> {
 
 // 搜索结果
 export interface SearchResult {
+  manuscripts?: {id:string;uid:string;title:string;excerpt:string;wordCount:number}[]
   worldviewEntries?: import('./worldview').WorldviewEntry[]
   characters: import('./character').Character[]
   scenes: import('./scene').Scene[]

@@ -9,6 +9,15 @@ export const sheets = [
     motif: 'orbit',
   },
   {
+    id: 'writing',
+    title: '故事就在笔尖',
+    caption: '写作罗盘',
+    label: '写作工作台',
+    layout: 'right',
+    tint: '#dfc491',
+    motif: 'writing',
+  },
+  {
     id: 'characters',
     title: '每个人，都是一个宇宙',
     caption: '人物索引',

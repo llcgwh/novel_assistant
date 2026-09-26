@@ -2,6 +2,7 @@ package com.novelwriting.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.*;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -9,8 +10,9 @@ import java.util.regex.Pattern;
 /** Shared canonical document and counting rules. No HTML is accepted or evaluated. */
 public final class WritingDocuments {
 
-  public static final ObjectMapper JSON =
-    new ObjectMapper().findAndRegisterModules();
+  public static final ObjectMapper JSON = new ObjectMapper()
+    .findAndRegisterModules()
+    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
   private static final Set<String> NODES = Set.of(
     "doc",
     "paragraph",

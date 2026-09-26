@@ -1,5 +1,6 @@
 export const studioModules = [
   { path: 'overview', name: '创作总览', hint: '故事的全貌', group: '工作台' },
+  { path: 'writing', name: '写作工作台', hint: '让故事落在纸上', group: '工作台' },
   {
     path: 'outlines',
     name: '章节大纲',
