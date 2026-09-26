@@ -72,4 +72,14 @@ VITE_API_PROXY_TARGET=http://127.0.0.1:8081 npm run dev -- --host 127.0.0.1 --po
 
 完成后停止前端，并从根目录运行 `python3 scripts/integration-check.py --cleanup /输出目录/run.json`。若测试进程被强制杀死，使用同一清理命令。支持 `IT_PORT`、`DAV_PORT` 调整测试端口。
 
+写作回归在上述 `--keep` 产生的独立环境执行一次，再进行浏览器验收：
+
+```sh
+python3 scripts/writing-integration-check.py /输出目录/run.json
+```
+
+它会校验测试库标记，验证正文版本冲突、反向链接、搜索、真实 DOCX 包、WebDAV 分支检测、恢复前完整副本、恢复后的关联及别名映射、另一设备采用云端作品标识。输出 `writing-result.json` 和虚构示例文稿。不要对同一测试环境反复运行以避免累积演示数据；需要完整重跑时创建新的独立测试环境。
+
+写作新增 `writing_books`、`writing_chapters`、`writing_revisions`、`writing_sessions` 四张表。默认 `spring.jpa.hibernate.ddl-auto=update` 启动时创建；使用自行管理数据库结构的安装需先同步这些实体的表结构。旧小说第一次访问写作页才初始化工作区，不会自动把大纲转换成正文。
+
 已用 PostgreSQL 18 和 WsgiDAV 4.3.5 通过集成测试；这不代表已验证每一家云盘或 NAS 的特殊行为。前端 npm 审计在 2026-09-26 为 0 项告警，后端已升级 Spring Boot 3.5.16 并使用 Hibernate 6 对应的 Jackson 模块；未声称后端或未来依赖永久无漏洞。
