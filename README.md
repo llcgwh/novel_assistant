@@ -529,6 +529,10 @@ A: 确保 Node.js 版本 >= 22.12，尝试重新 npm install。
 **Q: 页面空白/无法加载？**
 A: 清除浏览器缓存和 localStorage，重新启动前端开发服务器。
 
+## 维护与回归验证
+
+外观偏好可在设置页单独导出/导入。表单事务、提交重试、孤立图片隔离、密钥轮换及独立 PostgreSQL/WebDAV 回归步骤见 [维护手册](docs/maintenance.md)；各批改动见 [修复记录](docs/maintenance-batches.md)。
+
 ## 许可证
 
 本项目仅供学习和个人使用。
