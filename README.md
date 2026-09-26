@@ -125,7 +125,7 @@
 ## 技术架构
 
 ### 后端
-- **框架**: Spring Boot 3.2.0
+- **框架**: Spring Boot 3.5.16
 - **数据库**: PostgreSQL
 - **ORM**: Spring Data JPA
 - **语言**: Java 17
@@ -133,7 +133,7 @@
 
 ### 前端（Vue 3 版本）✨ 当前主力
 - **框架**: Vue 3 (Composition API)
-- **构建工具**: Vite 6
+- **构建工具**: Vite 7.3
 - **状态管理**: Pinia
 - **路由**: Vue Router 4
 - **语言**: TypeScript
@@ -163,7 +163,7 @@ WebDAV 密码使用 AES-256-GCM 加密存入数据库。默认密钥位于后端
 - Java 17 或更高版本
 - PostgreSQL 数据库
 - Maven 3.x
-- Node.js 18+ (Vue 版本)
+- Node.js 22.12+ (Vue 版本)
 
 ### 数据库设置
 
@@ -524,7 +524,7 @@ A: 确认已设置了坐标值，坐标应在画布范围内。
 A: 检查后端 uploads 目录权限，确保有写入权限。
 
 **Q: Vue 版本启动报错？**
-A: 确保 Node.js 版本 >= 18，尝试删除 node_modules 后重新 npm install。
+A: 确保 Node.js 版本 >= 22.12，尝试重新 npm install。
 
 **Q: 页面空白/无法加载？**
 A: 清除浏览器缓存和 localStorage，重新启动前端开发服务器。
