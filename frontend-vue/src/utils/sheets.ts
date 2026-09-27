@@ -1,4 +1,6 @@
-export const sheets = [
+import { studioNavigation } from '@/utils/studio'
+
+const sheetProfiles = [
   {
     id: 'overview',
     title: '故事的另一面',
@@ -118,9 +120,23 @@ export const sheets = [
   },
 ] as const
 
-export type SheetId = (typeof sheets)[number]['id']
+export type SheetId = (typeof sheetProfiles)[number]['id']
+// One navigation order drives the sidebar, numbering, arrows and flight direction.
+export const sheets = studioNavigation.map((item) => {
+  const profile = sheetProfiles.find((sheet) => sheet.id === item.path)
+  if (!profile) throw Error(`缺少创作模块折页配置：${item.path}`)
+  return { ...profile, label: item.name }
+})
 export function sheetFor(id: string) {
   return sheets.find((sheet) => sheet.id === id) || sheets[0]
+}
+export function sheetSerial(id: string) {
+  return String(
+    Math.max(
+      0,
+      sheets.findIndex((sheet) => sheet.id === id),
+    ) + 1,
+  ).padStart(2, '0')
 }
 export function adjacentSheet(id: string, direction: number) {
   const index = Math.max(

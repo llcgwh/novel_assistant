@@ -1591,3 +1591,22 @@
     width: 100%;
   }
 }
+
+/* Keep module navigation available when the folding sheet becomes the writing compass. */
+.writing-context .writer-module-navigation {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 0;
+  gap: 8px;
+}
+.writing-context .writer-module-navigation > a {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-color: var(--line);
+}
+.writing-context .writer-module-navigation > span {
+  min-width: 0;
+  text-align: center;
+}

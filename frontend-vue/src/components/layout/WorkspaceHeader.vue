@@ -100,7 +100,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useNovelStore } from '@/stores/novel'
 import { useStudioStore } from '@/stores/studio'
 import { useAppStore } from '@/stores/app'
-import { studioModules } from '@/utils/studio'
+import { studioModules, studioGroups, studioNavigation } from '@/utils/studio'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import CommandPalette from '@/components/studio/CommandPalette.vue'
@@ -113,12 +113,11 @@ const base = computed(() => `/novel/${route.params.novelId}/`)
 const current = computed(() =>
   studioModules.find((item) => route.path === base.value + item.path),
 )
-const groups = ['工作台', '故事脉络', '世界构建']
-const navigationOptions = [
-  ...studioModules.map((item) => ({ value: item.path, label: item.name })),
-  { value: 'search', label: '全局搜索' },
-  { value: 'settings', label: '设置与备份' },
-]
+const groups = studioGroups
+const navigationOptions = studioNavigation.map((item) => ({
+  value: item.path,
+  label: item.name,
+}))
 const navigation = ref<HTMLElement | null>(null)
 const marker = ref({ transform: 'translateY(0px)', height: '39px', opacity: 0 })
 let markerObserver: ResizeObserver | undefined

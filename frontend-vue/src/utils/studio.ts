@@ -1,6 +1,11 @@
 export const studioModules = [
   { path: 'overview', name: '创作总览', hint: '故事的全貌', group: '工作台' },
-  { path: 'writing', name: '写作工作台', hint: '让故事落在纸上', group: '工作台' },
+  {
+    path: 'writing',
+    name: '写作工作台',
+    hint: '让故事落在纸上',
+    group: '工作台',
+  },
   {
     path: 'outlines',
     name: '章节大纲',
@@ -45,7 +50,21 @@ export const studioModules = [
   },
   { path: 'map', name: '世界地图', hint: '展开故事的疆域', group: '世界构建' },
   { path: 'tags', name: '标签索引', hint: '整理你的灵感', group: '世界构建' },
+] as const
+
+export const studioGroups = [
+  ...new Set(studioModules.map((item) => item.group)),
 ]
+// Preserve the complete sidebar order, then append the search-only utility page.
+export const studioNavigation = [
+  ...studioGroups.flatMap((group) =>
+    studioModules
+      .filter((item) => item.group === group)
+      .map(({ path, name }) => ({ path, name })),
+  ),
+  { path: 'settings', name: '设置与备份' },
+  { path: 'search', name: '全局搜索' },
+] as const
 export interface StudioRecord {
   id: number
   name?: string

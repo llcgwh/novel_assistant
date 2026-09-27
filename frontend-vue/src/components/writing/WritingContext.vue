@@ -400,6 +400,7 @@
       <span>{{ writer.current?.links.length || 0 }} 个故事连接</span
       ><button @click="writer.loadResources()">刷新资料 ↻</button>
     </footer>
+    <SheetNavigation sheet-id="writing" class="writer-module-navigation" />
     <BaseModal
       v-if="createOpen"
       title="把这一笔，收进世界"
@@ -455,6 +456,7 @@ import type { Resource, WritingLink } from '@/types/writing'
 import { request } from '@/api/request'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
+import SheetNavigation from '@/components/studio/SheetNavigation.vue'
 const writer = useWritingStore(),
   app = useAppStore(),
   studio = useStudioStore(),

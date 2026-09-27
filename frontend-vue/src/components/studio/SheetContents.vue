@@ -155,27 +155,18 @@
         </div>
       </template>
     </div>
-    <footer class="sheet-footer">
-      <RouterLink
-        :to="base + adjacentSheet(sheetId, -1).id"
-        aria-label="上一张折页"
-        ><StudioIcon name="arrow" /></RouterLink
-      ><span
-        ><b>{{ profile.label }}</b> / {{ serial }}</span
-      ><RouterLink
-        :to="base + adjacentSheet(sheetId, 1).id"
-        aria-label="下一张折页"
-        ><StudioIcon name="arrow"
-      /></RouterLink>
-    </footer>
+    <SheetNavigation :sheet-id="sheetId" />
   </div>
 </template>
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
-const WritingContext = defineAsyncComponent(() => import('@/components/writing/WritingContext.vue'))
+const WritingContext = defineAsyncComponent(
+  () => import('@/components/writing/WritingContext.vue'),
+)
 import { useRoute, useRouter } from 'vue-router'
 import StudioIcon from '@/components/common/StudioIcon.vue'
-import { sheetFor, adjacentSheet, sheets, type SheetId } from '@/utils/sheets'
+import SheetNavigation from '@/components/studio/SheetNavigation.vue'
+import { sheetFor, sheetSerial, type SheetId } from '@/utils/sheets'
 import { useStudioStore } from '@/stores/studio'
 import { useNovelStore } from '@/stores/novel'
 import { useCharactersStore } from '@/stores/characters'
@@ -204,12 +195,7 @@ const characters = useCharactersStore(),
   map = useMapStore(),
   tags = useTagsStore()
 const profile = computed(() => sheetFor(props.sheetId))
-const serial = computed(() =>
-  String(sheets.findIndex((sheet) => sheet.id === props.sheetId) + 1).padStart(
-    2,
-    '0',
-  ),
-)
+const serial = computed(() => sheetSerial(props.sheetId))
 const base = computed(() => `/novel/${route.params.novelId}/`)
 const limit = computed(() => (profile.value.layout === 'wide' ? 3 : 4))
 const entries = computed<
