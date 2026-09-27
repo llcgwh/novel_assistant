@@ -14,7 +14,7 @@
   ></div>
   <router-view :key="String(route.params.novelId || 'global')" />
   <BookPassage />
-  <ProjectSignature />
+  <ProjectSignature v-if="route.name !== 'NovelSelector'" />
   <Toast />
 </template>
 

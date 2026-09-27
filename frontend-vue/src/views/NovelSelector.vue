@@ -227,8 +227,9 @@
           </button>
         </div>
       </section>
-      <footer class="studio-page-footer">
+      <footer class="studio-page-footer library-footer">
         <span>INK STUDIO · 墨境</span><span>世界很大，你的想象更大。</span>
+        <ProjectSignature library />
       </footer>
     </main>
     <!-- 创建/编辑模态框 -->
@@ -322,6 +323,7 @@ import ImageUpload from '@/components/common/ImageUpload.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import StoryOrbit from '@/components/studio/StoryOrbit.vue'
+import ProjectSignature from '@/components/studio/ProjectSignature.vue'
 const router = useRouter(),
   novelStore = useNovelStore(),
   studio = useStudioStore()
