@@ -31,6 +31,7 @@ public class BackupBundleService {
     private static final Set<String> IMAGE_FIELDS = Set.of("coverImage", "portraitImage", "sceneImage", "locationImage", "entryImage");
     @Autowired private ExportService exporter;
     @Autowired private ImportService importer;
+    @Autowired private WritingService writing;
     @Autowired private ImageRepository images;
     @Autowired private NovelRepository novels;
     @Value("${app.upload.dir:uploads}") private String uploadDir;
@@ -84,6 +85,7 @@ public class BackupBundleService {
         if (!FORMAT.equals(bundle.path("format").asText())) throw new IOException("Unsupported image backup format");
         JsonNode rawData = bundle.path("data");
         BackupValidator.validate(rawData);
+        writing.protectLegacyRestore(novelId, rawData);
         ObjectNode data = (ObjectNode) rawData;
         long sourceId = data.path("novel").path("id").asLong();
         if (sourceId <= 0) throw new IOException("Missing source novel ID");

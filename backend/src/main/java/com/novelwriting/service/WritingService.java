@@ -42,9 +42,7 @@ public class WritingService {
 
   public WritingBook book(Long novelId) {
     // The parent row serializes first creation and structural changes across devices.
-    if (
-      em.find(Novel.class, novelId, LockModeType.PESSIMISTIC_WRITE) == null
-    ) throw missing();
+    requireNovel(novelId);
     WritingBook b = em.find(WritingBook.class, novelId);
     if (b == null) {
       b = new WritingBook();
@@ -53,6 +51,12 @@ public class WritingService {
       em.persist(b);
     }
     return b;
+  }
+
+  private void requireNovel(Long novelId) {
+    if (
+      em.find(Novel.class, novelId, LockModeType.PESSIMISTIC_WRITE) == null
+    ) throw missing();
   }
 
   public List<WritingChapter> chapters(Long id) {
@@ -103,18 +107,18 @@ public class WritingService {
         .put("uid", row[1].toString())
         .put("title", row[2].toString());
     }
-    for (WritingBook book : em
-      .createQuery("from WritingBook", WritingBook.class)
+    for (Object[] book : em
+      .createQuery(
+        "select novelId,preferences from WritingBook",
+        Object[].class
+      )
       .getResultList()) {
-      ObjectNode summary = out.has(book.getNovelId().toString())
-        ? (ObjectNode) out.path(book.getNovelId().toString())
-        : out
-          .putObject(book.getNovelId().toString())
-          .put("words", 0)
-          .put("chapters", 0);
+      ObjectNode summary = out.has(book[0].toString())
+        ? (ObjectNode) out.path(book[0].toString())
+        : out.putObject(book[0].toString()).put("words", 0).put("chapters", 0);
       summary.put(
         "dailyGoal",
-        parse(book.getPreferences()).path("dailyGoal").asInt(2000)
+        parse((String) book[1]).path("dailyGoal").asInt(2000)
       );
       summary.put("todayNet", 0);
     }
@@ -153,14 +157,27 @@ public class WritingService {
   }
 
   public ObjectNode workspace(Long id) {
-    WritingBook b = book(id);
+    requireNovel(id);
+    // Desk notes can reach 2 MiB; the chapter tree only needs book metadata.
+    var query = em
+      .createQuery(
+        "select uid,structureVersion,changeSequence,syncedSequence,volumes,preferences,syncMessage,lastSync from WritingBook where novelId=:id",
+        Object[].class
+      )
+      .setParameter("id", id);
+    List<Object[]> books = query.getResultList();
+    if (books.isEmpty()) {
+      book(id);
+      books = query.getResultList();
+    }
+    Object[] b = books.get(0);
     ObjectNode out = JSON.createObjectNode()
-      .put("uid", b.getUid())
-      .put("structureVersion", b.getStructureVersion())
-      .put("changeSequence", b.getChangeSequence())
-      .put("syncedSequence", b.getSyncedSequence());
-    out.set("volumes", parse(b.getVolumes()));
-    out.set("preferences", parse(b.getPreferences()));
+      .put("uid", (String) b[0])
+      .put("structureVersion", ((Number) b[1]).longValue())
+      .put("changeSequence", ((Number) b[2]).longValue())
+      .put("syncedSequence", ((Number) b[3]).longValue());
+    out.set("volumes", parse((String) b[4]));
+    out.set("preferences", parse((String) b[5]));
     ArrayNode rows = out.putArray("chapters");
     // Avoid loading all manuscript bodies just to render the chapter tree.
     List<Object[]> values = em
@@ -201,11 +218,8 @@ public class WritingService {
       .setParameter("id", id)
       .getResultList())
       sessions.add(parse(s.getPayload()));
-    out.put("syncMessage", b.getSyncMessage());
-    out.put(
-      "lastSync",
-      b.getLastSync() == null ? null : b.getLastSync().toString()
-    );
+    out.put("syncMessage", (String) b[6]);
+    out.put("lastSync", b[7] == null ? null : b[7].toString());
     return out;
   }
 
@@ -457,6 +471,7 @@ public class WritingService {
         row.getPosition() > c.getPosition()
       ) row.setPosition(row.getPosition() + 1);
     other.setPosition(c.getPosition() + 1);
+    WritingDeskDocuments.moveAnchors(b, uid, other.getUid(), moved, Map.of());
     touch(b, true);
     return detail(other);
   }
@@ -476,6 +491,7 @@ public class WritingService {
     snapshot(second, "合并前");
     ObjectNode doc = (ObjectNode) parse(first.getDocument());
     JsonNode added = parse(second.getDocument());
+    Set<String> movedBlocks = blocks(added);
     // IDs copied by duplicate/import can coincide; remap the incoming blocks and links together.
     Map<String, String> remap = new HashMap<>();
     Set<String> occupied = blocks(doc);
@@ -498,6 +514,13 @@ public class WritingService {
     second.setDeleted(true);
     second.setRevision(second.getRevision() + 1);
     second.setUpdatedAt(LocalDateTime.now());
+    WritingDeskDocuments.moveAnchors(
+      b,
+      second.getUid(),
+      first.getUid(),
+      movedBlocks,
+      remap
+    );
     touch(b, true);
     return detail(first);
   }
@@ -713,6 +736,9 @@ public class WritingService {
       b == null ? JSON.createObjectNode() : parse(b.getPreferences())
     );
     result.put("uid", b == null ? "" : b.getUid());
+    ObjectNode desk = WritingDeskDocuments.read(b);
+    desk.remove("mutationId");
+    result.set("desk", desk);
     ArrayNode rows = result.putArray("chapters");
     for (WritingChapter c : chapters(id)) rows.add(detail(c));
     ArrayNode sessions = result.putArray("sessions");
@@ -745,8 +771,22 @@ public class WritingService {
   }
 
   public void protectLegacyRestore(Long id, JsonNode root) {
+    WritingBook book = book(id);
     if (!root.has("writing") && !chapters(id).isEmpty()) throw bad(
       "这个旧备份不含正文。请恢复到一个新建作品，避免清除现有正文及关联。"
+    );
+    protectLegacyDeskRestore(book, root.path("writing"));
+  }
+
+  private void protectLegacyDeskRestore(WritingBook book, JsonNode input) {
+    if (input.has("desk")) return;
+    JsonNode desk = WritingDeskDocuments.read(book);
+    if (
+      desk.path("nextPen").isObject() ||
+      !desk.path("tasks").isEmpty() ||
+      !desk.path("bookmarks").isEmpty()
+    ) throw bad(
+      "这个旧备份不含创作便签。请恢复到一个新建作品，避免清除现有下一笔便签、修订任务和书签。"
     );
   }
 
@@ -779,6 +819,10 @@ public class WritingService {
     }
     for (JsonNode r : data.path("revisions"))
       validate(r.path("snapshot").path("doc"));
+    if (data.has("desk")) WritingDeskDocuments.validateDesk(
+      data.path("desk"),
+      false
+    );
   }
 
   public void restoreBackup(
@@ -789,6 +833,14 @@ public class WritingService {
     if (input == null) return;
     validateBackup(input);
     WritingBook b = book(id);
+    protectLegacyDeskRestore(b, input);
+    // A restore is a new local revision, even if the backup predates desk support.
+    WritingDeskDocuments.replace(
+      b,
+      input.has("desk")
+        ? WritingDeskDocuments.validateDesk(input.path("desk"), false)
+        : WritingDeskDocuments.emptyDesk()
+    );
     b.setVolumes(stringify(input.path("volumes")));
     ObjectNode preferences = input.path("preferences").deepCopy();
     ObjectNode aliases = JSON.createObjectNode();

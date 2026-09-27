@@ -16,11 +16,27 @@ public class WritingController {
   private WritingService service;
 
   @Autowired
+  private WritingDeskService desk;
+
+  @Autowired
   private ManuscriptExportService exporter;
 
   @GetMapping
   public JsonNode workspace(@PathVariable Long novelId) {
     return service.workspace(novelId);
+  }
+
+  @GetMapping("/desk")
+  public JsonNode desk(@PathVariable Long novelId) {
+    return desk.get(novelId);
+  }
+
+  @PutMapping("/desk")
+  public JsonNode saveDesk(
+    @PathVariable Long novelId,
+    @RequestBody JsonNode body
+  ) {
+    return desk.save(novelId, body);
   }
 
   @GetMapping("/chapters/{uid}")

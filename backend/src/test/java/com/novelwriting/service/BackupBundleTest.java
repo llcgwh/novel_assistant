@@ -8,6 +8,8 @@ import com.novelwriting.entity.Character;
 import com.novelwriting.repository.ImageRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
@@ -22,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(showSql = false, properties = "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect")
-@Import({com.novelwriting.security.TestCredentials.class, BackupBundleService.class, ExportService.class, ImportService.class, WritingService.class})
+@Import({com.novelwriting.security.TestCredentials.class, BackupBundleService.class, ExportService.class, ImportService.class, WritingService.class, WritingDeskService.class})
 class BackupBundleTest {
     static final Path ROOT = tempDirectory();
     static final byte[] PNG = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=");
@@ -31,6 +33,8 @@ class BackupBundleTest {
     @Autowired BackupBundleService bundles;
     @Autowired ExportService exporter;
     @Autowired ImageRepository images;
+    @Autowired WritingService writing;
+    @Autowired WritingDeskService desk;
     @SpyBean ImportService importer;
     final ObjectMapper mapper = new ObjectMapper();
 
@@ -118,6 +122,42 @@ class BackupBundleTest {
         byte[] backup = exporter.exportNovelToJson(novel.getId());
         bundles.restore(novel.getId(), backup);
         assertEquals(image.getId(), images.findByNovelId(novel.getId()).get(0).getId());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"nextPen", "tasks", "bookmarks"})
+    void oldImageAndDataBackupsCannotClearCreativeNotes(String kind) throws Exception {
+        Novel novel = novel("保留新便签");
+        Image cover = image(novel, "novel_cover");
+        ObjectNode chapter = writing.create(novel.getId(), mapper.createObjectNode()
+                .put("uid", UUID.randomUUID().toString()).put("title", "保留正文"));
+        ObjectNode data = WritingDeskDocuments.emptyDesk().put("mutationId", UUID.randomUUID().toString());
+        ObjectNode note = mapper.createObjectNode().put("chapterUid", chapter.path("uid").asText())
+                .put("blockId", "").put("excerpt", "已有摘录");
+        switch (kind) {
+            case "nextPen" -> data.set("nextPen", note.put("nextScene", "明天继续")
+                    .put("question", "").put("opening", "").put("updatedAt", "2026-09-28T12:00:00Z"));
+            case "tasks" -> data.withArray("tasks").add(note.put("uid", UUID.randomUUID().toString())
+                    .put("body", "已有修订").put("category", "other").put("priority", "normal").put("status", "open")
+                    .put("createdAt", "2026-09-28T12:00:00Z").put("updatedAt", "2026-09-28T12:00:00Z"));
+            case "bookmarks" -> data.withArray("bookmarks").add(note.put("uid", UUID.randomUUID().toString())
+                    .put("label", "已有书签").put("createdAt", "2026-09-28T12:00:00Z"));
+        }
+        ObjectNode saved = desk.save(novel.getId(), data);
+        ObjectNode legacyBundle = (ObjectNode) mapper.readTree(bundles.exportBundle(novel.getId()));
+        ((ObjectNode) legacyBundle.path("data").path("writing")).remove("desk");
+        // The HTTP restore and cloud pull both use this bundle entry point.
+        var blocked = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> bundles.restore(novel.getId(), mapper.writeValueAsBytes(legacyBundle)));
+        assertTrue(blocked.getReason().contains("旧备份不含创作便签"));
+        verify(importer, never()).importFromJson(eq(novel.getId()), any(byte[].class));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> importer.importFromJson(novel.getId(), mapper.writeValueAsBytes(legacyBundle.path("data"))));
+        assertEquals(saved, desk.get(novel.getId()));
+        assertEquals(chapter, writing.get(novel.getId(), chapter.path("uid").asText()));
+        assertEquals(cover.getId(), images.findByNovelId(novel.getId()).get(0).getId());
+        assertArrayEquals(PNG, Files.readAllBytes(Path.of(cover.getFilePath())));
+        try (var files = Files.list(ROOT.resolve(novel.getId().toString()))) { assertEquals(1, files.count()); }
     }
 
     @Test void refusesImageFilesOutsideNovelDirectory() throws Exception {

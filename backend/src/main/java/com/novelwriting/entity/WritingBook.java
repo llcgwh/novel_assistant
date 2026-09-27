@@ -22,6 +22,10 @@ public class WritingBook {
   @Column(columnDefinition = "TEXT", nullable = false)
   private String preferences = "{}";
 
+  // Nullable for books created before the creative desk was introduced.
+  @Column(columnDefinition = "TEXT")
+  private String deskData;
+
   private long changeSequence;
   private long syncedSequence;
 
