@@ -170,7 +170,10 @@ export const useWritingStore = defineStore('writing', () => {
   }
   async function select(uid: string) {
     const id = novelId.value,
-      epoch = generation
+      epoch = generation,
+      turn = ++selectionGeneration
+    // Returning to the current chapter also supersedes an in-flight selection.
+    loading.value = false
     if (
       current.value?.uid === uid &&
       (dirty.value ||
@@ -181,8 +184,7 @@ export const useWritingStore = defineStore('writing', () => {
     )
       return true
     if (!(await flush()) && !localSafe.value) return false
-    if (!isContext(id, epoch)) return false
-    const turn = ++selectionGeneration
+    if (!isContext(id, epoch) || turn !== selectionGeneration) return false
     loading.value = true
     error.value = ''
     clearTimeout(timer)
@@ -211,7 +213,8 @@ export const useWritingStore = defineStore('writing', () => {
       } catch {}
       return true
     } catch (e) {
-      if (epoch === generation) error.value = message(e)
+      if (epoch === generation && turn === selectionGeneration)
+        error.value = message(e)
       return false
     } finally {
       if (epoch === generation && turn === selectionGeneration)

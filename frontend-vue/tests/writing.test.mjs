@@ -117,6 +117,86 @@ function setup() {
     },
   }
 }
+test('returning to the current chapter invalidates a pending chapter response and error', async (t) => {
+  for (const fail of [false, true]) {
+    await t.test(fail ? 'late rejection' : 'late success', async () => {
+      const h = setup()
+      try {
+        await h.store.load(1)
+        await h.store.select(h.uid)
+        const otherUid = crypto.randomUUID()
+        const adapter = request.defaults.adapter
+        let release, started
+        const gate = new Promise((resolve) => (release = resolve))
+        const begin = new Promise((resolve) => (started = resolve))
+        request.defaults.adapter = async (config) => {
+          if (!config.url.endsWith(`/chapters/${otherUid}`))
+            return adapter(config)
+          started()
+          await gate
+          if (fail) throw Error('late chapter error')
+          return {
+            data: {
+              ...clone(h.server),
+              uid: otherUid,
+              doc: plainDocument('另一章正文'),
+            },
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config,
+          }
+        }
+        const pending = h.store.select(otherUid)
+        await begin
+        assert.equal(h.store.loading, true)
+        assert.equal(await h.store.select(h.uid), true)
+        assert.equal(h.store.loading, false)
+        release()
+        assert.equal(await pending, false)
+        assert.equal(h.store.current.uid, h.uid)
+        assert.equal(documentText(h.store.current.doc), '原稿\n')
+        assert.equal(h.store.error, '')
+        assert.equal(h.store.loading, false)
+      } finally {
+        h.store.$reset()
+      }
+    })
+  }
+})
+test('returning to the current chapter while flushing cancels the pending chapter fetch without losing edits', async () => {
+  const h = setup()
+  try {
+    await h.store.load(1)
+    await h.store.select(h.uid)
+    h.store.current.doc = plainDocument('仍留在本章的新稿')
+    h.store.changed()
+    let release, started
+    const gate = new Promise((resolve) => (release = resolve))
+    const begin = new Promise((resolve) => (started = resolve))
+    h.intercept = async () => {
+      started()
+      await gate
+    }
+    const otherUid = crypto.randomUUID()
+    const pending = h.store.select(otherUid)
+    await begin
+    assert.equal(await h.store.select(h.uid), true)
+    release()
+    assert.equal(await pending, false)
+    assert.equal(
+      h.requests.some((r) => r.url.endsWith(`/chapters/${otherUid}`)),
+      false,
+    )
+    assert.equal(h.store.current.uid, h.uid)
+    assert.equal(documentText(h.store.current.doc), '仍留在本章的新稿\n')
+    assert.equal(documentText(h.server.doc), '仍留在本章的新稿\n')
+    assert.equal(h.store.dirty, false)
+    assert.equal(h.store.loading, false)
+  } finally {
+    h.store.$reset()
+  }
+})
 test('Chinese, mixed scripts, Latin words and punctuation use the same documented counting rules', () => {
   assert.equal(wordCount('沈雾推开门。Hello world 2026'), 8)
   assert.equal(wordCount('Hi沈雾 hello世界'), 6)

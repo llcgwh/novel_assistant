@@ -162,3 +162,21 @@ test('nested quote containers cannot mask the visible paragraph when remembering
   )
   assert.equal(visible.id, 'visible-paragraph')
 })
+
+test('pagination accounts for actual column width and gap without adding an empty page', async () => {
+  const { pageCountForWidth, pageForOffset } = await load('utils/readerLayout')
+  assert.equal(pageCountForWidth(600, 600, 40), 1)
+  assert.equal(pageCountForWidth(1240, 600, 40), 2)
+  assert.equal(pageCountForWidth(1880, 600, 40), 3)
+  assert.equal(pageForOffset(640, 600, 40, 3), 1)
+  assert.equal(pageForOffset(1280, 600, 40, 3), 2)
+  assert.equal(pageForOffset(-20, 600, 40, 3), 0)
+  assert.equal(pageForOffset(5000, 600, 40, 3), 2)
+})
+
+test('continuous reading keeps a bounded window even in a thousand-chapter book', async () => {
+  const { boundedReadingWindow } = await load('utils/readerLayout')
+  assert.deepEqual(boundedReadingWindow(0, 1000), { start: 0, end: 3 })
+  assert.deepEqual(boundedReadingWindow(500, 1000), { start: 498, end: 503 })
+  assert.deepEqual(boundedReadingWindow(999, 1000), { start: 997, end: 1000 })
+})

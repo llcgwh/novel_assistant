@@ -10,6 +10,12 @@
       </button>
     </header>
     <nav class="reader-toolbar" aria-label="阅读操作">
+      <BaseSelect
+        v-model="mode"
+        aria-label="阅读方式"
+        :options="modeOptions"
+        class="reader-mode-select"
+      />
       <button
         type="button"
         :disabled="chapterIndex < 1 || pending"
@@ -17,7 +23,7 @@
       >
         ← 上一章
       </button>
-      <span
+      <span :title="activeChapter.title"
         >{{ Math.max(1, chapterIndex + 1) }} / {{ chapters.length }} 章</span
       >
       <button
@@ -74,11 +80,25 @@
       </button>
     </div>
     <p v-if="notice" class="reader-notice" role="status">{{ notice }}</p>
-    <p v-if="draftStorageError" class="reader-error" role="alert">
-      {{ draftStorageError }}
-    </p>
+    <div v-if="draftStorageError" class="reader-error" role="alert">
+      <span>{{ draftStorageError }}</span>
+      <button
+        v-if="pendingLocalDrafts.size"
+        type="button"
+        class="btn-secondary"
+        @click="returnToUnsaved"
+      >
+        查看未保存批注（{{ pendingLocalDrafts.size }} 章）
+      </button>
+    </div>
     <div v-if="pendingDestination" class="reader-confirm" role="alert">
-      <span>批注还未保存，先保存它，或放弃这条批注后离开。</span>
+      <span
+        >有
+        {{
+          pendingLocalDrafts.size
+        }}
+        章批注未能保存在本机。请返回对应章节保存，或明确放弃这些草稿后离开。</span
+      >
       <button
         type="button"
         class="btn-secondary"
@@ -86,49 +106,28 @@
       >
         继续批注
       </button>
+      <button type="button" class="btn-secondary" @click="returnToUnsaved">
+        返回未保存批注
+      </button>
       <button type="button" class="btn-secondary" @click="discardAndLeave">
-        放弃并离开
+        放弃这些草稿并离开
       </button>
     </div>
     <div class="reader-layout" :class="{ 'with-notes': notesOpen }">
-      <div
-        ref="scrollPanel"
-        class="reader-scroll"
-        @scroll.passive="rememberPosition"
-      >
-        <article
-          class="reader-page"
-          :style="{ '--reader-size': fontSize + 'px' }"
-        >
-          <header class="reader-chapter-heading">
-            <span>{{ volumeTitle || '正文' }}</span>
-            <h2>{{ chapter.title }}</h2>
-            <p>
-              {{ chapter.wordCount.toLocaleString() }} 字 · 当前章节连续阅读
-            </p>
-          </header>
-          <div
-            ref="prose"
-            tabindex="0"
-            role="document"
-            aria-label="只读章节正文"
-            @pointerup="captureSelection"
-            @keyup="captureSelection"
-          >
-            <ReadonlyManuscript :doc="chapter.doc" />
-          </div>
-          <p class="reader-end">— 本章完 —</p>
-          <button
-            v-if="chapterIndex >= 0 && chapterIndex < chapters.length - 1"
-            type="button"
-            class="reader-next btn-secondary"
-            :disabled="pending"
-            @click="changeChapter(1)"
-          >
-            继续阅读 · {{ chapters[chapterIndex + 1]?.title }} →
-          </button>
-        </article>
-      </div>
+      <ReaderViewport
+        ref="viewport"
+        :novel-id="contextNovel"
+        :book-uid="contextBook"
+        :initial-chapter="chapter"
+        :initial-block="initialBlock"
+        :chapters="chapters"
+        :volumes="writer.workspace?.volumes || []"
+        :mode="mode"
+        :font-size="fontSize"
+        @position="readingPosition"
+        @selection="captureSelection"
+        @error="notice = $event"
+      />
       <aside v-if="notesOpen" class="reader-notes" aria-label="阅读批注与书签">
         <div class="reader-note-title">
           <h3>留下阅读感受</h3>
@@ -141,6 +140,7 @@
           </button>
         </div>
         <p class="reader-hint">在正文选中一句话，再记录哪里需要打磨。</p>
+        <p class="reader-note-chapter">{{ activeChapter.title }}</p>
         <blockquote
           v-if="noteAnchor?.excerpt || selectedExcerpt || sourceExcerpt"
         >
@@ -152,6 +152,7 @@
             v-model="category"
             aria-label="阅读批注分类"
             :options="revisionCategories"
+            :disabled="pending"
         /></label>
         <label
           >阅读批注<textarea
@@ -248,56 +249,94 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import BaseSelect from '@/components/common/BaseSelect.vue'
-import ReadonlyManuscript from './ReadonlyManuscript'
+import ReaderViewport from './ReaderViewport.vue'
 import { useWritingStore } from '@/stores/writing'
 import { useWritingDeskStore } from '@/stores/writingDesk'
 import type { Chapter } from '@/types/writing'
 import type { ReaderBookmark, RevisionTask } from '@/types/writingDesk'
 import { blockList, documentText } from '@/utils/writing'
-import { decodeReaderDraft, readerDraftKey } from '@/utils/readerDraft'
+import {
+  decodeReaderDraft,
+  readerDraftKey,
+  type ReaderNoteDraft,
+} from '@/utils/readerDraft'
 import {
   findDocumentBlock,
-  readingLeafBlockIds,
   readingOrder,
   revisionCategories,
   revisionCategoryLabel,
 } from '@/utils/revisionDesk'
+import type { ReaderLocation, ReaderMode } from '@/utils/readerLayout'
 
 const props = defineProps<{ chapter: Chapter; initialBlock?: string }>()
 const emit = defineEmits<{
-  close: [blockId: string]
-  navigate: [target: { chapterUid: string; blockId?: string }]
+  close: [target: ReaderLocation]
+  navigate: [target: ReaderLocation]
+  position: [target: ReaderLocation]
 }>()
-const writer = useWritingStore()
-const desk = useWritingDeskStore()
-const scrollPanel = ref<HTMLElement | null>(null)
-const prose = ref<HTMLElement | null>(null)
-const activeBlock = ref('')
-const selectedExcerpt = ref('')
-const selectedBlock = ref('')
-const notesOpen = ref(false)
-const fontSize = ref(20)
-const note = ref('')
-const noteUid = ref<string>(crypto.randomUUID())
-const noteCreatedAt = ref(new Date().toISOString())
-const noteAnchor = ref<{ blockId: string; excerpt: string } | null>(null)
-const bookmarkDraft = ref<ReaderBookmark | null>(null)
-const draftStorageError = ref('')
-const localDraftKey = readerDraftKey(
-  writer.novelId,
-  writer.workspace?.uid || '',
-  props.chapter.uid,
+const writer = useWritingStore(),
+  desk = useWritingDeskStore()
+const contextNovel = writer.novelId,
+  contextBook = writer.workspace?.uid || ''
+const viewport = ref<InstanceType<typeof ReaderViewport> | null>(null)
+const activeChapter = shallowRef(props.chapter)
+const activeBlock = ref(
+  props.initialBlock || blockList(props.chapter.doc)[0]?.id || '',
 )
-let restoringDraft = false
+const mode = ref<ReaderMode>('chapter'),
+  fontSize = ref(20)
+const modeOptions = [
+  { value: 'chapter', label: '逐章阅读' },
+  { value: 'continuous', label: '全书连续' },
+  { value: 'paged', label: '分页阅读' },
+]
+const preferenceKey = 'ink-reader-preferences-v1'
+try {
+  const preferences = JSON.parse(localStorage.getItem(preferenceKey) || '{}')
+  if (modeOptions.some((option) => option.value === preferences.mode))
+    mode.value = preferences.mode
+  if (
+    Number.isInteger(preferences.fontSize) &&
+    preferences.fontSize >= 16 &&
+    preferences.fontSize <= 28
+  )
+    fontSize.value = preferences.fontSize
+} catch {}
+const selectedExcerpt = ref(''),
+  selectedBlock = ref(''),
+  notesOpen = ref(false)
+const note = ref(''),
+  noteUid = ref<string>(crypto.randomUUID()),
+  noteCreatedAt = ref(new Date().toISOString())
+const noteChapterUid = ref(props.chapter.uid)
+const noteAnchor = ref<{ blockId: string; excerpt: string } | null>(null)
 const category = ref<RevisionTask['category']>('wording')
-const pending = ref(false)
-const error = ref('')
-const notice = ref('')
-const pendingDestination = ref<{ chapterUid?: string } | null>(null)
-let scrollFrame = 0
-let explicitScroll = false
+const bookmarkDraft = ref<ReaderBookmark | null>(null)
+const pending = ref(false),
+  error = ref(''),
+  notice = ref(''),
+  draftStorageError = ref('')
+const pendingDestination = ref<ReaderLocation | null>(null)
+const localDrafts = new Map<string, ReaderNoteDraft>()
+const pendingLocalDrafts = ref(new Set<string>())
+let restoringDraft = false,
+  restoreGeneration = 0,
+  disposed = false
+const contextActive = () =>
+  !disposed &&
+  writer.novelId === contextNovel &&
+  writer.workspace?.uid === contextBook
+const keyFor = (uid: string) => readerDraftKey(contextNovel, contextBook, uid)
 const chapters = computed(() =>
   readingOrder(
     writer.workspace?.chapters || [],
@@ -305,17 +344,13 @@ const chapters = computed(() =>
   ),
 )
 const chapterIndex = computed(() =>
-  chapters.value.findIndex((chapter) => chapter.uid === props.chapter.uid),
-)
-const volumeTitle = computed(
-  () =>
-    writer.workspace?.volumes.find(
-      (volume) => volume.uid === props.chapter.volumeId,
-    )?.title,
+  chapters.value.findIndex(
+    (chapter) => chapter.uid === activeChapter.value.uid,
+  ),
 )
 const bookmarks = computed(() =>
   (desk.data?.bookmarks || []).filter(
-    (bookmark) => bookmark.chapterUid === props.chapter.uid,
+    (bookmark) => bookmark.chapterUid === activeChapter.value.uid,
   ),
 )
 const activeBookmark = computed(() =>
@@ -323,119 +358,151 @@ const activeBookmark = computed(() =>
 )
 const chapterTasks = computed(() =>
   (desk.data?.tasks || []).filter(
-    (task) => task.chapterUid === props.chapter.uid && task.status === 'open',
+    (task) =>
+      task.chapterUid === activeChapter.value.uid && task.status === 'open',
   ),
 )
 const sourceExcerpt = computed(() => {
-  const block = findDocumentBlock(props.chapter.doc, activeBlock.value)
+  const block = findDocumentBlock(activeChapter.value.doc, activeBlock.value)
   return block ? documentText(block).trim().slice(0, 280) : ''
 })
-const readingLeaves = computed(() => readingLeafBlockIds(props.chapter.doc))
 const remoteNote = computed(() =>
   desk.data?.tasks.find((task) => task.uid === noteUid.value),
 )
-function describeError(cause: unknown) {
+function message(cause: unknown) {
   return cause instanceof Error
     ? cause.message
     : '保存失败，请稍后重试。输入内容已保留。'
 }
 async function perform(action: () => Promise<void>, success: string) {
-  if (pending.value) return
+  if (pending.value || !contextActive()) return
   pending.value = true
   error.value = ''
   notice.value = ''
   try {
     await action()
-    notice.value = success
+    if (contextActive()) notice.value = success
   } catch (cause) {
-    error.value = describeError(cause)
+    if (contextActive()) error.value = message(cause)
   } finally {
-    pending.value = false
+    if (!disposed) pending.value = false
   }
 }
-function blocks() {
-  return Array.from(
-    prose.value?.querySelectorAll<HTMLElement>('[data-reader-block]') || [],
-  )
-}
-async function goToBlock(id: string) {
-  await nextTick()
-  const element = blocks().find((node) => node.dataset.readerBlock === id)
-  if (!element) {
-    notice.value = '关联段落已变化，仍可在本章中查看原文。'
-    return
+function snapshotDraft(): ReaderNoteDraft {
+  return {
+    uid: noteUid.value,
+    createdAt: noteCreatedAt.value,
+    body: note.value,
+    category: category.value,
+    anchor: noteAnchor.value ? { ...noteAnchor.value } : null,
   }
-  explicitScroll = true
-  element.scrollIntoView({ block: 'start', behavior: 'auto' })
-  activeBlock.value = id
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-    element.animate?.(
-      [
-        { backgroundColor: 'var(--accent-soft)' },
-        { backgroundColor: 'transparent' },
-      ],
-      { duration: 650 },
-    )
 }
-function rememberPosition() {
-  if (scrollFrame) return
-  scrollFrame = requestAnimationFrame(() => {
-    scrollFrame = 0
-    if (explicitScroll) {
-      explicitScroll = false
-      return
+function persistDraft() {
+  if (restoringDraft) return pendingLocalDrafts.value.size === 0
+  const uid = noteChapterUid.value
+  const draft = note.value.trim() ? snapshotDraft() : undefined
+  if (draft) localDrafts.set(uid, draft)
+  else localDrafts.delete(uid)
+  try {
+    if (draft) localStorage.setItem(keyFor(uid), JSON.stringify(draft))
+    else localStorage.removeItem(keyFor(uid))
+    pendingLocalDrafts.value.delete(uid)
+    updateDraftWarning()
+    return pendingLocalDrafts.value.size === 0
+  } catch {
+    if (draft) pendingLocalDrafts.value.add(uid)
+    else pendingLocalDrafts.value.delete(uid)
+    updateDraftWarning()
+    return false
+  }
+}
+function updateDraftWarning() {
+  draftStorageError.value = pendingLocalDrafts.value.size
+    ? `有 ${pendingLocalDrafts.value.size} 章批注仅保留在本次阅读内存中。请返回对应章节加入修订清单，再离开。`
+    : ''
+}
+function discardStoredDraft(chapterUid: string) {
+  localDrafts.delete(chapterUid)
+  pendingLocalDrafts.value.delete(chapterUid)
+  updateDraftWarning()
+  try {
+    localStorage.removeItem(keyFor(chapterUid))
+  } catch {}
+}
+async function restoreDraft(chapterUid: string) {
+  const turn = ++restoreGeneration
+  restoringDraft = true
+  noteChapterUid.value = chapterUid
+  let saved = localDrafts.get(chapterUid)
+  try {
+    if (!saved) {
+      const raw = localStorage.getItem(keyFor(chapterUid))
+      saved = raw ? decodeReaderDraft(raw) : undefined
     }
-    const panelTop = (scrollPanel.value?.getBoundingClientRect().top || 0) + 36
-    const visible = blocks().find(
-      (element) =>
-        readingLeaves.value.has(element.dataset.readerBlock || '') &&
-        element.getBoundingClientRect().bottom > panelTop,
-    )
-    if (visible?.dataset.readerBlock)
-      activeBlock.value = visible.dataset.readerBlock
+  } catch {
+    draftStorageError.value =
+      '此浏览器暂时无法读取批注草稿，请先保存新批注再离开。'
+  }
+  note.value = saved?.body || ''
+  category.value = saved?.category || 'wording'
+  noteAnchor.value = saved?.anchor || null
+  noteUid.value = saved?.uid || crypto.randomUUID()
+  noteCreatedAt.value = saved?.createdAt || new Date().toISOString()
+  selectedExcerpt.value = ''
+  selectedBlock.value = ''
+  if (saved) {
+    notesOpen.value = true
+    notice.value = '已找回本章尚未提交的阅读批注。'
+  }
+  await nextTick()
+  if (turn === restoreGeneration) restoringDraft = false
+}
+function readingPosition(value: { chapter: Chapter; blockId: string }) {
+  if (!contextActive()) return
+  if (activeChapter.value.uid !== value.chapter.uid) {
+    persistDraft()
+    activeChapter.value = value.chapter
+    activeBlock.value = value.blockId
+    bookmarkDraft.value = null
+    void restoreDraft(value.chapter.uid)
+  } else {
+    activeChapter.value = value.chapter
+    activeBlock.value = value.blockId
+  }
+  emit('position', {
+    chapterUid: value.chapter.uid,
+    blockId: value.blockId || undefined,
   })
 }
-function captureSelection(event: Event) {
-  const target =
-    event.target instanceof Element
-      ? event.target.closest<HTMLElement>('[data-reader-block]')
-      : null
-  if (target?.dataset.readerBlock)
-    activeBlock.value = target.dataset.readerBlock
-  const selection = window.getSelection()
-  if (
-    !selection?.rangeCount ||
-    !prose.value?.contains(selection.anchorNode) ||
-    !prose.value?.contains(selection.focusNode)
-  )
-    return
-  const anchor =
-    selection.anchorNode instanceof Element
-      ? selection.anchorNode
-      : selection.anchorNode?.parentElement
-  const id =
-    anchor?.closest<HTMLElement>('[data-reader-block]')?.dataset.readerBlock ||
-    activeBlock.value
-  if (selection.toString().trim() && !note.value.trim()) {
-    selectedExcerpt.value = selection.toString().trim().slice(0, 1000)
-    selectedBlock.value = id
-    activeBlock.value = id
-  } else if (!note.value.trim()) {
-    selectedExcerpt.value = ''
-    selectedBlock.value = ''
+function captureSelection(value: {
+  chapter: Chapter
+  blockId: string
+  excerpt: string
+}) {
+  readingPosition(value)
+  if (!note.value.trim()) {
+    selectedExcerpt.value = value.excerpt
+    selectedBlock.value = value.excerpt ? value.blockId : ''
   }
 }
+async function goToBlock(blockId: string) {
+  await viewport.value?.jump(activeChapter.value.uid, blockId)
+}
+async function changeChapter(direction: number) {
+  persistDraft()
+  await viewport.value?.moveChapter(direction)
+}
 async function toggleBookmark() {
-  const existing = activeBookmark.value
-  if (existing) return removeBookmark(existing.uid)
+  if (activeBookmark.value) return removeBookmark(activeBookmark.value.uid)
   if (
     !bookmarkDraft.value ||
+    bookmarkDraft.value.chapterUid !== activeChapter.value.uid ||
     bookmarkDraft.value.blockId !== activeBlock.value
   ) {
     const excerpt = sourceExcerpt.value
     bookmarkDraft.value = {
       uid: crypto.randomUUID(),
-      chapterUid: props.chapter.uid,
+      chapterUid: activeChapter.value.uid,
       blockId: activeBlock.value,
       excerpt,
       label: excerpt.slice(0, 42) || '阅读位置',
@@ -445,33 +512,48 @@ async function toggleBookmark() {
   const bookmark = { ...bookmarkDraft.value }
   await perform(async () => {
     await desk.saveBookmark(bookmark)
-    bookmarkDraft.value = null
+    if (bookmarkDraft.value?.uid === bookmark.uid) bookmarkDraft.value = null
   }, '书签已保存。')
 }
 async function removeBookmark(uid: string) {
   await perform(() => desk.deleteBookmark(uid), '书签已移除。')
 }
+function clearNote() {
+  discardStoredDraft(noteChapterUid.value)
+  note.value = ''
+  selectedExcerpt.value = ''
+  selectedBlock.value = ''
+  noteAnchor.value = null
+  noteUid.value = crypto.randomUUID()
+  noteCreatedAt.value = new Date().toISOString()
+  pendingDestination.value = null
+}
+function separateNote() {
+  noteUid.value = crypto.randomUUID()
+  noteCreatedAt.value = new Date().toISOString()
+}
 async function saveNote() {
   if (!note.value.trim() || remoteNote.value) return
-  const now = new Date().toISOString()
-  const anchor = noteAnchor.value || {
-    blockId: selectedBlock.value || activeBlock.value,
-    excerpt: selectedExcerpt.value || sourceExcerpt.value,
-  }
   const task: RevisionTask = {
     uid: noteUid.value,
-    chapterUid: props.chapter.uid,
-    ...anchor,
+    chapterUid: noteChapterUid.value,
+    ...(noteAnchor.value || {
+      blockId: selectedBlock.value || activeBlock.value,
+      excerpt: selectedExcerpt.value || sourceExcerpt.value,
+    }),
     body: note.value.trim(),
     category: category.value,
     priority: 'normal',
     status: 'open',
     createdAt: noteCreatedAt.value,
-    updatedAt: now,
+    updatedAt: new Date().toISOString(),
   }
   await perform(async () => {
     await desk.saveTask(task)
-    clearNote()
+    if (!contextActive()) return
+    discardStoredDraft(task.chapterUid)
+    if (noteUid.value === task.uid && noteChapterUid.value === task.chapterUid)
+      clearNote()
   }, '已加入修订清单，稍后可以逐条处理。')
 }
 async function reloadDesk() {
@@ -488,105 +570,51 @@ async function reloadDesk() {
       clearNote()
   }, '便签已重新载入；已保存的相同批注已确认，其余输入仍保留。')
 }
-function clearNote() {
-  note.value = ''
-  selectedExcerpt.value = ''
-  selectedBlock.value = ''
-  noteAnchor.value = null
-  noteUid.value = crypto.randomUUID()
-  noteCreatedAt.value = new Date().toISOString()
-  pendingDestination.value = null
-}
-function separateNote() {
-  noteUid.value = crypto.randomUUID()
-  noteCreatedAt.value = new Date().toISOString()
-}
-function persistDraft() {
-  if (restoringDraft) return
-  try {
-    if (note.value.trim())
-      localStorage.setItem(
-        localDraftKey,
-        JSON.stringify({
-          uid: noteUid.value,
-          createdAt: noteCreatedAt.value,
-          body: note.value,
-          category: category.value,
-          anchor: noteAnchor.value,
-        }),
-      )
-    else localStorage.removeItem(localDraftKey)
-    draftStorageError.value = ''
-  } catch {
-    draftStorageError.value =
-      '此浏览器暂时无法保存批注草稿，请先加入修订清单再离开。'
+function requestClose() {
+  const target = {
+    chapterUid: activeChapter.value.uid,
+    blockId: activeBlock.value || undefined,
   }
+  persistDraft()
+  if (pendingLocalDrafts.value.size) {
+    pendingDestination.value = target
+    return
+  }
+  emit('close', target)
+}
+async function returnToUnsaved() {
+  persistDraft()
+  const uid = pendingLocalDrafts.value.values().next().value
+  if (!uid) return
+  const blockId = localDrafts.get(uid)?.anchor?.blockId || ''
+  pendingDestination.value = null
+  notesOpen.value = true
+  await viewport.value?.jump(uid, blockId)
+}
+function discardAndLeave() {
+  const target = pendingDestination.value
+  const discardCurrent = pendingLocalDrafts.value.has(noteChapterUid.value)
+  for (const uid of [...pendingLocalDrafts.value]) discardStoredDraft(uid)
+  if (discardCurrent) clearNote()
+  pendingDestination.value = null
+  if (target) emit('close', target)
 }
 function protectUnsaved(event: BeforeUnloadEvent) {
-  if (note.value.trim() && draftStorageError.value) {
+  persistDraft()
+  if (pendingLocalDrafts.value.size) {
     event.preventDefault()
     event.returnValue = ''
   }
 }
-async function restoreDraft() {
-  restoringDraft = true
-  try {
-    const raw = localStorage.getItem(localDraftKey)
-    const saved = raw ? decodeReaderDraft(raw) : undefined
-    if (saved) {
-      note.value = saved.body
-      category.value = saved.category
-      noteAnchor.value = saved.anchor
-      noteUid.value = saved.uid
-      noteCreatedAt.value = saved.createdAt
-      notesOpen.value = true
-      notice.value = '已找回本浏览器尚未提交的阅读批注。'
-    }
-  } catch {
-    draftStorageError.value =
-      '此浏览器暂时无法读取批注草稿，请先保存新批注再离开。'
+onBeforeRouteLeave(() => {
+  persistDraft()
+  if (!pendingLocalDrafts.value.size) return true
+  pendingDestination.value = {
+    chapterUid: activeChapter.value.uid,
+    blockId: activeBlock.value || undefined,
   }
-  await nextTick()
-  restoringDraft = false
-}
-function leave(target: { chapterUid?: string }) {
-  if (pending.value) return
-  if (note.value.trim()) {
-    pendingDestination.value = target
-    notesOpen.value = true
-    return
-  }
-  if (target.chapterUid) emit('navigate', { chapterUid: target.chapterUid })
-  else emit('close', activeBlock.value)
-}
-function requestClose() {
-  leave({})
-}
-function changeChapter(direction: number) {
-  const target = chapters.value[chapterIndex.value + direction]
-  if (target) leave({ chapterUid: target.uid })
-}
-function discardAndLeave() {
-  const destination = pendingDestination.value
-  pendingDestination.value = null
-  note.value = ''
-  if (destination) leave(destination)
-}
-watch(
-  () => props.chapter.uid,
-  async () => {
-    selectedExcerpt.value = ''
-    selectedBlock.value = ''
-    notice.value = ''
-    error.value = ''
-    activeBlock.value =
-      props.initialBlock || blockList(props.chapter.doc)[0]?.id || ''
-    await nextTick()
-    if (props.initialBlock) await goToBlock(props.initialBlock)
-    else if (scrollPanel.value) scrollPanel.value.scrollTop = 0
-  },
-  { immediate: true },
-)
+  return false
+})
 watch(note, (value, previous) => {
   if (restoringDraft) return
   if (value.trim() && !previous.trim())
@@ -600,11 +628,20 @@ watch([note, category, noteAnchor, noteUid], persistDraft, {
   deep: true,
   flush: 'post',
 })
-void restoreDraft()
+watch([mode, fontSize], () => {
+  try {
+    localStorage.setItem(
+      preferenceKey,
+      JSON.stringify({ mode: mode.value, fontSize: fontSize.value }),
+    )
+  } catch {}
+})
+void restoreDraft(props.chapter.uid)
 window.addEventListener('beforeunload', protectUnsaved)
 onBeforeUnmount(() => {
-  cancelAnimationFrame(scrollFrame)
   persistDraft()
+  disposed = true
+  restoreGeneration++
   window.removeEventListener('beforeunload', protectUnsaved)
 })
 </script>
@@ -658,7 +695,20 @@ onBeforeUnmount(() => {
 .reader-toolbar-space {
   flex: 1;
 }
-.reader-toolbar button,
+.reader-toolbar :deep(.reader-mode-select) {
+  --select-width: 138px;
+  --select-height: 34px;
+  --select-font-size: 12px;
+  width: 138px;
+  flex-basis: 138px;
+  flex-shrink: 0;
+}
+.reader-note-chapter {
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.reader-toolbar button:not(.base-select),
 .reader-footer button,
 .reader-note-title button {
   border: 1px solid transparent;
@@ -670,9 +720,9 @@ onBeforeUnmount(() => {
   font-size: 12px;
   cursor: pointer;
 }
-.reader-toolbar button:hover,
-.reader-toolbar button[aria-pressed='true'],
-.reader-toolbar button[aria-expanded='true'],
+.reader-toolbar button:not(.base-select):hover,
+.reader-toolbar button:not(.base-select)[aria-pressed='true'],
+.reader-toolbar button:not(.base-select)[aria-expanded='true'],
 .reader-footer button:hover {
   color: var(--accent);
   background: var(--accent-soft);
@@ -948,7 +998,7 @@ onBeforeUnmount(() => {
   .reader-toolbar-space {
     display: none;
   }
-  .reader-toolbar button {
+  .reader-toolbar button:not(.base-select) {
     font-size: 11px;
   }
   .reader-page {

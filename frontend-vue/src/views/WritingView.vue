@@ -98,11 +98,12 @@
     </div>
     <ReaderWorkspace
       v-if="reading && writer.current && !writer.recovery"
-      :key="writer.current.uid"
+      :key="`${writer.current.uid}:${readerEntry}`"
       :chapter="writer.current"
       :initial-block="String(route.query.block || '')"
       @close="closeReader"
       @navigate="readChapter"
+      @position="rememberReadingPosition"
     />
     <div
       v-else
@@ -338,6 +339,61 @@ const writer = useWritingStore(),
   router = useRouter()
 const desk = useWritingDeskStore()
 const reading = computed(() => route.query.mode === 'read')
+const readerEntry = ref(0)
+let routeFollowTicket = 0
+type ReaderPosition = { chapterUid: string; blockId?: string }
+let readerRouteTarget: ReaderPosition | null = null
+let pendingReaderPosition: ReaderPosition | null = null
+let readerPositionTimer: ReturnType<typeof setTimeout> | undefined
+let readerRoutePending = false
+let readerClosing = false
+function clearReaderPosition() {
+  clearTimeout(readerPositionTimer)
+  readerPositionTimer = undefined
+  pendingReaderPosition = null
+  readerRouteTarget = null
+}
+function rememberReadingPosition(target: ReaderPosition) {
+  if (!reading.value || !active() || readerClosing) return
+  if (
+    !writer.workspace?.chapters.some(
+      (c) => c.uid === target.chapterUid && !c.deleted,
+    )
+  )
+    return
+  pendingReaderPosition = { ...target }
+  clearTimeout(readerPositionTimer)
+  readerPositionTimer = setTimeout(syncReadingPosition, 250)
+}
+async function syncReadingPosition() {
+  readerPositionTimer = undefined
+  if (!reading.value || !active() || readerClosing || !pendingReaderPosition)
+    return
+  if (readerRoutePending) {
+    readerPositionTimer = setTimeout(syncReadingPosition, 250)
+    return
+  }
+  const target = pendingReaderPosition
+  pendingReaderPosition = null
+  if (
+    String(route.query.chapter || '') === target.chapterUid &&
+    String(route.query.block || '') === (target.blockId || '')
+  )
+    return
+  readerRoutePending = true
+  readerRouteTarget = target
+  try {
+    await router.replace({
+      query: {
+        chapter: target.chapterUid,
+        block: target.blockId || undefined,
+        mode: 'read',
+      },
+    })
+  } finally {
+    readerRoutePending = false
+  }
+}
 const revisionOpen = ref(false)
 function openRevisionHistory() {
   revisionOpen.value = false
@@ -353,6 +409,8 @@ async function openReader() {
     app.showToast('请先保存当前正文，再进入读者模式', 'info')
     return
   }
+  readerClosing = false
+  clearReaderPosition()
   await router.replace({
     query: {
       chapter: writer.current.uid,
@@ -361,13 +419,16 @@ async function openReader() {
     },
   })
 }
-async function closeReader(blockId: string) {
+async function closeReader(target: ReaderPosition) {
+  readerClosing = true
+  clearReaderPosition()
   await router.replace({
-    query: { chapter: writer.current?.uid, block: blockId || undefined },
+    query: { chapter: target.chapterUid, block: target.blockId || undefined },
   })
   await followRoute()
 }
 async function readChapter(target: { chapterUid: string; blockId?: string }) {
+  clearReaderPosition()
   await router.replace({
     query: {
       chapter: target.chapterUid,
@@ -678,8 +739,26 @@ function emergencyExport() {
     )
 }
 async function followRoute() {
+  // Reading can cross chapters without replacing the editor's last saved draft.
+  // Only position events from this reader skip selection; external links still load.
+  if (
+    reading.value &&
+    readerRouteTarget &&
+    String(route.query.chapter || '') === readerRouteTarget.chapterUid &&
+    String(route.query.block || '') === (readerRouteTarget.blockId || '')
+  )
+    return
+  const ticket = ++routeFollowTicket
+  clearReaderPosition()
+  readerClosing = reading.value
   const uid = String(route.query.chapter || '')
-  if (uid && uid !== writer.current?.uid) await writer.select(uid)
+  if (uid && !(await writer.select(uid))) {
+    if (ticket === routeFollowTicket) readerClosing = false
+    return
+  }
+  if (ticket !== routeFollowTicket || !active()) return
+  readerClosing = false
+  if (reading.value) readerEntry.value++
   if (!active() || reading.value) return
   if (writer.current && route.query.block) {
     await nextTick()
@@ -720,6 +799,7 @@ watch(
     if (
       uid &&
       !disposed &&
+      !reading.value &&
       route.path.endsWith('/writing') &&
       String(route.query.chapter || '') !== uid
     )
@@ -788,9 +868,12 @@ onMounted(async () => {
   void retryOffline()
 })
 onBeforeRouteLeave(async () => {
+  readerClosing = true
+  clearReaderPosition()
   await editorPanel.value?.flushStats()
   const ok = await writer.flush()
   if (!ok && !writer.localSafe) {
+    readerClosing = false
     app.showToast('尚未安全保存，请先导出当前正文', 'error')
     return false
   }
@@ -798,6 +881,7 @@ onBeforeRouteLeave(async () => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  clearReaderPosition()
   if (desk.novelId === novelId) desk.$reset()
   window.removeEventListener('beforeunload', beforeUnload)
   window.removeEventListener('keydown', shortcut)
