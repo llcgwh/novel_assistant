@@ -4,7 +4,7 @@
     <p v-if="loading"><small>正在寻找故事中的连接…</small></p>
     <p v-else-if="error">
       <small>{{ error }}</small
-      ><button @click="load">重试</button>
+      ><button class="btn-secondary" @click="load">重试</button>
     </p>
     <p v-else-if="!links.length">
       <small>还没有关联正文。可在写作工作台中把这条资料连到章节或段落。</small>

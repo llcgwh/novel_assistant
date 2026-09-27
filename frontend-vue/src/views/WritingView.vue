@@ -277,6 +277,7 @@
       v-if="revisionOpen"
       @close="revisionOpen = false"
       @jump="jumpToAnchor"
+      @history="openRevisionHistory"
     />
     <BaseModal
       v-if="dialog"
@@ -338,6 +339,10 @@ const writer = useWritingStore(),
 const desk = useWritingDeskStore()
 const reading = computed(() => route.query.mode === 'read')
 const revisionOpen = ref(false)
+function openRevisionHistory() {
+  revisionOpen.value = false
+  tools.value = 'history'
+}
 const openTasks = computed(
   () => desk.data?.tasks.filter((task) => task.status === 'open').length || 0,
 )

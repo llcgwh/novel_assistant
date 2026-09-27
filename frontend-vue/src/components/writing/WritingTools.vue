@@ -1,7 +1,7 @@
 <template>
   <BaseModal
     :busy="busy"
-    :wide="mode === 'stats'"
+    :wide="mode === 'stats' || mode === 'history'"
     :title="titles[mode]"
     @close="$emit('close')"
   >
@@ -86,31 +86,28 @@
         aria-label="选择历史版本"
         v-model="historyId"
         :options="historyOptions"
+        :disabled="busy"
         @change="loadRevision(Number($event))"
       />
-      <div v-if="revision" class="writer-compare">
-        <label
-          >当前正文 · {{ writer.current?.wordCount }} 字<textarea
-            readonly
-            :value="documentText(writer.current!.doc)"
-            rows="14"
-          /></label
-        ><label
-          >历史正文 · {{ wordCount(documentText(revision.doc)) }} 字<textarea
-            readonly
-            :value="documentText(revision.doc)"
-            rows="14"
-          />
-        </label>
-      </div>
+      <p v-if="historyNotice" class="history-notice" role="status">
+        {{ historyNotice }}
+      </p>
+      <HistoryCompare
+        v-if="revision && writer.current"
+        :key="historyId"
+        :current="writer.current.doc"
+        :historical="revision.doc"
+        :busy="busy"
+        @adopt="adoptBlock"
+      />
     </template>
     <template v-else-if="mode === 'search'">
-      <form class="writer-find" @submit.prevent="search">
+      <form class="writer-find writer-book-search" @submit.prevent="search">
         <input
           v-model="searchText"
           placeholder="搜索全书正文与章名"
           aria-label="搜索全书正文与章名"
-        /><button>搜索</button>
+        /><button type="submit" class="btn-primary">搜索</button>
       </form>
       <div class="writer-search-results">
         <button v-for="row in results" :key="row.uid" @click="jump(row.uid)">
@@ -262,12 +259,18 @@
   </BaseModal>
 </template>
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import BaseFilePicker from '@/components/common/BaseFilePicker.vue'
 import WritingHeatmap from '@/components/writing/WritingHeatmap.vue'
+import HistoryCompare from '@/components/writing/HistoryCompare.vue'
+import {
+  adoptHistorySelection,
+  restoreHistorySnapshot,
+} from '@/utils/historyAdoption'
+import type { HistoryChange } from '@/utils/historyDiff'
 import { useWritingStore } from '@/stores/writing'
 import { writingApi } from '@/api/writing'
 import {
@@ -344,6 +347,21 @@ const history = ref<
   results = ref<any[]>([]),
   traceKey = ref('')
 const historyId = ref<string | number>('')
+const historyChapterUid = writer.current?.uid
+const historyNotice = ref('')
+watch(
+  () => writer.current?.uid,
+  (uid) => {
+    if (props.mode === 'history' && uid !== historyChapterUid) {
+      revisionRequest++
+      revision.value = null
+      historyId.value = ''
+      history.value = []
+      historyNotice.value = ''
+      error.value = '章节已切换，请关闭后重新打开历史'
+    }
+  },
+)
 const historyOptions = computed(() => [
   { value: '', label: '选择版本进行比较' },
   ...history.value.map((row) => ({
@@ -465,6 +483,7 @@ async function loadRevision(id: number) {
   const requestId = ++revisionRequest
   revision.value = null
   error.value = ''
+  historyNotice.value = ''
   if (!id || !writer.current) return
   try {
     const selected = await writingApi.revision(
@@ -472,9 +491,30 @@ async function loadRevision(id: number) {
       writer.current.uid,
       id,
     )
+    ensureActive()
+    if (writer.current?.uid !== historyChapterUid) return
     if (requestId === revisionRequest) revision.value = selected
   } catch {
     if (requestId === revisionRequest) error.value = '版本读取失败，请重新选择'
+  }
+}
+async function adoptBlock(row: HistoryChange) {
+  if (busy.value || !revision.value) return
+  busy.value = true
+  error.value = ''
+  historyNotice.value = ''
+  try {
+    if (writer.current?.uid !== historyChapterUid)
+      throw Error('章节已切换，请重新打开历史')
+    await adoptHistorySelection(writer, revision.value.doc, row, ensureActive)
+    historyNotice.value = '已采用并保存。采用前的当前稿已留在历史中。'
+  } catch (failure: any) {
+    error.value =
+      failure?.response?.data?.message ||
+      failure.message ||
+      '采用失败，请检查保存状态'
+  } finally {
+    busy.value = false
   }
 }
 async function search() {
@@ -548,23 +588,12 @@ async function perform() {
       await writer.select(imported.value[0].uid)
       emit('close')
     } else if (props.mode === 'history' && revision.value && writer.current) {
-      const old = revision.value
-      const chapterUid = writer.current.uid
-      if (!(await writer.flush(true)))
-        throw Error('请先保存当前修改或处理冲突，再恢复历史版本')
-      ensureActive()
-      if (writer.current?.uid !== chapterUid)
-        throw Error('章节已切换，请重新选择历史版本')
-      Object.assign(writer.current, {
-        doc: old.doc,
-        links: old.links,
-        notes: old.notes,
-        summary: old.summary,
-        title: old.title,
-      })
-      writer.changed()
-      if (!(await writer.flush(true)))
-        throw Error('恢复内容尚未保存，请处理保存状态')
+      await restoreHistorySnapshot(
+        writer,
+        revision.value,
+        historyChapterUid || '',
+        ensureActive,
+      )
       emit('close')
     } else if (props.mode === 'stats') {
       await writer.preferences({
@@ -596,5 +625,9 @@ onMounted(async () => {
 <style scoped>
 .writer-import-file {
   margin-bottom: 18px;
+}
+.history-notice {
+  color: var(--accent);
+  font-size: 13px;
 }
 </style>

@@ -5,7 +5,15 @@
         <small>WEBDAV / MANUSCRIPT</small>
         <h3>让故事，跟上你的脚步。</h3>
       </div>
-      <button aria-label="关闭云端面板" @click="$emit('close')">×</button>
+      <button
+        type="button"
+        class="icon-button writer-cloud-close"
+        aria-label="关闭云端面板"
+        :disabled="busy"
+        @click="$emit('close')"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
     </header>
     <p>
       正文、篇章、资料、段落关联与统计一起同步。自动同步在后端运行时执行；云端有分歧时保留版本，等待你处理。
@@ -34,8 +42,20 @@
       >
     </div>
     <div class="writer-cloud-actions">
-      <button :disabled="busy" @click="act('push')">上传当前作品</button
-      ><button :disabled="busy" @click="load">查看云端版本</button
+      <button
+        type="button"
+        class="btn-secondary"
+        :disabled="busy"
+        @click="act('push')"
+      >
+        上传当前作品</button
+      ><button
+        type="button"
+        class="btn-secondary"
+        :disabled="busy"
+        @click="load"
+      >
+        查看云端版本</button
       ><RouterLink :to="`/novel/${writer.novelId}/settings`"
         >配置 WebDAV ↗</RouterLink
       >
@@ -45,11 +65,19 @@
       <p>
         本作品云端标识：<code>{{ writer.workspace?.uid }}</code>
       </p>
-      <label
+      <label class="writer-cloud-field"
         >已有作品的云端标识<input
           v-model="remoteUid"
+          :disabled="busy"
           placeholder="粘贴另一台设备显示的作品标识" /></label
-      ><button :disabled="busy" @click="load">读取该作品版本</button>
+      ><button
+        type="button"
+        class="btn-secondary"
+        :disabled="busy"
+        @click="load"
+      >
+        读取该作品版本
+      </button>
     </details>
     <p v-if="error" class="writer-warning" role="alert">{{ error }}</p>
     <div v-if="versions.length" class="writer-cloud-versions">
@@ -62,7 +90,12 @@
             {{ version.safety ? '同步前保护副本' : '' }}</small
           >
         </div>
-        <button :disabled="busy" @click="preview(version.file)">
+        <button
+          type="button"
+          class="btn-secondary"
+          :disabled="busy"
+          @click="preview(version.file)"
+        >
           比较与恢复
         </button>
       </article>
@@ -78,15 +111,20 @@
       </p>
       <div class="writer-cloud-comparison">
         <article v-for="c in comparison" :key="c.uid">
-          <button @click="inspect(c.uid)">
+          <button
+            type="button"
+            class="btn-secondary writer-cloud-chapter"
+            @click="inspect(c.uid)"
+          >
             <strong>{{ c.title }}</strong></button
           ><span>本机 {{ c.local }} 字 → 云端 {{ c.remote }} 字</span
           ><small>{{ c.state }}</small>
         </article>
       </div>
       <div v-if="compareUid" class="writer-compare">
-        <label>本机正文<textarea :value="localText" readonly rows="8" /></label
-        ><label
+        <label class="writer-cloud-field"
+          >本机正文<textarea :value="localText" readonly rows="8" /></label
+        ><label class="writer-cloud-field"
           >云端正文<textarea
             :value="
               remote.chapters.find((c: any) => c.uid === compareUid)?.text ||
@@ -105,8 +143,19 @@
       >
       <p v-if="error" class="writer-warning">{{ error }}</p>
       <template #actions
-        ><button @click="remote = null">取消</button
-        ><button :disabled="busy || !confirmed" @click="act('pull')">
+        ><button
+          type="button"
+          class="btn-secondary"
+          :disabled="busy"
+          @click="remote = null"
+        >
+          取消</button
+        ><button
+          type="button"
+          class="btn-primary"
+          :disabled="busy || !confirmed"
+          @click="act('pull')"
+        >
           {{ busy ? '恢复中…' : '保留副本并恢复' }}
         </button></template
       ></BaseModal

@@ -424,6 +424,21 @@
   color: var(--muted);
   font-size: 10px;
 }
+.writer-book-search {
+  gap: 14px;
+  padding: 8px 4px;
+}
+.writer-book-search input {
+  min-height: 42px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.writer-book-search button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 10px 18px;
+  font-size: 13px;
+}
 .writer-appearance {
   padding: 14px;
   display: flex;
@@ -523,11 +538,100 @@
 }
 .writing-context {
   height: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 21px 18px 12px;
   overflow: hidden;
   color: var(--text);
+}
+.writing-context :where(button:not(.base-select)) {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+}
+.writing-context :where(button:not(.base-select)):hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.writing-context :is(button, a, input, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.writer-context-panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.writer-context-fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.writer-context-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0 0 14px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.writer-context-fields > .writer-context-field {
+  margin: 0;
+}
+.writer-context-field > :is(input, textarea, .base-select) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.writing-context .writer-check,
+.writing-context .writer-task label {
+  align-items: flex-start;
+  line-height: 1.7;
+  min-width: 0;
+}
+.writing-context .writer-check input,
+.writing-context .writer-task input {
+  margin: 3px 0 0;
+}
+.writing-context .writer-context-icon {
+  flex: 0 0 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 6px;
+}
+.writing-context .writer-context-icon[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.writing-context .writer-context-action {
+  width: 100%;
+  min-height: 40px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  text-align: left;
+}
+.writer-context-action > span {
+  flex-shrink: 0;
 }
 .writer-context-header {
   display: flex;
@@ -574,22 +678,7 @@
   min-height: 0;
   overflow: auto;
   scrollbar-width: thin;
-  padding: 15px 2px 20px;
-}
-.writer-context-body > label {
-  display: block;
-  font-size: 11px;
-  color: var(--muted);
-  margin-bottom: 14px;
-}
-.writer-context-body > label > textarea,
-.writer-context-body > label > .base-select,
-.writer-context-body > input {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  font-size: 11px;
-  padding: 9px;
+  padding: 15px 4px 20px;
 }
 .writer-context-intro > span {
   font: 8px monospace;
@@ -618,6 +707,9 @@
   display: flex;
   gap: 10px;
   align-items: center;
+}
+.writer-person-top > div {
+  min-width: 0;
 }
 .writer-person-top > img,
 .writer-person-monogram {
@@ -738,26 +830,35 @@
 }
 .writer-resource-list > div {
   display: flex;
+  align-items: center;
+  gap: 4px;
   border-bottom: 1px solid var(--line);
 }
 .writer-resource-list button {
   flex: 1;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  min-width: 0;
   text-align: left;
   gap: 10px;
   background: none;
   border: 0;
-  padding: 9px 4px;
+  padding: 9px 8px;
   font-size: 11px;
   color: var(--text);
 }
 .writer-resource-list > div > button:nth-child(2) {
-  flex: 0;
+  flex: 0 0 32px;
   color: var(--sheet-tint);
 }
-.writer-resource-list span {
+.writer-resource-add {
   color: var(--sheet-tint);
+  flex-shrink: 0;
+}
+.writer-resource-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .writer-bound-link {
   display: flex;
@@ -782,12 +883,16 @@
 }
 .writer-bound-link > div {
   display: flex;
+  flex-wrap: wrap;
   gap: 15px;
 }
 .writer-context-footer {
   border-top: 1px solid var(--line);
   padding-top: 13px;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   justify-content: space-between;
   color: var(--muted);
   font-size: 9px;
@@ -815,7 +920,7 @@
 .writer-task {
   margin: 10px 0;
 }
-.writer-context-body > small {
+.writer-context-panel > small {
   display: block;
   font-size: 9px;
   color: var(--muted);
@@ -979,6 +1084,7 @@
   border-color: var(--accent);
 }
 .writer-cloud {
+  min-width: 0;
   border: 1px solid var(--line);
   padding: 20px;
   background: var(--panel);
@@ -989,12 +1095,63 @@
   display: flex;
   justify-content: space-between;
   align-items: start;
+  gap: 16px;
+}
+.writer-cloud > header > div {
+  min-width: 0;
+}
+.writer-cloud .writer-cloud-close {
+  flex: 0 0 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 7px;
+  background: var(--field);
+  border-color: var(--line);
+  line-height: 1;
+}
+.writer-cloud .writer-cloud-close:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.writer-cloud button:focus-visible,
+.writer-cloud a:focus-visible,
+.writer-cloud summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.writer-cloud :is(button:not(.icon-button), a) {
+  min-height: 36px;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.writer-cloud-actions > a {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 2px;
+}
+.writer-cloud-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 12px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.writer-cloud-field > :is(input, textarea) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .writer-cloud h3 {
   font:
     22px 'Songti SC',
     serif;
   margin: 13px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .writer-cloud small {
   font: 9px monospace;
@@ -1009,6 +1166,11 @@
 }
 .writer-cloud details {
   margin-top: 15px;
+}
+.writer-cloud details > summary {
+  padding: 7px 0;
+  cursor: pointer;
+  color: var(--text);
 }
 .writer-cloud code {
   overflow-wrap: anywhere;
@@ -1028,6 +1190,8 @@
 }
 .writer-cloud-versions article {
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: space-between;
   align-items: center;
   border-top: 1px solid var(--line);
@@ -1038,6 +1202,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  flex: 1 1 180px;
+  overflow-wrap: anywhere;
+}
+.writer-cloud-versions article > button {
+  flex: 0 0 auto;
+  max-width: 100%;
+  font-size: 11px;
 }
 .writer-cloud-comparison {
   max-height: 300px;
@@ -1049,6 +1221,16 @@
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
+}
+.writer-cloud-comparison .writer-cloud-chapter {
+  justify-self: start;
+  max-width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.writer-cloud-chapter strong {
+  white-space: normal;
 }
 .writer-cloud-comparison span,
 .writer-cloud-comparison small {
@@ -1146,7 +1328,7 @@
     display: none;
   }
   .writer-context-body {
-    padding: 10px 0;
+    padding: 10px 4px;
   }
   .writer-context-intro {
     display: none;

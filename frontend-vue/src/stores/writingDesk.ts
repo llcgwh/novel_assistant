@@ -5,6 +5,7 @@ import type {
   WritingDesk,
   NextPen,
   RevisionTask,
+  RevisionRound,
   ReaderBookmark,
 } from '@/types/writingDesk'
 
@@ -15,6 +16,7 @@ function contentKey(value: WritingDesk) {
   // Forms may refresh their edit timestamp when the user clicks retry.
   if (normalized.nextPen) normalized.nextPen.updatedAt = ''
   for (const task of normalized.tasks) task.updatedAt = ''
+  for (const round of normalized.rounds || []) round.updatedAt = ''
   return JSON.stringify(normalized)
 }
 const message = (failure: any) =>
@@ -107,6 +109,13 @@ export const useWritingDeskStore = defineStore('writingDesk', () => {
       if (at < 0) draft.tasks.push(clone(task))
       else draft.tasks[at] = clone(task)
     })
+  const saveRound = (round: RevisionRound) =>
+    mutate((draft) => {
+      const rounds = (draft.rounds ||= [])
+      const at = rounds.findIndex((row) => row.uid === round.uid)
+      if (at < 0) rounds.push(clone(round))
+      else rounds[at] = clone(round)
+    })
   const deleteTask = (uid: string) =>
     mutate((draft) => {
       draft.tasks = draft.tasks.filter((row) => row.uid !== uid)
@@ -142,6 +151,7 @@ export const useWritingDeskStore = defineStore('writingDesk', () => {
     reload,
     saveNextPen,
     saveTask,
+    saveRound,
     deleteTask,
     saveBookmark,
     deleteBookmark,

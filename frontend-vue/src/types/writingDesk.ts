@@ -18,10 +18,19 @@ export type RevisionCategory =
   | 'other'
 export interface RevisionTask extends ChapterAnchor {
   uid: string
+  roundUid?: string
   body: string
   category: RevisionCategory
   priority: 'normal' | 'high'
   status: 'open' | 'done'
+  createdAt: string
+  updatedAt: string
+}
+export interface RevisionRound {
+  uid: string
+  title: string
+  goal: string
+  status: 'active' | 'archived'
   createdAt: string
   updatedAt: string
 }
@@ -34,6 +43,7 @@ export interface WritingDesk {
   version: number
   nextPen: NextPen | null
   tasks: RevisionTask[]
+  rounds?: RevisionRound[]
   bookmarks: ReaderBookmark[]
   mutationId?: string
 }

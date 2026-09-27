@@ -9,6 +9,82 @@
         ><b>{{ completed }}</b> 已完成 / {{ allTasks.length }} 条</span
       >
     </div>
+    <section class="revision-rounds" aria-label="修订轮次">
+      <div class="revision-round-toolbar">
+        <label
+          >修订轮次<BaseSelect
+            v-model="roundFilter"
+            aria-label="筛选修订轮次"
+            :options="roundFilterOptions"
+            :disabled="pending"
+        /></label>
+        <button
+          type="button"
+          class="btn-secondary"
+          :disabled="pending || !desk.data || allRounds.length >= 100"
+          @click="beginCreateRound"
+        >
+          ＋ 新建轮次
+        </button>
+      </div>
+      <div v-if="selectedRound" class="revision-round-summary">
+        <div class="revision-round-heading">
+          <div>
+            <span class="revision-round-state">{{
+              selectedRound.status === 'archived' ? '已归档' : '进行中'
+            }}</span>
+            <h3>{{ selectedRound.title }}</h3>
+          </div>
+          <span class="revision-round-count"
+            >{{ scopedProgress.completed }} /
+            {{ scopedProgress.total }} 已完成</span
+          >
+        </div>
+        <p v-if="selectedRound.goal" class="revision-round-goal">
+          {{ selectedRound.goal }}
+        </p>
+        <p v-else class="revision-round-hint">
+          为这一轮定下目标，让每次打磨都有方向。
+        </p>
+        <progress
+          :value="scopedProgress.completed"
+          :max="scopedProgress.total || 1"
+          :aria-label="`${selectedRound.title}完成进度`"
+        >
+          {{ scopedProgress.percent }}%
+        </progress>
+        <div class="revision-round-actions">
+          <small>{{
+            selectedRound.status === 'archived'
+              ? '归档保留本轮任务与完成记录。'
+              : '已完成的任务仍保留在本轮，可随时回看。'
+          }}</small>
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="pending"
+            @click="beginEditRound(selectedRound)"
+          >
+            编辑轮次
+          </button>
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="pending"
+            @click="toggleRoundStatus(selectedRound)"
+          >
+            {{ selectedRound.status === 'archived' ? '重新开始' : '归档本轮' }}
+          </button>
+        </div>
+      </div>
+      <p v-else class="revision-round-hint">
+        {{
+          roundFilter === ''
+            ? '旧修订和阅读批注先留在这里，编辑任务即可归入某一轮。'
+            : '把对白、视角或伏笔分轮打磨；每一轮都有自己的目标与进度。'
+        }}
+      </p>
+    </section>
     <div class="revision-filters">
       <label
         >分类<BaseSelect
@@ -42,7 +118,7 @@
     </p>
     <p v-if="notice" class="revision-notice" role="status">{{ notice }}</p>
     <div v-if="discardAction" class="revision-discard" role="alert">
-      <span>当前修订有尚未保存的改动。</span
+      <span>当前编辑有尚未保存的改动。</span
       ><button
         type="button"
         class="btn-secondary"
@@ -53,6 +129,78 @@
         放弃改动
       </button>
     </div>
+    <section
+      v-if="roundDraft"
+      class="revision-composer"
+      aria-label="编辑修订轮次"
+    >
+      <div class="revision-composer-title">
+        <h3>{{ existingRoundUid ? '编辑修订轮次' : '开启新一轮修订' }}</h3>
+        <span>每部作品最多 100 轮</span>
+      </div>
+      <label class="revision-body-label"
+        >轮次名称<input
+          v-model="roundDraft.title"
+          :disabled="pending"
+          maxlength="120"
+          placeholder="例如：第二遍 · 理顺人物动机"
+      /></label>
+      <label class="revision-body-label"
+        >本轮目标<textarea
+          v-model="roundDraft.goal"
+          :disabled="pending"
+          rows="3"
+          maxlength="1000"
+          placeholder="这一遍主要检查什么？写下希望达到的效果。"
+        />
+      </label>
+      <div v-if="remoteRoundChanged" class="revision-remote" role="alert">
+        <strong>这轮修订的已保存版本发生了变化。</strong>
+        <p>
+          {{
+            remoteRoundDraft
+              ? '重新载入的内容：'
+              : '重新载入后，这一轮已不存在。'
+          }}
+        </p>
+        <blockquote v-if="remoteRoundDraft">
+          {{ remoteRoundDraft.title }} ·
+          {{ remoteRoundDraft.status === 'active' ? '进行中' : '已归档'
+          }}<br />{{ remoteRoundDraft.goal || '未填写目标' }}
+        </blockquote>
+        <p>你的输入保留在上方，请比较后选择。</p>
+        <div>
+          <button type="button" class="btn-secondary" @click="adoptRemoteRound">
+            采用已保存版本</button
+          ><button type="button" class="btn-secondary" @click="keepRoundDraft">
+            继续使用我的改动
+          </button>
+        </div>
+      </div>
+      <div class="revision-composer-actions">
+        <span>归档不会删除任务，也不会重置完成进度。</span
+        ><button
+          type="button"
+          class="btn-secondary"
+          :disabled="pending"
+          @click="cancelRoundDraft"
+        >
+          取消</button
+        ><button
+          type="button"
+          class="btn-primary"
+          :disabled="
+            pending ||
+            !desk.data ||
+            !roundDraft.title.trim() ||
+            remoteRoundChanged
+          "
+          @click="saveRoundDraft"
+        >
+          {{ pending ? '保存中…' : '保存轮次' }}
+        </button>
+      </div>
+    </section>
     <section v-if="draft" class="revision-composer" aria-label="编辑修订任务">
       <div class="revision-composer-title">
         <h3>{{ existingUid ? '编辑修订' : '记录新的修订' }}</h3>
@@ -63,18 +211,28 @@
         <label
           >修订分类<BaseSelect
             v-model="draft.category"
+            :disabled="pending"
             aria-label="任务修订分类"
             :options="revisionCategories" /></label
         ><label
           >优先级<BaseSelect
             v-model="draft.priority"
+            :disabled="pending"
             aria-label="任务优先级"
             :options="revisionPriorities"
+        /></label>
+        <label class="revision-task-round"
+          >所属轮次<BaseSelect
+            v-model="draft.roundUid"
+            :disabled="pending"
+            aria-label="任务所属轮次"
+            :options="taskRoundOptions"
         /></label>
       </div>
       <label class="revision-body-label"
         >需要改什么<textarea
           v-model="draft.body"
+          :disabled="pending"
           rows="4"
           maxlength="4000"
           placeholder="写下具体问题或希望达到的效果…"
@@ -90,7 +248,7 @@
         <blockquote v-if="remoteDraft">
           {{ revisionCategoryLabel(remoteDraft.category) }} ·
           {{ remoteDraft.status === 'done' ? '已完成' : '待处理' }} ·
-          {{ remoteDraft.body }}
+          {{ roundTitle(remoteDraft.roundUid) }} · {{ remoteDraft.body }}
         </blockquote>
         <p>上方保留着你的改动，请比较后选择。</p>
         <div>
@@ -103,7 +261,12 @@
       </div>
       <div class="revision-composer-actions">
         <span>保留来源位置，便于逐条返回正文处理。</span
-        ><button type="button" class="btn-secondary" @click="cancelDraft">
+        ><button
+          type="button"
+          class="btn-secondary"
+          :disabled="pending"
+          @click="cancelDraft"
+        >
           取消</button
         ><button
           type="button"
@@ -166,7 +329,10 @@
           <div class="revision-badges">
             <span>{{ revisionCategoryLabel(task.category) }}</span
             ><span v-if="task.priority === 'high'" class="high">优先处理</span
-            ><span v-if="task.status === 'done'">已完成</span>
+            ><span v-if="task.status === 'done'">已完成</span
+            ><span class="revision-round-badge">{{
+              roundTitle(task.roundUid)
+            }}</span>
           </div>
           <span
             class="revision-chapter"
@@ -226,6 +392,18 @@
       ><button
         type="button"
         class="btn-secondary"
+        :disabled="
+          pending ||
+          !writer.current ||
+          writer.current.deleted ||
+          !!writer.recovery
+        "
+        @click="guarded(() => emit('history'))"
+      >
+        比较当前章节历史</button
+      ><button
+        type="button"
+        class="btn-secondary"
         :disabled="pending"
         @click="requestClose"
       >
@@ -241,7 +419,7 @@ import BaseModal from '@/components/common/BaseModal.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import { useWritingStore } from '@/stores/writing'
 import { useWritingDeskStore } from '@/stores/writingDesk'
-import type { RevisionTask } from '@/types/writingDesk'
+import type { RevisionRound, RevisionTask } from '@/types/writingDesk'
 import { documentText } from '@/utils/writing'
 import {
   findDocumentBlock,
@@ -249,8 +427,16 @@ import {
   revisionCategoryLabel,
   revisionPriorities,
 } from '@/utils/revisionDesk'
+import {
+  ALL_ROUNDS,
+  createRevisionRound,
+  roundOptions,
+  roundProgress,
+  roundTasks,
+} from '@/utils/revisionRounds'
 
 const emit = defineEmits<{
+  history: []
   jump: [target: { chapterUid: string; blockId?: string }]
   close: []
 }>()
@@ -259,6 +445,7 @@ const desk = useWritingDeskStore()
 const categoryFilter = ref('all')
 const statusFilter = ref('open')
 const priorityFilter = ref('all')
+const roundFilter = ref(ALL_ROUNDS)
 const pending = ref(false)
 const error = ref('')
 const notice = ref('')
@@ -266,6 +453,10 @@ const draft = ref<RevisionTask | null>(null)
 const originalDraft = ref('')
 const remoteBaseline = ref('')
 const existingUid = ref('')
+const roundDraft = ref<RevisionRound | null>(null)
+const originalRoundDraft = ref('')
+const remoteRoundBaseline = ref('')
+const existingRoundUid = ref('')
 const deleteUid = ref('')
 const discardAction = ref<(() => void) | null>(null)
 const categoryFilterOptions = [
@@ -282,11 +473,27 @@ const statusOptions = [
   { value: 'all', label: '全部状态' },
 ]
 const allTasks = computed(() => desk.data?.tasks || [])
+const allRounds = computed(() => desk.data?.rounds || [])
+const roundFilterOptions = computed(() => [
+  { value: ALL_ROUNDS, label: '全部轮次' },
+  { value: '', label: '未分组' },
+  ...roundOptions(allRounds.value),
+])
+const taskRoundOptions = computed(() => [
+  { value: '', label: '未分组' },
+  ...roundOptions(allRounds.value),
+])
+const selectedRound = computed(() =>
+  allRounds.value.find((round) => round.uid === roundFilter.value),
+)
+const scopedProgress = computed(() =>
+  roundProgress(allTasks.value, roundFilter.value),
+)
 const completed = computed(
   () => allTasks.value.filter((task) => task.status === 'done').length,
 )
 const filteredTasks = computed(() =>
-  allTasks.value
+  roundTasks(allTasks.value, roundFilter.value)
     .filter(
       (task) =>
         (categoryFilter.value === 'all' ||
@@ -304,6 +511,23 @@ const filteredTasks = computed(() =>
 )
 const draftDirty = computed(
   () => draft.value && JSON.stringify(draft.value) !== originalDraft.value,
+)
+const roundDraftDirty = computed(
+  () =>
+    roundDraft.value &&
+    JSON.stringify(roundDraft.value) !== originalRoundDraft.value,
+)
+const remoteRoundDraft = computed(() =>
+  roundDraft.value
+    ? allRounds.value.find((round) => round.uid === roundDraft.value!.uid)
+    : undefined,
+)
+const remoteRoundChanged = computed(() =>
+  Boolean(
+    roundDraft.value &&
+      JSON.stringify(remoteRoundDraft.value || null) !==
+        remoteRoundBaseline.value,
+  ),
 )
 const remoteDraft = computed(() =>
   draft.value
@@ -323,6 +547,12 @@ function chapterTitle(uid: string) {
     '来源章节已失效'
   )
 }
+function roundTitle(uid?: string) {
+  if (!uid) return '未分组'
+  return (
+    allRounds.value.find((round) => round.uid === uid)?.title || '原轮次已失效'
+  )
+}
 function isMissingChapter(uid: string) {
   return !writer.workspace?.chapters.some(
     (chapter) => chapter.uid === uid && !chapter.deleted,
@@ -336,7 +566,8 @@ function isMissingCurrentBlock(task: RevisionTask) {
   )
 }
 function guarded(action: () => void) {
-  if (draftDirty.value) discardAction.value = action
+  if (pending.value) return
+  if (draftDirty.value || roundDraftDirty.value) discardAction.value = action
   else action()
 }
 function confirmDiscard() {
@@ -355,7 +586,8 @@ function cancelDraft() {
   })
 }
 function setDraft(task: RevisionTask, editing: boolean) {
-  draft.value = { ...task }
+  roundDraft.value = null
+  draft.value = { ...task, roundUid: task.roundUid || '' }
   originalDraft.value = JSON.stringify(draft.value)
   remoteBaseline.value = JSON.stringify(
     allTasks.value.find((row) => row.uid === task.uid) || null,
@@ -364,6 +596,38 @@ function setDraft(task: RevisionTask, editing: boolean) {
   error.value = ''
   notice.value = ''
   discardAction.value = null
+}
+function setRoundDraft(round: RevisionRound, editing: boolean) {
+  draft.value = null
+  roundDraft.value = { ...round }
+  originalRoundDraft.value = JSON.stringify(roundDraft.value)
+  remoteRoundBaseline.value = JSON.stringify(
+    allRounds.value.find((row) => row.uid === round.uid) || null,
+  )
+  existingRoundUid.value = editing ? round.uid : ''
+  error.value = ''
+  notice.value = ''
+  discardAction.value = null
+}
+function beginCreateRound() {
+  if (allRounds.value.length >= 100) return
+  guarded(() => setRoundDraft(createRevisionRound(), false))
+}
+function beginEditRound(round: RevisionRound) {
+  guarded(() => setRoundDraft(round, true))
+}
+function cancelRoundDraft() {
+  guarded(() => {
+    roundDraft.value = null
+  })
+}
+function adoptRemoteRound() {
+  if (remoteRoundDraft.value) setRoundDraft(remoteRoundDraft.value, true)
+  else roundDraft.value = null
+}
+function keepRoundDraft() {
+  remoteRoundBaseline.value = JSON.stringify(remoteRoundDraft.value || null)
+  notice.value = '已保留你的轮次改动，确认无误后再保存。'
 }
 function adoptRemote() {
   if (remoteDraft.value) setDraft(remoteDraft.value, true)
@@ -385,6 +649,7 @@ function beginCreate() {
     setDraft(
       {
         uid: crypto.randomUUID(),
+        roundUid: selectedRound.value?.uid || '',
         chapterUid: chapter.uid,
         blockId: writer.activeBlock,
         excerpt: (writer.selectedText || (block ? documentText(block) : ''))
@@ -437,6 +702,41 @@ async function saveDraft() {
     originalDraft.value = ''
     discardAction.value = null
   }, '修订已保存。')
+}
+async function saveRoundDraft() {
+  if (!roundDraft.value?.title.trim() || remoteRoundChanged.value) return
+  const round = {
+    ...roundDraft.value,
+    title: roundDraft.value.title.trim(),
+    goal: roundDraft.value.goal.trim(),
+    updatedAt: new Date().toISOString(),
+  }
+  await perform(async () => {
+    await desk.saveRound(round)
+    roundFilter.value = round.uid
+    roundDraft.value = null
+    discardAction.value = null
+  }, '修订轮次已保存。')
+}
+async function toggleRoundStatus(round: RevisionRound) {
+  if (roundDraft.value?.uid === round.uid && roundDraftDirty.value) {
+    error.value = '先保存当前轮次的改动，再调整它的状态。'
+    return
+  }
+  await perform(
+    async () => {
+      const changed: RevisionRound = {
+        ...round,
+        status: round.status === 'active' ? 'archived' : 'active',
+        updatedAt: new Date().toISOString(),
+      }
+      await desk.saveRound(changed)
+      if (roundDraft.value?.uid === round.uid) setRoundDraft(changed, true)
+    },
+    round.status === 'active'
+      ? '本轮已归档，任务与完成记录均保留。'
+      : '本轮已重新开始，原有完成记录保留。',
+  )
 }
 async function toggleStatus(task: RevisionTask) {
   if (draft.value?.uid === task.uid && draftDirty.value) {
@@ -515,6 +815,112 @@ function jump(task: RevisionTask) {
   font-weight: 400;
   margin-right: 4px;
 }
+.revision-rounds {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-soft) 35%, var(--field));
+}
+.revision-round-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.revision-round-toolbar label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.revision-round-toolbar button,
+.revision-round-actions button {
+  font-size: 12px;
+}
+.revision-round-toolbar > button {
+  height: 40px;
+  flex-shrink: 0;
+}
+.revision-round-summary {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.revision-round-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.revision-round-heading > div {
+  min-width: 0;
+}
+.revision-round-heading h3 {
+  margin: 6px 0 0;
+  font: 17px/1.6 var(--serif);
+  overflow-wrap: anywhere;
+}
+.revision-round-state {
+  color: var(--accent);
+  font-size: 10px;
+}
+.revision-round-count {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.revision-round-goal,
+.revision-round-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.revision-round-hint {
+  font-size: 11px;
+  color: var(--faint);
+}
+.revision-round-summary progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  margin: 16px 0 14px;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--line);
+  accent-color: var(--accent);
+}
+.revision-round-summary progress::-webkit-progress-bar {
+  background: var(--line);
+}
+.revision-round-summary progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 8px;
+}
+.revision-round-summary progress::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 8px;
+}
+.revision-round-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.revision-round-actions small {
+  flex: 1;
+  color: var(--faint);
+  font-size: 10px;
+  line-height: 1.7;
+}
+.revision-task-round {
+  grid-column: 1 / -1;
+}
 .revision-filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
@@ -577,7 +983,8 @@ function jump(task: RevisionTask) {
   font-size: 11px;
   margin-top: 14px;
 }
-.revision-body-label textarea {
+.revision-body-label textarea,
+.revision-body-label input {
   width: 100%;
   font: inherit;
   font-size: 13px;
@@ -670,6 +1077,13 @@ function jump(task: RevisionTask) {
 }
 .revision-badges .high {
   color: var(--warm);
+  background: transparent;
+}
+.revision-badges .revision-round-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--muted);
   background: transparent;
 }
 .revision-chapter {
@@ -784,6 +1198,25 @@ function jump(task: RevisionTask) {
   font-size: 11px;
 }
 @media (max-width: 650px) {
+  .revision-rounds {
+    padding: 12px;
+  }
+  .revision-round-toolbar {
+    flex-wrap: wrap;
+  }
+  .revision-round-toolbar label {
+    flex-basis: 100%;
+  }
+  .revision-round-toolbar > button {
+    margin-left: auto;
+  }
+  .revision-round-heading {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .revision-round-actions small {
+    flex-basis: 100%;
+  }
   .revision-filters {
     grid-template-columns: 1fr 1fr;
     gap: 10px;

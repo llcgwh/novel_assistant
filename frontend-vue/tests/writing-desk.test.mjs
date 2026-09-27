@@ -37,6 +37,14 @@ const bookmark = () => ({
   label: '下次读这里',
   createdAt: 'now',
 })
+const round = () => ({
+  uid: 'round-a',
+  title: '第二遍 · 对白',
+  goal: '让人物说话有各自的声音',
+  status: 'active',
+  createdAt: '2026-09-27T01:00:00Z',
+  updatedAt: '2026-09-27T01:00:00Z',
+})
 function setup() {
   setActivePinia(createPinia())
   let server = empty()
@@ -188,4 +196,83 @@ test('read and save operations cannot race within the same workspace', async () 
   await saving
   assert.equal(store.data.version, 1)
   assert.deepEqual(store.data.bookmarks, [])
+})
+
+test('legacy desks can create rounds and move tasks without changing anchors or other desk content', async () => {
+  const { store } = setup()
+  await store.load(1)
+  assert.equal(store.data.rounds, undefined)
+  await store.saveTask(task())
+  await store.saveNextPen(nextPen())
+  await store.saveBookmark(bookmark())
+  const localRound = round()
+  await store.saveRound(localRound)
+  localRound.title = 'unsaved local edit'
+  assert.equal(store.data.rounds[0].title, '第二遍 · 对白')
+  await store.saveTask({ ...store.data.tasks[0], roundUid: 'round-a' })
+  assert.deepEqual(store.data.tasks[0], { ...task(), roundUid: 'round-a' })
+  await store.saveNextPen(nextPen('继续下一章'))
+  assert.equal(store.data.rounds[0].goal, '让人物说话有各自的声音')
+  assert.equal(store.data.bookmarks[0].blockId, 'p3')
+  await store.saveTask({ ...store.data.tasks[0], roundUid: '' })
+  assert.deepEqual(store.data.tasks[0], { ...task(), roundUid: '' })
+  assert.equal(store.data.rounds.length, 1)
+})
+
+test('archiving and reopening a round preserves completed tasks and avoids duplicate rounds', async () => {
+  const { store } = setup()
+  await store.load(1)
+  await store.saveRound(round())
+  await store.saveTask({ ...task(), roundUid: 'round-a', status: 'done' })
+  const preserved = clone(store.data.tasks)
+  await store.saveRound({ ...store.data.rounds[0], status: 'archived' })
+  assert.equal(store.data.rounds[0].status, 'archived')
+  assert.deepEqual(store.data.tasks, preserved)
+  await store.saveRound({
+    ...store.data.rounds[0],
+    status: 'active',
+    title: '再次打磨',
+  })
+  assert.equal(store.data.rounds.length, 1)
+  assert.equal(store.data.rounds[0].title, '再次打磨')
+  assert.deepEqual(store.data.tasks, preserved)
+})
+
+test('round retries retain stable identity and exact payload after a lost response', async () => {
+  const { store } = setup()
+  await store.load(1)
+  const requests = []
+  api.save = async (_, payload) => {
+    requests.push(clone(payload))
+    if (requests.length === 1) throw Error('response lost')
+    return { ...clone(payload), version: 1 }
+  }
+  await assert.rejects(store.saveRound(round()), /response lost/)
+  await store.saveRound({ ...round(), updatedAt: 'later' })
+  assert.deepEqual(requests[0], requests[1])
+  assert.equal(store.data.rounds.length, 1)
+  assert.equal(store.data.rounds[0].createdAt, round().createdAt)
+})
+
+test('changing a failed round draft requires reload and retains the remote round baseline', async () => {
+  const ctx = setup(),
+    store = ctx.store
+  await store.load(1)
+  api.save = async () => {
+    throw { response: { status: 409 } }
+  }
+  await assert.rejects(store.saveRound(round()))
+  assert.equal(store.data.rounds, undefined)
+  await assert.rejects(
+    store.saveRound({ ...round(), goal: '改写目标' }),
+    /重新载入/,
+  )
+  ctx.server = {
+    ...empty(),
+    version: 4,
+    rounds: [{ ...round(), title: '另一处的标题' }],
+  }
+  await store.reload()
+  assert.equal(store.data.rounds[0].title, '另一处的标题')
+  assert.equal(store.data.version, 4)
 })

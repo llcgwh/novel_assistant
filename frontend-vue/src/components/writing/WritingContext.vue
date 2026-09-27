@@ -57,6 +57,8 @@
                   <small>{{ person.raw.role || '故事人物' }}</small>
                 </div>
                 <button
+                  type="button"
+                  class="writer-context-icon"
                   :aria-label="'固定' + person.name"
                   :aria-pressed="writer.pinned.includes(person.id)"
                   @click="togglePin(person.id)"
@@ -215,46 +217,55 @@
             </p>
           </template>
           <template v-else-if="writer.contextTab === 'links' && writer.current">
-            <label
-              >资料类型<BaseSelect
-                v-model="kind"
-                aria-label="资料类型"
-                :options="resourceTypeOptions"
-            /></label>
-            <input
-              v-model="query"
-              placeholder="搜索当前作品资料"
-              aria-label="搜索当前作品资料"
-            />
-            <label
-              >关联作用<BaseSelect
-                v-model="role"
-                aria-label="关联作用"
-                :options="roleOptions"
-            /></label>
-            <label class="writer-check"
-              ><input
-                v-model="atParagraph"
-                type="checkbox"
-                :disabled="!writer.activeBlock"
-              />关联到当前段落</label
-            >
-            <label v-if="kind === 'foreshadows'" class="writer-check"
-              ><input
-                v-model="planFirst"
-                type="checkbox"
-              />先列入本章计划，完成后再记入原文</label
-            >
+            <div class="writer-context-fields">
+              <label class="writer-context-field"
+                >资料类型<BaseSelect
+                  v-model="kind"
+                  aria-label="资料类型"
+                  :options="resourceTypeOptions"
+              /></label>
+              <label class="writer-context-field"
+                >资料搜索<input
+                  v-model="query"
+                  placeholder="搜索当前作品资料"
+                  aria-label="搜索当前作品资料"
+              /></label>
+              <label class="writer-context-field"
+                >关联作用<BaseSelect
+                  v-model="role"
+                  aria-label="关联作用"
+                  :options="roleOptions"
+              /></label>
+              <label class="writer-check"
+                ><input
+                  v-model="atParagraph"
+                  type="checkbox"
+                  :disabled="!writer.activeBlock"
+                />关联到当前段落</label
+              >
+              <label v-if="kind === 'foreshadows'" class="writer-check"
+                ><input
+                  v-model="planFirst"
+                  type="checkbox"
+                />先列入本章计划，完成后再记入原文</label
+              >
+            </div>
             <div class="writer-resource-list">
               <div v-for="resource in available" :key="resource.id">
-                <button @click="linkResource(resource, role)">
-                  {{ resource.name }} <span>＋</span></button
+                <button type="button" @click="linkResource(resource, role)">
+                  <span class="writer-resource-name">{{ resource.name }}</span
+                  ><span class="writer-resource-add" aria-hidden="true"
+                    >＋</span
+                  ></button
                 ><button
                   v-if="kind === 'characters'"
-                  aria-label="固定人物"
+                  type="button"
+                  class="writer-context-icon"
+                  :aria-label="'固定' + resource.name"
+                  :aria-pressed="writer.pinned.includes(resource.id)"
                   @click="togglePin(resource.id)"
                 >
-                  ◇
+                  {{ writer.pinned.includes(resource.id) ? '◆' : '◇' }}
                 </button>
               </div>
               <p v-if="!available.length">没有匹配资料</p>
@@ -306,11 +317,15 @@
                   >{{ resource.name }} ↗</RouterLink
                 >
               </div>
-              <button @click="writer.contextTab = 'links'">
-                调整本章资料关联
+              <button
+                type="button"
+                class="writer-context-action"
+                @click="writer.contextTab = 'links'"
+              >
+                调整本章资料关联 <span aria-hidden="true">↗</span>
               </button>
             </div>
-            <label
+            <label class="writer-context-field"
               >本章目标<textarea
                 v-model="writer.current.summary"
                 rows="3"
@@ -318,7 +333,7 @@
                 @input="writer.changed()"
               />
             </label>
-            <label
+            <label class="writer-context-field"
               >创作便笺<textarea
                 v-model="writer.current.notes"
                 rows="10"
@@ -390,13 +405,16 @@
       title="把这一笔，收进世界"
       :submit="createResource"
       @close="createOpen = false"
-      ><label
+      ><label class="writer-context-field"
         >类型<BaseSelect
           v-model="createKind"
           aria-label="创建类型"
           :options="creationTypeOptions" /></label
-      ><label>名称<input v-model="createTitle" maxlength="100" /></label
-      ><label>内容<textarea v-model="createText" rows="6" /></label>
+      ><label class="writer-context-field"
+        >名称<input v-model="createTitle" maxlength="100" /></label
+      ><label class="writer-context-field"
+        >内容<textarea v-model="createText" rows="6" />
+      </label>
       <p>
         {{
           createKind === 'note'
@@ -411,7 +429,7 @@
       :title="aliasPerson.name + '的别名'"
       :submit="saveAliases"
       @close="aliasPerson = null"
-      ><label
+      ><label class="writer-context-field"
         >用逗号分隔<input v-model="aliasText" placeholder="小雾，沈姑娘"
       /></label>
       <p>同名或重叠别名会保留候选，由你确认关联。</p></BaseModal

@@ -68,9 +68,9 @@
         v-model="replacement"
         placeholder="替换为"
         aria-label="替换为"
-      /><button @click="findNext">下一处</button
-      ><button @click="replaceOne">替换</button
-      ><button @click="replaceAll">全部替换</button
+      /><button class="btn-secondary" @click="findNext">下一处</button
+      ><button class="btn-secondary" @click="replaceOne">替换</button
+      ><button class="btn-secondary" @click="replaceAll">全部替换</button
       ><small>{{ matches.length }} 处</small>
     </div>
     <div v-if="appearance" class="writer-appearance">

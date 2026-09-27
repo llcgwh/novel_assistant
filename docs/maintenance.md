@@ -82,4 +82,12 @@ python3 scripts/writing-integration-check.py /输出目录/run.json
 
 写作新增 `writing_books`、`writing_chapters`、`writing_revisions`、`writing_sessions` 四张表。默认 `spring.jpa.hibernate.ddl-auto=update` 启动时创建；使用自行管理数据库结构的安装需先同步这些实体的表结构。旧小说第一次访问写作页才初始化工作区，不会自动把大纲转换成正文。
 
+创作便签和修订轮次的真实接口回归使用同一独立环境：
+
+```sh
+python3 scripts/writing-desk-check.py /输出目录/run.json
+```
+
+它创建自己的虚构作品，验证下一笔、任务、书签、轮次的版本保护、跨作品拒绝、备份往返和实际 WebDAV 文件，不修改浏览器验收作品。`writing_books.desk_data` 为可空 TEXT；旧记录读取为默认空文档。缺少 desk 或 rounds 的旧包禁止静默清除对应已有数据；遇到该提示应恢复到新作品。轮次属于 desk 文档，没有新增独立数据表。
+
 已用 PostgreSQL 18 和 WsgiDAV 4.3.5 通过集成测试；这不代表已验证每一家云盘或 NAS 的特殊行为。前端 npm 审计在 2026-09-26 为 0 项告警，后端已升级 Spring Boot 3.5.16 并使用 Hibernate 6 对应的 Jackson 模块；未声称后端或未来依赖永久无漏洞。
