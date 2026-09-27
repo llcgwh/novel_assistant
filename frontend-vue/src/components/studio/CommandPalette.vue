@@ -4,7 +4,12 @@
     @close="studio.commandsOpen = false"
     :submit="submit"
   >
-    <p class="command-intro">跳转工作区，或者搜索当前小说的全部资料。</p>
+    <div class="command-intro-row">
+      <p class="command-intro">跳转工作区，或者搜索当前小说的正文与资料。</p>
+      <button type="button" class="btn-secondary" @click="search">
+        全局搜索 <StudioIcon name="arrow" />
+      </button>
+    </div>
     <input
       ref="input"
       v-model="query"
@@ -87,7 +92,11 @@ function go(path: string) {
 }
 function search() {
   studio.commandsOpen = false
-  router.push({ name: 'SearchResults', query: { keyword: query.value.trim() } })
+  router.push({
+    name: 'SearchResults',
+    params: { novelId: route.params.novelId },
+    query: query.value.trim() ? { keyword: query.value.trim() } : {},
+  })
 }
 function submit() {
   const item = matches.value[selected.value]
@@ -95,3 +104,24 @@ function submit() {
   else if (query.value.trim()) search()
 }
 </script>
+
+<style scoped>
+.command-intro-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.command-intro-row .command-intro {
+  flex: 1 1 240px;
+  margin: 0;
+}
+.command-intro-row button {
+  flex-shrink: 0;
+}
+.command-intro-row .studio-icon {
+  width: 15px;
+  height: 15px;
+}
+</style>
