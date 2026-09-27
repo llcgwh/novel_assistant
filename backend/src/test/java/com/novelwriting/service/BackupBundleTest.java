@@ -166,6 +166,44 @@ class BackupBundleTest {
         assertThrows(IOException.class, () -> bundles.exportBundle(novel.getId()));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"desk", "rounds"})
+    void oldBackupsCannotClearRevisionRoundsBeforeImagesOrDataAreChanged(String missing) throws Exception {
+        Novel novel = novel("保留修订轮次");
+        Image cover = image(novel, "novel_cover");
+        ObjectNode chapter = writing.create(novel.getId(), mapper.createObjectNode()
+                .put("uid", UUID.randomUUID().toString()).put("title", "保留正文"));
+        ObjectNode data = WritingDeskDocuments.emptyDesk().put("mutationId", UUID.randomUUID().toString());
+        data.withArray("rounds").add(mapper.createObjectNode().put("uid", "round-1").put("title", "人物修订")
+                .put("goal", "逐章检查动机").put("status", "active")
+                .put("createdAt", "2026-09-28T12:00:00Z").put("updatedAt", "2026-09-28T12:00:00Z"));
+        data.withArray("tasks").add(mapper.createObjectNode().put("uid", "task-1")
+                .put("chapterUid", chapter.path("uid").asText()).put("blockId", "").put("excerpt", "")
+                .put("body", "保留任务分组").put("roundUid", "round-1").put("category", "other")
+                .put("priority", "normal").put("status", "open")
+                .put("createdAt", "2026-09-28T12:00:00Z").put("updatedAt", "2026-09-28T12:00:00Z"));
+        ObjectNode saved = desk.save(novel.getId(), data);
+        ObjectNode legacyBundle = (ObjectNode) mapper.readTree(bundles.exportBundle(novel.getId()));
+        ObjectNode backupWriting = (ObjectNode) legacyBundle.path("data").path("writing");
+        if (missing.equals("desk")) backupWriting.remove("desk");
+        else {
+            ((ObjectNode) backupWriting.path("desk")).remove("rounds");
+            ((ObjectNode) backupWriting.path("desk").path("tasks").get(0)).remove("roundUid");
+        }
+        var blocked = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> bundles.restore(novel.getId(), mapper.writeValueAsBytes(legacyBundle)));
+        assertEquals(400, blocked.getStatusCode().value());
+        assertTrue(blocked.getReason().contains("旧备份不含修订轮次"));
+        verify(importer, never()).importFromJson(eq(novel.getId()), any(byte[].class));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> importer.importFromJson(novel.getId(), mapper.writeValueAsBytes(legacyBundle.path("data"))));
+        assertEquals(saved, desk.get(novel.getId()));
+        assertEquals(chapter, writing.get(novel.getId(), chapter.path("uid").asText()));
+        assertEquals(cover.getId(), images.findByNovelId(novel.getId()).get(0).getId());
+        assertArrayEquals(PNG, Files.readAllBytes(Path.of(cover.getFilePath())));
+        try (var files = Files.list(ROOT.resolve(novel.getId().toString()))) { assertEquals(1, files.count()); }
+    }
+
     @Test void boundedReaderRejectsOversizedInput() {
         assertThrows(IOException.class, () -> BackupBundleService.readLimited(new ByteArrayInputStream(new byte[11]), 10));
     }

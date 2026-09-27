@@ -110,7 +110,7 @@ def main():
     })
     foreign_chapter = api("POST", f"/novels/{foreign}/writing/chapters", {"uid": uid(), "title": "另一本书"})
     empty = api("GET", prefix + "/writing/desk")
-    require(content(empty) == {"nextPen": None, "tasks": [], "bookmarks": []}, "New work has nonempty desk")
+    require(content(empty) == {"nextPen": None, "tasks": [], "bookmarks": [], "rounds": []}, "New work has nonempty desk")
     moment = datetime.datetime.now(datetime.timezone.utc).isoformat()
     anchor = {"chapterUid": chapter_uid, "blockId": block_id, "excerpt": "潮声穿过灯塔。"}
     request = {
@@ -138,18 +138,46 @@ def main():
     require(content(api("GET", f"/novels/{foreign}/writing/desk")) == content(empty), "Desk leaked between works")
     require(api("GET", prefix + "/writing")["chapters"][0]["wordCount"] == chapter["wordCount"], "Notes changed prose counts")
 
+    # An older payload is accepted above while empty; grouped work must preserve its rounds.
+    require(saved["rounds"] == [], "Legacy desk payload was not normalized")
+    round_uid = uid()
+    grouped = {**copy.deepcopy(saved), "mutationId": uid()}
+    grouped["rounds"] = [{"uid": round_uid, "title": "第二轮：人物与动机", "goal": "逐章检查对白与行动的因果",
+                          "status": "active", "createdAt": moment, "updatedAt": moment}]
+    grouped["tasks"][0]["roundUid"] = round_uid
+    saved = api("PUT", prefix + "/writing/desk", grouped)
+    require(api("PUT", prefix + "/writing/desk", grouped) == saved, "Round retry was not idempotent")
+    archived = {**copy.deepcopy(saved), "mutationId": uid()}
+    archived["rounds"][0]["status"] = "archived"
+    saved = api("PUT", prefix + "/writing/desk", archived)
+    require(saved["tasks"] == grouped["tasks"], "Archiving a round changed its tasks")
+    old_client = {**copy.deepcopy(saved), "mutationId": uid()}
+    del old_client["rounds"]
+    del old_client["tasks"][0]["roundUid"]
+    blocked_client = api("PUT", prefix + "/writing/desk", old_client, expected=409)
+    require("未包含修订轮次" in blocked_client.get("message", ""), "Missing legacy client explanation")
+    dangling = {**copy.deepcopy(saved), "mutationId": uid(), "rounds": []}
+    api("PUT", prefix + "/writing/desk", dangling, expected=400)
+    require(api("GET", prefix + "/writing/desk") == saved, "Rejected round change mutated data")
+
     backup = api("GET", prefix + "/backup")
     require(content(backup["data"]["writing"]["desk"]) == content(saved), "Complete backup omitted desk data")
     require("mutationId" not in backup["data"]["writing"]["desk"], "Backup leaked retry identity")
     api("POST", f"/novels/{restored}/backup", backup)
     restored_desk = api("GET", f"/novels/{restored}/writing/desk")
-    require(content(restored_desk) == content(saved), "Restored notes, bookmarks or next pen changed")
+    require(content(restored_desk) == content(saved), "Restored rounds, notes, bookmarks or next pen changed")
     require(api("GET", f"/novels/{restored}/writing/chapters/{chapter_uid}")["doc"] == chapter["doc"], "Restore lost anchored chapter")
     legacy = copy.deepcopy(backup)
     del legacy["data"]["writing"]["desk"]
     blocked = api("POST", prefix + "/backup", legacy, expected=400)
-    require("旧备份不含创作便签" in blocked.get("message", ""), "Missing legacy restore explanation")
+    require("旧备份不含修订轮次" in blocked.get("message", ""), "Missing legacy restore explanation")
     require(api("GET", prefix + "/writing/desk") == saved, "Legacy restore cleared creative notes")
+    legacy_rounds = copy.deepcopy(backup)
+    del legacy_rounds["data"]["writing"]["desk"]["rounds"]
+    del legacy_rounds["data"]["writing"]["desk"]["tasks"][0]["roundUid"]
+    blocked_rounds = api("POST", prefix + "/backup", legacy_rounds, expected=400)
+    require("旧备份不含修订轮次" in blocked_rounds.get("message", ""), "Missing legacy rounds restore explanation")
+    require(api("GET", prefix + "/writing/desk") == saved, "Old desk backup cleared revision rounds")
     require(api("GET", prefix + "/writing/chapters/" + chapter_uid) == chapter, "Blocked restore modified manuscript")
 
     sql(f"UPDATE novels SET webdav_server_url=s.webdav_server_url, webdav_username=s.webdav_username, "
@@ -169,6 +197,7 @@ def main():
     require(workspace["syncedSequence"] == workspace["changeSequence"], "Successful upload did not acknowledge desk changes")
     update = {**copy.deepcopy(saved), "mutationId": uid()}
     update["tasks"][0]["status"] = "done"
+    update["rounds"][0]["status"] = "active"
     changed = api("PUT", prefix + "/writing/desk", update)
     pending = api("GET", prefix + "/writing")
     require(pending["changeSequence"] == workspace["changeSequence"] + 1 and
@@ -181,11 +210,12 @@ def main():
     result = {"status": "passed", "database": database, "novelId": origin, "restoredNovelId": restored,
               "foreignNovelId": foreign, "chapterUid": chapter_uid, "bookUid": final["uid"],
               "checks": ["HTTP idempotency", "409 conflict", "cross-work rejection", "backup round trip",
-                         "legacy backup protection", "actual WebDAV files", "desk-only sync sequence"],
+                         "round archive and task retention", "legacy client protection", "dangling round rejection",
+                         "legacy backup and rounds protection", "actual WebDAV files", "desk-only sync sequence"],
               "cloudFiles": [first["file"], second["file"]]}
     result_path = run / "writing-desk-result.json"
     result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("PASS: HTTP desk retries/conflicts/isolation, complete backup round trip, protected legacy restore, real WebDAV revisions")
+    print("PASS: HTTP desk retries/conflicts/isolation, revision rounds, complete backup round trip, protected legacy clients/restores, real WebDAV revisions")
     print("Result:", result_path)
     print("Fixture works:", origin, restored, foreign, "— existing browser fixture and services remain unchanged")
 

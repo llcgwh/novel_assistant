@@ -29,6 +29,7 @@ public final class WritingDeskDocuments {
       .putNull("nextPen");
     desk.putArray("tasks");
     desk.putArray("bookmarks");
+    desk.putArray("rounds");
     return desk;
   }
 
@@ -36,6 +37,7 @@ public final class WritingDeskDocuments {
     ObjectNode desk = book == null || book.getDeskData() == null
       ? emptyDesk()
       : (ObjectNode) parse(book.getDeskData());
+    if (!desk.has("rounds")) desk.putArray("rounds");
     return desk.put("version", desk.path("version").asLong());
   }
 
@@ -52,7 +54,7 @@ public final class WritingDeskDocuments {
     }
     keys(
       input,
-      Set.of("version", "nextPen", "tasks", "bookmarks", "mutationId")
+      Set.of("version", "nextPen", "tasks", "bookmarks", "rounds", "mutationId")
     );
     JsonNode version = input.path("version");
     if (
@@ -89,6 +91,22 @@ public final class WritingDeskDocuments {
         string(next, key, 3000, true);
       string(next, "updatedAt", 64, false);
     }
+    Set<String> rounds = new HashSet<>();
+    if (input.has("rounds")) {
+      entries(input, "rounds", 100);
+      for (JsonNode round : input.path("rounds")) {
+        keys(
+          round,
+          Set.of("uid", "title", "goal", "status", "createdAt", "updatedAt")
+        );
+        rounds.add(round.path("uid").asText());
+        string(round, "title", 120, false);
+        if (round.has("goal")) string(round, "goal", 1000, true);
+        choice(round, "status", Set.of("active", "archived"));
+        string(round, "createdAt", 64, false);
+        string(round, "updatedAt", 64, false);
+      }
+    }
     entries(input, "tasks", 1000);
     for (JsonNode task : input.path("tasks")) {
       keys(
@@ -102,6 +120,7 @@ public final class WritingDeskDocuments {
           "category",
           "priority",
           "status",
+          "roundUid",
           "createdAt",
           "updatedAt"
         )
@@ -113,6 +132,12 @@ public final class WritingDeskDocuments {
       choice(task, "status", Set.of("open", "done"));
       string(task, "createdAt", 64, false);
       string(task, "updatedAt", 64, false);
+      if (task.has("roundUid")) {
+        String roundUid = string(task, "roundUid", 100, true);
+        if (
+          !roundUid.isEmpty() && !rounds.contains(roundUid)
+        ) throw WritingService.bad("修订任务引用的修订轮次不存在");
+      }
     }
     entries(input, "bookmarks", 500);
     for (JsonNode bookmark : input.path("bookmarks")) {
@@ -124,7 +149,17 @@ public final class WritingDeskDocuments {
       string(bookmark, "label", 200, true);
       string(bookmark, "createdAt", 64, false);
     }
-    return input.deepCopy();
+    ObjectNode result = input.deepCopy();
+    if (!result.has("rounds")) result.putArray("rounds");
+    return result;
+  }
+
+  /** A legacy client/backup cannot express deliberate removal of newer round data. */
+  public static boolean hasRounds(JsonNode desk) {
+    if (!desk.path("rounds").isEmpty()) return true;
+    for (JsonNode task : desk.path("tasks"))
+      if (!task.path("roundUid").asText("").isEmpty()) return true;
+    return false;
   }
 
   private static void keys(JsonNode node, Set<String> allowed) {

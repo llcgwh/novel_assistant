@@ -111,6 +111,22 @@ class WritingDeskServiceTest {
     return mutation(state);
   }
 
+  ObjectNode round(String uid) {
+    return JSON.createObjectNode()
+      .put("uid", uid)
+      .put("title", "第二轮：人物与动机")
+      .put("goal", "检查本轮人物行动的因果")
+      .put("status", "active")
+      .put("createdAt", "2026-09-28T12:00:00Z")
+      .put("updatedAt", "2026-09-28T12:00:00Z");
+  }
+
+  ObjectNode withRound(ObjectNode state) {
+    state.withArray("rounds").add(round("round-1"));
+    ((ObjectNode) state.path("tasks").get(0)).put("roundUid", "round-1");
+    return state;
+  }
+
   @Test
   void missingLegacyColumnReadsEmptyAndWorkspaceDoesNotExposeCreativeContent() {
     long id = novel();
@@ -158,6 +174,84 @@ class WritingDeskServiceTest {
   }
 
   @Test
+  void legacyDocumentsAndSavesNormalizeRoundsWithoutLosingRetryIdentity() {
+    long id = novel();
+    String chapter = chapter(id, "旧稿").path("uid").asText();
+    ObjectNode oldStored = populated(chapter);
+    oldStored.remove("rounds");
+    writing.book(id).setDeskData(stringify(oldStored));
+    assertTrue(desk.get(id).path("rounds").isArray());
+    assertTrue(desk.get(id).path("rounds").isEmpty());
+
+    ObjectNode legacy = mutation(oldStored);
+    ObjectNode saved = desk.save(id, legacy);
+    assertEquals(saved, desk.save(id, legacy));
+    assertEquals(1, saved.path("version").asLong());
+    assertTrue(saved.path("rounds").isArray());
+
+    ObjectNode request = withRound(mutation(saved));
+    ObjectNode grouped = desk.save(id, request);
+    assertEquals(grouped, desk.save(id, request));
+    long sequence = writing.workspace(id).path("changeSequence").asLong();
+    ObjectNode oldClient = mutation(grouped);
+    oldClient.remove("rounds");
+    ((ObjectNode) oldClient.path("tasks").get(0)).remove("roundUid");
+    ResponseStatusException rejected = assertThrows(
+      ResponseStatusException.class,
+      () -> desk.save(id, oldClient)
+    );
+    assertEquals(409, rejected.getStatusCode().value());
+    assertTrue(rejected.getReason().contains("未包含修订轮次"));
+    assertEquals(grouped, desk.get(id));
+    assertEquals(
+      sequence,
+      writing.workspace(id).path("changeSequence").asLong()
+    );
+  }
+
+  @Test
+  void roundsCanBeArchivedButCannotBeDeletedWhileTasksStillReferenceThem() {
+    long id = novel();
+    String chapter = chapter(id, "分轮修订").path("uid").asText();
+    ObjectNode grouped = desk.save(id, withRound(populated(chapter)));
+    ObjectNode archive = mutation(grouped);
+    ((ObjectNode) archive.path("rounds").get(0)).put("status", "archived");
+    ObjectNode archived = desk.save(id, archive);
+    assertEquals(grouped.path("tasks"), archived.path("tasks"));
+    assertEquals(
+      "archived",
+      archived.path("rounds").get(0).path("status").asText()
+    );
+    assertEquals(archived, desk.save(id, archive));
+
+    ObjectNode dangling = mutation(archived);
+    dangling.withArray("rounds").removeAll();
+    assertBad(() -> desk.save(id, dangling));
+    assertEquals(archived, desk.get(id));
+
+    ObjectNode clear = mutation(archived);
+    clear.withArray("rounds").removeAll();
+    ((ObjectNode) clear.path("tasks").get(0)).put("roundUid", "");
+    ObjectNode ungrouped = desk.save(id, clear);
+    assertTrue(ungrouped.path("rounds").isEmpty());
+    assertEquals(1, ungrouped.path("tasks").size());
+  }
+
+  @Test
+  void roundsAreScopedToTheDeskEvenWhenTheirIdsExistInAnotherNovel() {
+    long source = novel(),
+      target = novel();
+    desk.save(
+      source,
+      withRound(populated(chapter(source, "甲").path("uid").asText()))
+    );
+    ObjectNode foreign = populated(chapter(target, "乙").path("uid").asText());
+    ((ObjectNode) foreign.path("tasks").get(0)).put("roundUid", "round-1");
+    assertBad(() -> desk.save(target, foreign));
+    assertEquals(emptyDesk(), desk.get(target));
+  }
+
+  @Test
   void notesAreIsolatedAndCannotAcquireForeignChapterAnchors() {
     long a = novel(),
       b = novel();
@@ -188,7 +282,7 @@ class WritingDeskServiceTest {
     long source = novel(),
       target = novel();
     String chapter = chapter(source, "来信").path("uid").asText();
-    ObjectNode initial = populated(chapter);
+    ObjectNode initial = withRound(populated(chapter));
     ObjectNode saved = desk.save(source, initial);
     ObjectNode backup = writing.exportBackup(source);
     assertFalse(backup.path("desk").has("mutationId"));
@@ -247,10 +341,45 @@ class WritingDeskServiceTest {
   }
 
   @Test
+  void legacyBackupWithoutRoundsCannotClearExistingRoundData() {
+    long source = novel(),
+      target = novel();
+    String chapter = chapter(source, "旧备份").path("uid").asText();
+    ObjectNode saved = desk.save(source, withRound(populated(chapter)));
+    ObjectNode legacy = writing.exportBackup(source);
+    ObjectNode oldDesk = (ObjectNode) legacy.path("desk");
+    oldDesk.remove("rounds");
+    ((ObjectNode) oldDesk.path("tasks").get(0)).remove("roundUid");
+    assertDoesNotThrow(() -> WritingService.validateBackup(legacy));
+    ResponseStatusException blocked = assertThrows(
+      ResponseStatusException.class,
+      () -> writing.restoreBackup(source, legacy, Map.of())
+    );
+    assertEquals(400, blocked.getStatusCode().value());
+    assertTrue(blocked.getReason().contains("旧备份不含修订轮次"));
+    assertEquals(saved, desk.get(source));
+
+    writing.restoreBackup(target, legacy, Map.of());
+    assertTrue(desk.get(target).path("rounds").isEmpty());
+    assertEquals(oldDesk.path("tasks"), desk.get(target).path("tasks"));
+    assertEquals(oldDesk.path("bookmarks"), desk.get(target).path("bookmarks"));
+
+    ObjectNode onlyRound = mutation(emptyDesk()).put(
+      "version",
+      saved.path("version").asLong()
+    );
+    onlyRound.withArray("rounds").add(round("round-only"));
+    ObjectNode roundOnlySaved = desk.save(source, onlyRound);
+    legacy.remove("desk");
+    assertBad(() -> writing.restoreBackup(source, legacy, Map.of()));
+    assertEquals(roundOnlySaved, desk.get(source));
+  }
+
+  @Test
   void splitMovesEveryAnchoredKindButKeepsChapterLevelAndMissingBlockNotes() {
     long id = novel();
     String source = chapter(id, "原章").path("uid").asText();
-    ObjectNode request = populated(source);
+    ObjectNode request = withRound(populated(source));
     request
       .withArray("tasks")
       .add(task(source, ""))
@@ -266,6 +395,11 @@ class WritingDeskServiceTest {
     ObjectNode after = desk.get(id);
     assertEquals(next, after.path("nextPen").path("chapterUid").asText());
     assertEquals(next, after.path("tasks").get(0).path("chapterUid").asText());
+    assertEquals(before.path("rounds"), after.path("rounds"));
+    assertEquals(
+      "round-1",
+      after.path("tasks").get(0).path("roundUid").asText()
+    );
     assertEquals(
       next,
       after.path("bookmarks").get(0).path("chapterUid").asText()
@@ -293,7 +427,7 @@ class WritingDeskServiceTest {
     long id = novel();
     String first = chapter(id, "甲章").path("uid").asText();
     String second = chapter(id, "乙章").path("uid").asText();
-    ObjectNode request = populated(second);
+    ObjectNode request = withRound(populated(second));
     request.withArray("tasks").add(task(second, ""));
     desk.save(id, request);
     ObjectNode merged = writing.merge(
@@ -313,6 +447,11 @@ class WritingDeskServiceTest {
       .asText();
     assertNotEquals("p2", newBlock);
     ObjectNode state = desk.get(id);
+    assertEquals(request.path("rounds"), state.path("rounds"));
+    assertEquals(
+      "round-1",
+      state.path("tasks").get(0).path("roundUid").asText()
+    );
     for (JsonNode anchor : List.of(
       state.path("nextPen"),
       state.path("tasks").get(0),
@@ -390,6 +529,62 @@ class WritingDeskServiceTest {
         task(UUID.randomUUID().toString(), "").put("body", "字".repeat(4000))
       );
     assertBad(() -> validateDesk(tooLarge, true));
+  }
+
+  @Test
+  void validatesRoundBoundariesAndRejectsDuplicateOrDanglingReferences() {
+    ObjectNode valid = withRound(populated(UUID.randomUUID().toString()));
+    ObjectNode limit = valid.deepCopy();
+    ((ObjectNode) limit.path("rounds").get(0)).put(
+      "title",
+      "字".repeat(120)
+    ).put("goal", "字".repeat(1000));
+    assertDoesNotThrow(() -> validateDesk(limit, true));
+    ((ObjectNode) limit.path("rounds").get(0)).remove("goal");
+    assertDoesNotThrow(() -> validateDesk(limit, true));
+    ((ObjectNode) limit.path("rounds").get(0)).put("goal", "");
+    assertDoesNotThrow(() -> validateDesk(limit, true));
+
+    for (ObjectNode badRound : List.of(
+      round("round-1").put("title", " "),
+      round("round-1").put("title", "字".repeat(121)),
+      round("round-1").put("goal", "字".repeat(1001)),
+      round("round-1").putNull("goal"),
+      round("round-1").put("status", "done"),
+      round("round-1").put("createdAt", ""),
+      round("round-1").put("updatedAt", "x".repeat(65)),
+      round("round-1").put("uid", "x".repeat(101)),
+      round("round-1").put("extra", "unknown")
+    )) {
+      ObjectNode bad = valid.deepCopy();
+      bad.withArray("rounds").removeAll().add(badRound);
+      assertBad(() -> validateDesk(bad, true));
+    }
+    ObjectNode duplicate = valid.deepCopy();
+    duplicate.withArray("rounds").add(round("round-1"));
+    assertBad(() -> validateDesk(duplicate, true));
+    ObjectNode hundred = valid.deepCopy();
+    for (int i = 2; i <= 100; i++) hundred
+      .withArray("rounds")
+      .add(round("round-" + i));
+    assertDoesNotThrow(() -> validateDesk(hundred, true));
+    hundred.withArray("rounds").add(round("round-101"));
+    assertBad(() -> validateDesk(hundred, true));
+    assertBad(() -> validateDesk(valid.deepCopy().putNull("rounds"), true));
+    assertBad(() ->
+      validateDesk(valid.deepCopy().put("rounds", "invalid"), true)
+    );
+    for (JsonNode invalid : List.of(
+      TextNode.valueOf("missing"),
+      TextNode.valueOf(" "),
+      TextNode.valueOf("x".repeat(101)),
+      NullNode.instance,
+      IntNode.valueOf(1)
+    )) {
+      ObjectNode bad = valid.deepCopy();
+      ((ObjectNode) bad.path("tasks").get(0)).set("roundUid", invalid);
+      assertBad(() -> validateDesk(bad, true));
+    }
   }
 
   void assertConflict(Runnable action) {

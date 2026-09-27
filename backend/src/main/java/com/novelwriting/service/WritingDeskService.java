@@ -10,8 +10,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Transactional
@@ -28,9 +30,20 @@ public class WritingDeskService {
   }
 
   public ObjectNode save(Long novelId, JsonNode input) {
-    ObjectNode next = validateDesk(input, true);
     WritingBook book = writing.book(novelId);
     ObjectNode current = read(book);
+    if (
+      input != null &&
+      input.isObject() &&
+      !input.has("rounds") &&
+      hasRounds(current)
+    ) {
+      throw new ResponseStatusException(
+        HttpStatus.CONFLICT,
+        "此客户端未包含修订轮次。请刷新后重试，避免清除现有轮次及任务分组。"
+      );
+    }
+    ObjectNode next = validateDesk(input, true);
     long version = current.path("version").asLong();
     String mutation = next.path("mutationId").asText();
     if (mutation.equals(current.path("mutationId").asText())) {

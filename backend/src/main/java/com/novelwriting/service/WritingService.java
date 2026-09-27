@@ -779,8 +779,14 @@ public class WritingService {
   }
 
   private void protectLegacyDeskRestore(WritingBook book, JsonNode input) {
-    if (input.has("desk")) return;
     JsonNode desk = WritingDeskDocuments.read(book);
+    if (
+      !input.path("desk").has("rounds") &&
+      WritingDeskDocuments.hasRounds(desk)
+    ) throw bad(
+      "这个旧备份不含修订轮次。请恢复到一个新建作品，避免清除现有轮次及任务分组。"
+    );
+    if (input.has("desk")) return;
     if (
       desk.path("nextPen").isObject() ||
       !desk.path("tasks").isEmpty() ||
