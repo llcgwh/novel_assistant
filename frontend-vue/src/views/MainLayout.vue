@@ -1,14 +1,17 @@
 <template>
-  <div class="studio-shell" :class="{ 'is-focused': studio.focused }">
+  <div
+    class="studio-shell"
+    :class="{ 'is-focused': studio.focused || reading }"
+  >
     <WorkspaceHeader />
     <main id="workspace-content" class="studio-content spatial-workspace">
       <div
         class="sheet-stage"
-        :class="`layout-${sheet.layout}`"
+        :class="reading ? 'layout-reader' : `layout-${sheet.layout}`"
         :data-active-sheet="sheet.id"
       >
         <div
-          v-if="sheet.id !== 'overview'"
+          v-if="sheet.id !== 'overview' && !reading"
           :key="sheet.id"
           class="sheet-dock-column"
         >
@@ -21,7 +24,7 @@
         </div>
       </div>
     </main>
-    <MorphSheet :anchor="anchor" :sheet-id="sheet.id" />
+    <MorphSheet v-if="!reading" :anchor="anchor" :sheet-id="sheet.id" />
   </div>
 </template>
 <script setup lang="ts">
@@ -36,6 +39,9 @@ import MorphSheet from '@/components/studio/MorphSheet.vue'
 const studio = useStudioStore()
 const route = useRoute()
 const sheet = computed(() => sheetFor(String(route.path.split('/').at(-1))))
+const reading = computed(
+  () => sheet.value.id === 'writing' && route.query.mode === 'read',
+)
 const anchor = shallowRef<HTMLElement | null>(null)
 provide(sheetDockKey, {
   register: (element) => {
@@ -46,3 +52,8 @@ provide(sheetDockKey, {
   },
 })
 </script>
+<style scoped>
+.sheet-stage.layout-reader {
+  display: block;
+}
+</style>

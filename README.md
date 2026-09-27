@@ -8,6 +8,8 @@
 
 [写作指南](docs/writing-guide.md) · [方案逐项核对](docs/writing-scope-audit.md) · [界面与快捷操作](docs/ink-studio.md) · [维护手册](docs/maintenance.md) · [反馈问题](https://github.com/llcgwh/novel_assistant/issues)
 
+后续功能与进度见 [产品 case 清单](docs/product-cases.md)。
+
 ![墨境写作工作台](docs/screenshots/writing-desktop.png)
 
 ## 可以用它做什么

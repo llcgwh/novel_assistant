@@ -35,22 +35,27 @@
       <SheetDock />
     </section>
     <div v-if="failed.length" class="studio-warning" role="alert">
-      {{ failed.join('、') }}加载失败，对应统计暂不显示。<button
+      {{ failed.join('、') }}未能加载，请重试。<button
         :disabled="loading"
         @click="load"
       >
         重新加载
       </button>
     </div>
-    <RouterLink
-      v-if="manuscript"
-      :to="base + 'writing'"
-      class="writer-resume-card"
-    >
+    <RouterLink v-if="manuscript" :to="resumeTarget" class="writer-resume-card">
       <span class="writer-resume-symbol">✎</span
       ><span
-        ><small>正在写下的世界</small
-        ><strong>{{ lastChapter?.title || '写下第一章' }}</strong
+        ><small>{{
+          nextPen ? '给下一次落笔留下的入口' : '正在写下的世界'
+        }}</small
+        ><strong>{{ resumeTitle }}</strong
+        ><span v-if="nextPen" class="resume-next-pen" :title="nextPenSummary">{{
+          nextPenSummary
+        }}</span
+        ><span v-if="nextPen && !nextPenChapter" class="resume-anchor-warning"
+          >{{
+            missingNextPenLabel
+          }}，便签内容仍保留；可进入工作台重新指定位置。</span
         ><span
           >{{ manuscriptWords.toLocaleString() }} 字 ·
           {{ manuscript.chapters.filter((c) => !c.deleted).length }} 章</span
@@ -58,7 +63,13 @@
       ><span class="writer-resume-today"
         ><small>今日净增</small
         ><b>{{ todayWords > 0 ? '+' : '' }}{{ todayWords }}</b></span
-      ><span>继续落笔 ↗</span>
+      ><span>{{
+        nextPen
+          ? nextPenChapter
+            ? '从下一笔接着写 ↗'
+            : '进入工作台 ↗'
+          : '继续落笔 ↗'
+      }}</span>
     </RouterLink>
     <div class="stat-grid" :aria-busy="loading">
       <RouterLink
@@ -184,7 +195,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { request, withNovelId } from '@/api/request'
+import { request } from '@/api/request'
 import { useNovelStore } from '@/stores/novel'
 import { useStudioStore } from '@/stores/studio'
 import { studioModules, recentRecords, type StudioRecord } from '@/utils/studio'
@@ -193,9 +204,12 @@ import SheetDock from '@/components/studio/SheetDock.vue'
 import IdeaNotebook from '@/components/studio/IdeaNotebook.vue'
 import FocusTimer from '@/components/studio/FocusTimer.vue'
 import { writingApi } from '@/api/writing'
+import { writingDeskApi } from '@/api/writingDesk'
 import { localDate, latestChapter } from '@/utils/writing'
 import type { WritingWorkspace } from '@/types/writing'
+import type { NextPen } from '@/types/writingDesk'
 const manuscript = ref<WritingWorkspace | null>(null)
+const nextPen = ref<NextPen | null>(null)
 const manuscriptWords = computed(
   () =>
     manuscript.value?.chapters
@@ -216,6 +230,48 @@ const route = useRoute(),
   studio = useStudioStore()
 const novelId = Number(route.params.novelId),
   base = `/novel/${novelId}/`
+const nextPenChapter = computed(() =>
+  nextPen.value
+    ? manuscript.value?.chapters.find(
+        (chapter) =>
+          chapter.uid === nextPen.value!.chapterUid && !chapter.deleted,
+      )
+    : undefined,
+)
+const missingNextPenLabel = computed(() =>
+  manuscript.value?.chapters.some(
+    (chapter) => chapter.uid === nextPen.value?.chapterUid && chapter.deleted,
+  )
+    ? '便签原章节已移入回收站'
+    : '便签原章节已不存在',
+)
+const resumeTitle = computed(() =>
+  nextPen.value
+    ? nextPenChapter.value?.title || '下一笔便签'
+    : lastChapter.value?.title || '写下第一章',
+)
+const nextPenSummary = computed(() =>
+  nextPen.value
+    ? [
+        nextPen.value.nextScene && `下一幕：${nextPen.value.nextScene}`,
+        nextPen.value.question && `卡点：${nextPen.value.question}`,
+        nextPen.value.opening && `留住一句：${nextPen.value.opening}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '',
+)
+const resumeTarget = computed(() =>
+  nextPen.value && nextPenChapter.value
+    ? {
+        path: base + 'writing',
+        query: {
+          chapter: nextPen.value.chapterUid,
+          ...(nextPen.value.blockId ? { block: nextPen.value.blockId } : {}),
+        },
+      }
+    : base + 'writing',
+)
 const today = new Intl.DateTimeFormat('zh-CN', {
   month: 'long',
   day: 'numeric',
@@ -235,14 +291,24 @@ const records = ref<Record<string, StudioRecord[]>>({}),
   loading = ref(true),
   failed = ref<string[]>([])
 let alive = true
+let loadEpoch = 0
 async function load() {
   if (!alive) return
+  const epoch = ++loadEpoch
   loading.value = true
   failed.value = []
-  const results = await Promise.allSettled(
-    resources.map(([, , endpoint]) => request.get(withNovelId(`/${endpoint}`))),
-  )
-  if (!alive) return
+  const [results, writingResults] = await Promise.all([
+    Promise.allSettled(
+      resources.map(([, , endpoint]) =>
+        request.get(`/novels/${novelId}/${endpoint}`),
+      ),
+    ),
+    Promise.allSettled([
+      writingApi.workspace(novelId),
+      writingDeskApi.get(novelId),
+    ]),
+  ])
+  if (!alive || epoch !== loadEpoch) return
   results.forEach((result, index) => {
     const [path, label] = resources[index]
     if (result.status === 'fulfilled' && Array.isArray(result.value)) {
@@ -254,19 +320,21 @@ async function load() {
       failed.value.push(label)
     }
   })
+  const [workspaceResult, deskResult] = writingResults
+  if (workspaceResult.status === 'fulfilled')
+    manuscript.value = workspaceResult.value
+  else failed.value.push('正文统计')
+  if (deskResult.status === 'fulfilled')
+    nextPen.value = deskResult.value.nextPen
+  else failed.value.push('下一笔便签')
   loading.value = false
 }
 onMounted(() => {
   void load()
-  void writingApi
-    .workspace(novelId)
-    .then((data) => {
-      if (alive) manuscript.value = data
-    })
-    .catch(() => {})
 })
 onBeforeUnmount(() => {
   alive = false
+  loadEpoch++
 })
 const completed = computed(
   () =>
@@ -347,3 +415,20 @@ function dateLabel(value?: string) {
   })
 }
 </script>
+
+<style scoped>
+.writer-resume-card .resume-next-pen {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  line-height: 1.8;
+  max-width: 72ch;
+}
+.writer-resume-card .resume-anchor-warning {
+  color: var(--danger);
+  line-height: 1.7;
+}
+</style>

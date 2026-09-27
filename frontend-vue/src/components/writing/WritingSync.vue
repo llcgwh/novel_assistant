@@ -119,9 +119,11 @@ import { writingApi } from '@/api/writing'
 import { documentText } from '@/utils/writing'
 import { request } from '@/api/request'
 import { useWritingStore } from '@/stores/writing'
+import { useWritingDeskStore } from '@/stores/writingDesk'
 import BaseModal from '@/components/common/BaseModal.vue'
 defineEmits<{ close: [] }>()
 const writer = useWritingStore(),
+  desk = useWritingDeskStore(),
   remoteUid = ref(writer.workspace?.uid || ''),
   busy = ref(false),
   operation = ref(''),
@@ -234,6 +236,8 @@ async function act(action: string) {
     if (action === 'pull') {
       writer.current = null
       await writer.load(novelId)
+      if (!active()) return
+      await desk.load(novelId)
       if (!active()) return
       const first = writer.workspace?.chapters.find((c) => !c.deleted)
       if (first) await writer.select(first.uid)

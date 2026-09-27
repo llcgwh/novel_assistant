@@ -1,6 +1,6 @@
 <template>
   <div class="writing-view">
-    <header class="writer-heading">
+    <header v-if="!reading" class="writer-heading">
       <div>
         <p>WORDS BECOME WORLDS</p>
         <h1>落笔成章<span>✦</span></h1>
@@ -11,18 +11,32 @@
         ><button @click="tools = 'export'">导出 ↗</button>
       </div>
     </header>
-    <div class="writer-global-tools">
+    <div v-if="!reading" class="writer-global-tools">
       <button @click="treeOpen = !treeOpen">
         {{ treeOpen ? '收起' : '展开' }}篇章</button
       ><button @click="tools = 'search'">全书搜索</button
       ><button @click="tools = 'connections'">故事回响</button
+      ><button :disabled="!desk.data" @click="revisionOpen = true">
+        修订清单<span v-if="openTasks"> · {{ openTasks }}</span></button
+      ><button
+        :disabled="
+          !writer.current || writer.current.deleted || !!writer.recovery
+        "
+        @click="openReader"
+      >
+        读者模式</button
       ><button @click="tools = 'import'">导入旧稿</button
       ><button @click="syncOpen = !syncOpen">云端同步</button
       ><button @click="studio.focused = !studio.focused">
         {{ studio.focused ? '退出专注' : '专注写作' }}
       </button>
     </div>
-    <WritingSync v-if="syncOpen" @close="syncOpen = false" />
+    <NextPen v-if="!reading && writer.workspace" @jump="jumpToAnchor" />
+    <p v-if="!desk.data && desk.error" class="writer-warning" role="alert">
+      {{ desk.error }}
+      <button @click="run(() => desk.reload())">重新载入创作便签</button>
+    </p>
+    <WritingSync v-if="syncOpen && !reading" @close="syncOpen = false" />
     <p v-if="writer.error" class="writer-warning" role="alert">
       {{ writer.error }}
       <button v-if="writer.dirty && !writer.conflict" @click="writer.flush()">
@@ -82,7 +96,16 @@
         使用服务器稿
       </button>
     </div>
+    <ReaderWorkspace
+      v-if="reading && writer.current && !writer.recovery"
+      :key="writer.current.uid"
+      :chapter="writer.current"
+      :initial-block="String(route.query.block || '')"
+      @close="closeReader"
+      @navigate="readChapter"
+    />
     <div
+      v-else
       class="writer-desk"
       :class="{ 'tree-closed': !treeOpen }"
       :inert="!!writer.recovery"
@@ -250,6 +273,11 @@
       </section>
     </div>
     <WritingTools v-if="tools" :mode="tools" @close="tools = ''" />
+    <RevisionDesk
+      v-if="revisionOpen"
+      @close="revisionOpen = false"
+      @jump="jumpToAnchor"
+    />
     <BaseModal
       v-if="dialog"
       :title="
@@ -298,11 +326,65 @@ import WritingTools from '@/components/writing/WritingTools.vue'
 import WritingSync from '@/components/writing/WritingSync.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
+import NextPen from '@/components/writing/NextPen.vue'
+import ReaderWorkspace from '@/components/writing/ReaderWorkspace.vue'
+import RevisionDesk from '@/components/writing/RevisionDesk.vue'
+import { useWritingDeskStore } from '@/stores/writingDesk'
 const writer = useWritingStore(),
   studio = useStudioStore(),
   app = useAppStore(),
   route = useRoute(),
   router = useRouter()
+const desk = useWritingDeskStore()
+const reading = computed(() => route.query.mode === 'read')
+const revisionOpen = ref(false)
+const openTasks = computed(
+  () => desk.data?.tasks.filter((task) => task.status === 'open').length || 0,
+)
+async function openReader() {
+  if (!writer.current || writer.current.deleted || writer.recovery) return
+  await editorPanel.value?.flushStats()
+  if (!(await writer.flush()) || !active()) {
+    app.showToast('请先保存当前正文，再进入读者模式', 'info')
+    return
+  }
+  await router.replace({
+    query: {
+      chapter: writer.current.uid,
+      block: writer.activeBlock || undefined,
+      mode: 'read',
+    },
+  })
+}
+async function closeReader(blockId: string) {
+  await router.replace({
+    query: { chapter: writer.current?.uid, block: blockId || undefined },
+  })
+  await followRoute()
+}
+async function readChapter(target: { chapterUid: string; blockId?: string }) {
+  await router.replace({
+    query: {
+      chapter: target.chapterUid,
+      block: target.blockId || undefined,
+      mode: 'read',
+    },
+  })
+}
+async function jumpToAnchor(target: { chapterUid: string; blockId?: string }) {
+  const chapter = writer.workspace?.chapters.find(
+    (c) => c.uid === target.chapterUid,
+  )
+  if (!chapter || chapter.deleted) {
+    app.showToast('来源章节已移除或在回收站中，请先恢复章节', 'info')
+    return
+  }
+  revisionOpen.value = false
+  await router.replace({
+    query: { chapter: target.chapterUid, block: target.blockId || undefined },
+  })
+  await followRoute()
+}
 async function openStats() {
   await editorPanel.value?.flushStats()
   tools.value = 'stats'
@@ -324,6 +406,18 @@ let dragged = '',
   disposed = false
 const novelId = Number(route.params.novelId)
 const active = () => !disposed && writer.novelId === novelId
+watch(
+  () => desk.data?.version,
+  (version, before) => {
+    if (
+      before !== undefined &&
+      version !== undefined &&
+      version !== before &&
+      active()
+    )
+      void writer.refresh().catch(() => {})
+  },
+)
 const volumeGroups = computed(() => [
   { uid: '', title: '未分卷' },
   ...(writer.workspace?.volumes || []),
@@ -434,6 +528,7 @@ async function submitDialog() {
       })
       if (!active()) return
       await writer.refresh()
+      await desk.reload()
       if (!active()) return
       await choose(c.uid)
     } else {
@@ -547,6 +642,7 @@ async function chapterAction(action: string) {
       if (!active() || writer.current?.uid !== current.uid) return
       writer.adopt(c)
       await writer.refresh()
+      await desk.reload()
       return
     }
     if (action === 'up' && index > 0)
@@ -579,6 +675,7 @@ function emergencyExport() {
 async function followRoute() {
   const uid = String(route.query.chapter || '')
   if (uid && uid !== writer.current?.uid) await writer.select(uid)
+  if (!active() || reading.value) return
   if (writer.current && route.query.block) {
     await nextTick()
     const editor = editorPanel.value?.editor
@@ -625,14 +722,19 @@ watch(
   },
 )
 watch(
-  () => [route.query.chapter, route.query.block, route.query.find],
+  () => [
+    route.query.chapter,
+    route.query.block,
+    route.query.find,
+    route.query.mode,
+  ],
   () => {
     if (writer.workspace) void followRoute()
   },
 )
 function beforeUnload(event: BeforeUnloadEvent) {
   void writer.persistLocal()
-  if (writer.dirty || writer.recovery || writer.conflict) {
+  if (writer.dirty || writer.recovery || writer.conflict || desk.saving) {
     event.preventDefault()
     event.returnValue = ''
   }
@@ -657,7 +759,10 @@ async function retryOffline() {
   }
 }
 onMounted(async () => {
-  await writer.load(Number(route.params.novelId))
+  await Promise.allSettled([
+    writer.load(Number(route.params.novelId)),
+    desk.load(Number(route.params.novelId)),
+  ])
   if (disposed) return
   let uid = String(route.query.chapter || '')
   if (!uid) {
@@ -688,6 +793,7 @@ onBeforeRouteLeave(async () => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  if (desk.novelId === novelId) desk.$reset()
   window.removeEventListener('beforeunload', beforeUnload)
   window.removeEventListener('keydown', shortcut)
   window.removeEventListener('online', retryOffline)
