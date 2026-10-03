@@ -43,6 +43,32 @@
 
 需要 **Java 17+、Maven 3.x、PostgreSQL、Node.js 22.12+**。
 
+### 快速启停控制台
+
+已准备好数据库及前端依赖后，macOS 可双击根目录的 **`墨境控制台.command`**，或在终端运行：
+
+```sh
+python3 scripts/dev.py
+```
+
+控制台左侧显示后端日志、右侧显示前端日志，窄窗口自动改为上下排列。按 **S** 启动全部、**X** 关闭全部、**B / F** 单独启停后端／前端、**O** 打开网页；**Tab** 切换日志面板，方向键和 PageUp / PageDown 回看，**End** 回到最新日志，**L** 打开日志目录。**Q** 只退出控制台，服务继续运行；要一起关闭，先按 **X**，等状态显示停止后再按 **Q**。
+
+也可直接使用命令，不必进入分栏界面：
+
+```sh
+python3 scripts/dev.py start           # 启动前后端
+python3 scripts/dev.py stop            # 关闭前后端
+python3 scripts/dev.py status          # 查看状态
+python3 scripts/dev.py start backend   # 单独启动后端（frontend 同理）
+python3 scripts/dev.py logs backend -f # 持续查看后端日志，Ctrl+C 退出查看
+```
+
+默认地址为 [http://localhost:3000](http://localhost:3000)，后端为 `127.0.0.1:8080`。控制台需要 Python 3.9+，使用标准库；macOS 优先寻找已安装的 Java 17，也可使用 IntelliJ IDEA 自带的 Maven。首次拉取请先在 `frontend-vue/` 执行 `npm ci`；数据库仍按下文准备并运行。
+
+可将 `.dev.env.example` 复制为 `.dev.env`，修改端口、数据库连接或 Java/Maven 路径；终端环境变量优先。配置只支持 `KEY=value`，不执行 shell 表达式。数据库配置默认沿用后端配置文件。前端代理自动指向所选后端端口；如果前端 `.env*` 里已有不同的代理地址，会提示先调整。
+
+日志保存在 `.local-dev/backend.log` 和 `.local-dev/frontend.log`，重新启动会追加记录。配置、日志和进程记录均不提交 Git。控制台只管理自己启动的进程，不接管其他已占用端口的程序，也不启停 PostgreSQL；启动失败可直接在日志面板查看原因。
+
 ### 1. 获取项目并准备数据库
 
 ```sh

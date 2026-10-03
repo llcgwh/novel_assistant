@@ -26,3 +26,7 @@ Thumbs.db
 
 # Local credential encryption key (never commit or bundle)
 .secrets/
+
+# Local development console: process records, logs and private configuration
+.local-dev/
+.dev.env
