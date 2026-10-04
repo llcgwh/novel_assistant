@@ -39,7 +39,7 @@
               'is-today': day.index === 364,
               'is-selected': active.date === day.date,
             }"
-            :data-level="heatmapLevel(day.net, dailyGoal)"
+            :data-level="heatmapLevel(day.net, day.goal)"
             :data-day-index="day.index"
             :style="{ gridColumn: day.column, gridRow: day.row }"
             :tabindex="focusedIndex === day.index ? 0 : -1"
@@ -82,7 +82,7 @@
           }}{{
             active.sessions
               ? `${active.chapters} 章 · ${active.sessions} 次写作`
-              : '无写作记录'
+              : '无正文写作会话'
           }}</span
         >
       </div>
@@ -90,27 +90,61 @@
         >{{ active.net > 0 ? '+' : '' }}{{ active.net.toLocaleString() }}
         <small>字净增</small></strong
       >
-      <p>
-        手输 {{ active.typed.toLocaleString() }} · 粘贴
-        {{ active.pasted.toLocaleString() }} · 活跃
-        {{ duration(active.activeSeconds) }}
-      </p>
+      <p class="heatmap-goal">每日目标 · {{ goalLabel(active.goal) }}</p>
+      <dl class="heatmap-metrics">
+        <div>
+          <dt>修订保存</dt>
+          <dd>{{ active.revisionSaves.toLocaleString() }} 次</dd>
+        </div>
+        <div>
+          <dt>定稿章数</dt>
+          <dd>
+            {{ active.completedChapters.toLocaleString() }} 章<small>
+              · {{ active.finalTransitions.toLocaleString() }} 次定稿</small
+            >
+          </dd>
+        </div>
+        <div>
+          <dt>完成专注</dt>
+          <dd>{{ active.focusCompleted.toLocaleString() }} 段</dd>
+        </div>
+        <div>
+          <dt>专注时长</dt>
+          <dd>{{ duration(active.focusSeconds) }}</dd>
+        </div>
+        <div>
+          <dt>手输 / 粘贴</dt>
+          <dd>
+            {{ active.typed.toLocaleString() }} /
+            {{ active.pasted.toLocaleString() }} 字
+          </dd>
+        </div>
+        <div>
+          <dt>活跃时长</dt>
+          <dd>{{ duration(active.activeSeconds) }}</dd>
+        </div>
+      </dl>
     </div>
     <p class="heatmap-hint">
-      悬停、点击或用方向键查看每日详情。绿色按净增达到
+      悬停、点击或用方向键查看每日详情。绿色按当天记录的目标分档；选中日达到
       {{ scale.quarter.toLocaleString() }} / {{ scale.half.toLocaleString() }} /
       {{ scale.target.toLocaleString() }} 字加深{{
-        dailyGoal > 0
-          ? '，最深色表示达到每日目标'
-          : '（未设目标，按 2000 字分档）'
+        active.goal === null
+          ? '（未记录目标，按 2000 字分档）'
+          : active.goal > 0
+            ? '，最深色表示达到当天目标'
+            : '（当天未设目标，按 2000 字分档）'
       }}；删改造成的净减少用橙色纹理表示，无记录日期记为 0。
+      净增是正文字数变化，不等于修改字数；修订保存按保存次数计，定稿章数按当天章节去重。
+      活跃时长来自写作活动，专注时长来自专注计时，两者分别统计。
     </p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
-import type { SessionRecord } from '@/types/writing'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import type { SessionRecord, WritingStats } from '@/types/writing'
+import { localDate } from '@/utils/writing'
 import {
   heatmapFocusIndex,
   heatmapLevel,
@@ -118,10 +152,15 @@ import {
   writingHeatmap,
 } from '@/utils/writingHeatmap'
 
-const props = defineProps<{ sessions: SessionRecord[]; dailyGoal: number }>()
-const today = new Date()
-const calendar = computed(() => writingHeatmap(props.sessions, today))
-const scale = computed(() => heatmapScale(props.dailyGoal))
+const props = defineProps<{
+  sessions: SessionRecord[]
+  stats?: WritingStats | null
+  dailyGoal?: number
+}>()
+const today = ref(new Date())
+const calendar = computed(() =>
+  writingHeatmap(props.sessions, today.value, props.stats),
+)
 const positiveDays = computed(
   () => calendar.value.days.filter((day) => day.net > 0).length,
 )
@@ -130,14 +169,23 @@ const hoveredIndex = ref<number | null>(null)
 const active = computed(
   () => calendar.value.days[hoveredIndex.value ?? focusedIndex.value],
 )
+const scale = computed(() => heatmapScale(active.value.goal))
 const scroller = ref<HTMLElement | null>(null)
 function duration(seconds: number) {
-  return seconds < 60
-    ? `${seconds} 秒`
-    : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`
+  const whole = Math.max(0, Math.floor(seconds))
+  return whole < 60
+    ? `${whole} 秒`
+    : `${Math.floor(whole / 60)} 分 ${whole % 60} 秒`
+}
+function goalLabel(goal: number | null) {
+  return goal === null
+    ? '未记录目标'
+    : goal > 0
+      ? `${goal.toLocaleString()} 字`
+      : '未设目标'
 }
 function describe(day: (typeof calendar.value.days)[number]) {
-  return `${day.date}${day.index === 364 ? '，今天' : ''}：净增 ${day.net} 字，手输 ${day.typed} 字，粘贴 ${day.pasted} 字，活跃 ${duration(day.activeSeconds)}${day.sessions ? `，${day.chapters} 章，${day.sessions} 次写作` : '，无写作记录'}`
+  return `${day.date}${day.index === 364 ? '，今天' : ''}：净增 ${day.net} 字，每日目标 ${goalLabel(day.goal)}，修订保存 ${day.revisionSaves} 次，定稿 ${day.completedChapters} 章、${day.finalTransitions} 次定稿，完成专注 ${day.focusCompleted} 段，专注时长 ${duration(day.focusSeconds)}，手输 ${day.typed} 字，粘贴 ${day.pasted} 字，活跃时长 ${duration(day.activeSeconds)}${day.sessions ? `，${day.chapters} 章，${day.sessions} 次写作` : '，无写作会话记录'}`
 }
 function selectDay(index: number) {
   focusedIndex.value = index
@@ -168,10 +216,33 @@ function navigate(event: KeyboardEvent, index: number) {
   void focusDay(heatmapFocusIndex(index, event.key, calendar.value.days))
 }
 function goToToday() {
+  refreshDate()
   void focusDay(364)
+}
+let dateRefresh: ReturnType<typeof setInterval> | undefined
+function refreshDate() {
+  const now = new Date()
+  if (localDate(now) === localDate(today.value)) return
+  // Keep a selected historical date stable when the window advances at midnight.
+  const selectedDate = calendar.value.days[focusedIndex.value]?.date
+  const followedToday = focusedIndex.value === 364
+  today.value = now
+  hoveredIndex.value = null
+  if (!followedToday) {
+    focusedIndex.value = Math.max(
+      0,
+      calendar.value.days.findIndex((day) => day.date === selectedDate),
+    )
+  }
 }
 onMounted(() => {
   if (scroller.value) scroller.value.scrollLeft = scroller.value.scrollWidth
+  dateRefresh = setInterval(refreshDate, 30_000)
+  document.addEventListener('visibilitychange', refreshDate)
+})
+onUnmounted(() => {
+  if (dateRefresh !== undefined) clearInterval(dateRefresh)
+  document.removeEventListener('visibilitychange', refreshDate)
 })
 </script>
 
@@ -208,6 +279,9 @@ onMounted(() => {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 17px;
+}
+.writing-heatmap header > div {
+  min-width: 0;
 }
 .writing-heatmap header strong {
   display: block;
@@ -367,7 +441,7 @@ onMounted(() => {
   margin-top: 16px;
   padding: 12px 14px;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -391,6 +465,7 @@ onMounted(() => {
   color: var(--accent);
   font-size: 22px;
   letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
 }
 .heatmap-detail strong.negative {
   color: var(--heat-negative);
@@ -405,6 +480,35 @@ onMounted(() => {
   margin: 0;
   color: var(--muted);
   font-size: 11px;
+}
+.heatmap-goal {
+  padding: 4px 0 6px;
+}
+.heatmap-metrics {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.heatmap-metrics > div {
+  min-width: 0;
+}
+.heatmap-metrics dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.heatmap-metrics dd {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.heatmap-metrics small {
+  color: var(--muted);
 }
 .writing-heatmap .heatmap-hint {
   margin: 12px 0 0;
@@ -433,6 +537,36 @@ onMounted(() => {
   .legend-negative,
   .legend-today {
     margin-left: 5px;
+  }
+}
+@media (max-width: 420px) {
+  .writing-heatmap header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+  .writing-heatmap button.heatmap-today {
+    padding-left: 0;
+  }
+  .heatmap-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .heatmap-metrics {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .heatmap-metrics > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .heatmap-metrics dt {
+    flex-shrink: 0;
+  }
+  .heatmap-metrics dd {
+    margin-top: 0;
+    text-align: right;
   }
 }
 @media (prefers-reduced-motion: reduce) {

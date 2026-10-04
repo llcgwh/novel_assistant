@@ -161,7 +161,7 @@ public class WritingService {
     // Desk notes can reach 2 MiB; the chapter tree only needs book metadata.
     var query = em
       .createQuery(
-        "select uid,structureVersion,changeSequence,syncedSequence,volumes,preferences,syncMessage,lastSync from WritingBook where novelId=:id",
+        "select uid,structureVersion,changeSequence,syncedSequence,volumes,preferences,syncMessage,lastSync,statsData from WritingBook where novelId=:id",
         Object[].class
       )
       .setParameter("id", id);
@@ -220,7 +220,25 @@ public class WritingService {
       sessions.add(parse(s.getPayload()));
     out.put("syncMessage", (String) b[6]);
     out.put("lastSync", b[7] == null ? null : b[7].toString());
+    out.set("stats", WritingStatsDocuments.publicStats(WritingStatsDocuments.read((String) b[8])));
     return out;
+  }
+
+  public ObjectNode stats(Long id) {
+    return WritingStatsDocuments.publicStats(WritingStatsDocuments.read(book(id)));
+  }
+
+  public ObjectNode statsDay(Long id, JsonNode input) {
+    WritingBook book = book(id);
+    if (!input.isObject() || !input.has("date")) throw bad("缺少本地统计日期");
+    if (WritingStatsDocuments.captureDay(book, input, false)) touch(book, false);
+    return WritingStatsDocuments.publicStats(WritingStatsDocuments.read(book));
+  }
+
+  public ObjectNode focus(Long id, String uid, JsonNode input) {
+    WritingBook book = book(id);
+    if (WritingStatsDocuments.focus(book, uid, input)) touch(book, false);
+    return WritingStatsDocuments.publicStats(WritingStatsDocuments.read(book));
   }
 
   public ObjectNode detail(WritingChapter c) {
@@ -277,6 +295,10 @@ public class WritingService {
       !input.has("revision") ||
       input.path("revision").asLong(-1) != c.getRevision()
     ) throw conflict();
+    WritingStatsDocuments.activityDate(input);
+    String previousText = text(parse(c.getDocument()));
+    String previousStatus = c.getStatus();
+    boolean previouslyDeleted = c.isDeleted();
     boolean checkpoint = input.path("checkpoint").asBoolean();
     if (checkpoint) snapshot(c, "手动存档前");
     else snapshotIfDue(c, false);
@@ -285,6 +307,11 @@ public class WritingService {
     c.setMutationId(mutation);
     c.setUpdatedAt(LocalDateTime.now());
     if (checkpoint) snapshot(c, "手动存档");
+    WritingStatsDocuments.saved(
+      b, input, uid,
+      !c.isDeleted() && !previousText.equals(text(parse(c.getDocument()))),
+      !previouslyDeleted && !c.isDeleted() && !"final".equals(previousStatus) && "final".equals(c.getStatus())
+    );
     touch(b, false);
     return detail(c);
   }
@@ -414,7 +441,9 @@ public class WritingService {
     if (!prefs.isObject() || prefs.toString().length() > 100000) throw bad(
       "写作偏好无效"
     );
+    WritingStatsDocuments.activityDate(input);
     b.setPreferences(stringify(prefs));
+    WritingStatsDocuments.captureDay(b, input, true);
     touch(b, true);
     return workspace(id);
   }
@@ -471,7 +500,7 @@ public class WritingService {
         row.getPosition() > c.getPosition()
       ) row.setPosition(row.getPosition() + 1);
     other.setPosition(c.getPosition() + 1);
-    WritingDeskDocuments.moveAnchors(b, uid, other.getUid(), moved, Map.of());
+    WritingDeskDocuments.moveAnchors(b, uid, other.getUid(), moved, Map.of(), false);
     touch(b, true);
     return detail(other);
   }
@@ -519,7 +548,8 @@ public class WritingService {
       second.getUid(),
       first.getUid(),
       movedBlocks,
-      remap
+      remap,
+      true
     );
     touch(b, true);
     return detail(first);
@@ -598,6 +628,10 @@ public class WritingService {
   }
 
   public void session(Long id, String uid, JsonNode payload) {
+    session(id, uid, payload, true);
+  }
+
+  private void session(Long id, String uid, JsonNode payload, boolean captureGoal) {
     WritingBook b = book(id);
     uuid(uid);
     if (
@@ -636,6 +670,8 @@ public class WritingService {
     s.setSequence(sequence);
     s.setPayload(stringify(payload));
     if (fresh) em.persist(s);
+    if (captureGoal && LocalDate.parse(payload.path("date").asText()).equals(WritingStatsDocuments.currentDate(payload)))
+      WritingStatsDocuments.captureDay(b, payload, false);
     touch(b, false);
   }
 
@@ -739,6 +775,7 @@ public class WritingService {
     ObjectNode desk = WritingDeskDocuments.read(b);
     desk.remove("mutationId");
     result.set("desk", desk);
+    result.set("stats", WritingStatsDocuments.read(b));
     ArrayNode rows = result.putArray("chapters");
     for (WritingChapter c : chapters(id)) rows.add(detail(c));
     ArrayNode sessions = result.putArray("sessions");
@@ -776,10 +813,16 @@ public class WritingService {
       "这个旧备份不含正文。请恢复到一个新建作品，避免清除现有正文及关联。"
     );
     protectLegacyDeskRestore(book, root.path("writing"));
+    WritingStatsDocuments.protectLegacyRestore(book, root.path("writing"));
   }
 
   private void protectLegacyDeskRestore(WritingBook book, JsonNode input) {
     JsonNode desk = WritingDeskDocuments.read(book);
+    if (
+      !input.path("desk").has("ideas") && !desk.path("ideas").isEmpty()
+    ) throw bad(
+      "这个旧备份不含灵感收件箱。请恢复到一个新建作品，避免清除现有灵感。"
+    );
     if (
       !input.path("desk").has("rounds") &&
       WritingDeskDocuments.hasRounds(desk)
@@ -829,6 +872,7 @@ public class WritingService {
       data.path("desk"),
       false
     );
+    if (data.has("stats")) WritingStatsDocuments.validateStats(data.path("stats"));
   }
 
   public void restoreBackup(
@@ -840,6 +884,7 @@ public class WritingService {
     validateBackup(input);
     WritingBook b = book(id);
     protectLegacyDeskRestore(b, input);
+    WritingStatsDocuments.protectLegacyRestore(b, input);
     // A restore is a new local revision, even if the backup predates desk support.
     WritingDeskDocuments.replace(
       b,
@@ -898,7 +943,7 @@ public class WritingService {
       );
     }
     for (JsonNode s : input.path("sessions"))
-      session(id, s.path("uid").asText(), s);
+      session(id, s.path("uid").asText(), s, false);
     for (JsonNode h : input.path("revisions")) {
       ObjectNode snap = h.path("snapshot").deepCopy();
       remapLinks((ArrayNode) snap.path("links"), ids);
@@ -928,6 +973,9 @@ public class WritingService {
       r.setCreatedAt(createdAt);
       em.persist(r);
     }
+    WritingStatsDocuments.replace(
+      b, input.has("stats") ? input.path("stats") : WritingStatsDocuments.emptyStats()
+    );
     touch(b, true);
   }
 

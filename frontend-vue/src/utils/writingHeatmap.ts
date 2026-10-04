@@ -1,4 +1,4 @@
-import type { SessionRecord } from '@/types/writing'
+import type { SessionRecord, WritingStats } from '@/types/writing'
 import { localDate } from '@/utils/writing'
 
 export interface WritingDay {
@@ -9,6 +9,12 @@ export interface WritingDay {
   activeSeconds: number
   sessions: number
   chapters: number
+  goal: number | null
+  revisionSaves: number
+  finalTransitions: number
+  completedChapters: number
+  focusSeconds: number
+  focusCompleted: number
 }
 
 export interface HeatmapDay extends WritingDay {
@@ -18,7 +24,11 @@ export interface HeatmapDay extends WritingDay {
 }
 
 /** Session records are cumulative snapshots: count only the newest sequence. */
-export function writingHeatmap(sessions: SessionRecord[], today = new Date()) {
+export function writingHeatmap(
+  sessions: SessionRecord[],
+  today = new Date(),
+  stats?: WritingStats | null,
+) {
   const latest = new Map<string, SessionRecord>()
   for (const session of sessions) {
     const previous = latest.get(session.uid)
@@ -35,6 +45,12 @@ export function writingHeatmap(sessions: SessionRecord[], today = new Date()) {
       activeSeconds: 0,
       sessions: 0,
       chapters: 0,
+      goal: null,
+      revisionSaves: 0,
+      finalTransitions: 0,
+      completedChapters: 0,
+      focusSeconds: 0,
+      focusCompleted: 0,
       chapterIds: new Set<string>(),
     }
     day.net += finite(session.net)
@@ -46,6 +62,8 @@ export function writingHeatmap(sessions: SessionRecord[], today = new Date()) {
     day.chapters = day.chapterIds.size
     records.set(session.date, day)
   }
+  // Each row is an accepted daily snapshot, not another activity to add.
+  const dailyStats = new Map((stats?.days ?? []).map((day) => [day.date, day]))
   // Local noon and calendar arithmetic avoid UTC boundaries and DST shifts.
   const start = new Date(
     today.getFullYear(),
@@ -60,6 +78,7 @@ export function writingHeatmap(sessions: SessionRecord[], today = new Date()) {
     day.setDate(start.getDate() + index)
     const date = localDate(day)
     const record = records.get(date)
+    const statsDay = dailyStats.get(date)
     return {
       date,
       net: record?.net ?? 0,
@@ -68,6 +87,20 @@ export function writingHeatmap(sessions: SessionRecord[], today = new Date()) {
       activeSeconds: record?.activeSeconds ?? 0,
       sessions: record?.sessions ?? 0,
       chapters: record?.chapters ?? 0,
+      // Missing historical goals must remain unknown when today's goal changes.
+      goal:
+        statsDay?.goal != null && Number.isFinite(statsDay.goal)
+          ? Math.max(0, Math.round(statsDay.goal))
+          : null,
+      revisionSaves: count(statsDay?.revisionSaves),
+      finalTransitions: count(statsDay?.finalTransitions),
+      completedChapters: new Set(
+        (statsDay?.completedChapterUids ?? []).filter(
+          (uid) => typeof uid === 'string' && uid.length > 0,
+        ),
+      ).size,
+      focusSeconds: count(statsDay?.focusSeconds),
+      focusCompleted: count(statsDay?.focusCompleted),
       index,
       column: Math.floor((firstWeekday + index) / 7) + 1,
       row: ((firstWeekday + index) % 7) + 1,
@@ -91,9 +124,17 @@ function finite(value: number) {
   return Number.isFinite(value) ? value : 0
 }
 
-export function heatmapScale(goal: number) {
+function count(value: number | undefined) {
+  return value != null && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0
+}
+
+export function heatmapScale(goal: number | null | undefined) {
   const target =
-    Number.isFinite(goal) && goal > 0 ? Math.max(1, Math.round(goal)) : 2000
+    goal != null && Number.isFinite(goal) && goal > 0
+      ? Math.max(1, Math.round(goal))
+      : 2000
   return {
     target,
     quarter: Math.max(1, Math.ceil(target / 4)),
@@ -101,7 +142,7 @@ export function heatmapScale(goal: number) {
   }
 }
 
-export function heatmapLevel(net: number, goal: number) {
+export function heatmapLevel(net: number, goal: number | null | undefined) {
   if (net < 0) return -1
   if (!net) return 0
   const { quarter, half, target } = heatmapScale(goal)

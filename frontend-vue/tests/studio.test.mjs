@@ -2,12 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
-import { ref, watch } from 'vue'
+import { ref, watch, reactive, computed } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import { compileSources } from './helpers/load-source.mjs'
 
 const load = compileSources()
 const { filterNovels, recentRecords, notebookKey, remainingSeconds } = await load('utils/studio')
 const { mapPoint } = await load('utils/map')
+const { useFocusStore } = await load('stores/focus')
+const { request: focusRequest } = await load('api/request')
 
 test('map clicks retain the same stored position on mobile, desktop and zoomed canvases', () => {
   for (const scale of [0.4, 1, 1.5]) {
@@ -50,18 +53,19 @@ function component(name, runtime, returned) {
 }
 
 function timerHarness(storage = new Map(), novelId = 1) {
-  let now = 100000, timer, disposed = false, unmount
-  const timerState = component('FocusTimer', {
-    ref, defineProps: () => ({ novelId }), remainingSeconds,
-    localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
-    Date: { now: () => now },
-    onMounted: fn => fn(), onBeforeUnmount: fn => unmount = fn,
-    setInterval: fn => { timer = fn; return 1 }, clearInterval: () => disposed = true,
-  }, 'duration,seconds,running,toggle,reset,choose')
-  return { ...timerState, storage, elapse(ms) { now += ms; timer() }, unmount: () => unmount(), disposed: () => disposed }
+  setActivePinia(createPinia())
+  let now = 100000
+  const atTime = fn => { const original = Date.now; Date.now = () => now; try { return fn() } finally { Date.now = original } }
+  globalThis.localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }
+  focusRequest.defaults.adapter = async config => ({ data: { schemaVersion: 1, version: 1, days: [] }, status: 200, statusText: 'OK', headers: {}, config })
+  const focus = useFocusStore()
+  const timerState = atTime(() => component('FocusTimer', {
+    computed, watch, defineProps: () => ({ novelId }), useFocusStore: () => focus,
+  }, 'duration,seconds,running,choose'))
+  return { ...timerState, storage, focus, toggle: () => atTime(() => focus.toggle()), choose: value => atTime(() => timerState.choose(value)), elapse(ms) { now += ms; atTime(() => focus.tick(now)) }, dispose: () => focus.$reset() }
 }
 
-test('focus timer follows elapsed wall time, pauses, resumes, finishes and cleans up', () => {
+test('focus timer controls mirror its persistent store through pause, resume and completion', () => {
   const h = timerHarness()
   h.choose(15); h.toggle(); h.elapse(61500)
   assert.equal(h.seconds.value, 839)
@@ -74,44 +78,63 @@ test('focus timer follows elapsed wall time, pauses, resumes, finishes and clean
   assert.equal(restored.seconds.value, 0)
   restored.toggle()
   assert.equal(restored.seconds.value, 900)
-  restored.unmount()
-  assert.equal(restored.disposed(), true)
+  h.dispose(); restored.dispose()
 })
 
-test('focus timer restores a live deadline and ignores invalid or foreign novel state', () => {
+test('focus timer restores a live deadline, isolates works and preserves invalid original state', () => {
   const storage = new Map([['ink-studio-timer-1', JSON.stringify({ duration: 900, seconds: 900, deadline: 400000 })]])
   const h = timerHarness(storage)
   assert.equal(h.running.value, true)
   assert.equal(h.seconds.value, 300)
-  assert.equal(timerHarness(storage, 2).seconds.value, 1500)
+  h.dispose()
+  const foreign = timerHarness(storage, 2)
+  assert.equal(foreign.seconds.value, 1500)
+  foreign.dispose()
   storage.set('ink-studio-timer-1', '{broken')
-  assert.equal(timerHarness(storage).seconds.value, 1500)
-  storage.set('ink-studio-timer-1', JSON.stringify({ duration: 0, seconds: -1, deadline: 0 }))
-  assert.equal(timerHarness(storage).duration.value, 1500)
+  const invalid = timerHarness(storage)
+  assert.equal(invalid.focus.blocked, true)
+  assert.equal(storage.get('ink-studio-timer-1'), '{broken')
+  invalid.dispose()
 })
 
-test('notebooks autosave per novel and export the exact note even when storage is unavailable', async () => {
-  const storage = new Map([[notebookKey(1), '甲作品便笺']])
-  let fail = false, blob, filename
-  const make = novelId => component('IdeaNotebook', {
-    ref, watch, notebookKey, defineProps: () => ({ novelId }), Blob,
-    localStorage: { getItem: key => storage.get(key), setItem(key, value) { if (fail) throw new Error('quota'); storage.set(key, value) } },
+test('inbox exports saved ideas, drafts and untouched legacy originals; drag carries only a scoped reference', async () => {
+  const { markdownIdeas, ideaCategories, ideaCategoryLabel, IDEA_DRAG_MIME } = await load('utils/ideas')
+  const legacy = '甲作品旧便笺\r\n\n😀  '
+  let blob, filename, leave
+  const inbox = reactive({
+    ideas: [{ uid: 'idea-a', title: '已保存', body: '内容', category: 'scene', chapterUids: [], createdAt: '', updatedAt: '' }],
+    chapters: [], draft: { idea: { uid: 'draft', title: '草稿', body: '未提交', category: 'other', chapterUids: [] } },
+    legacyText: legacy, loading: false, saving: false, unsafe: false,
+    load: async () => {}, persist() {}, markExported() {}, rawRecovery: '{invalid draft',
+  })
+  const h = component('IdeaNotebook', {
+    ref, watch, reactive, computed, defineProps: () => ({ novelId: 1, compact: true }), withDefaults: value => value,
+    defineEmits: () => () => {}, useIdeasStore: () => inbox, markdownIdeas, ideaCategories, ideaCategoryLabel, IDEA_DRAG_MIME,
+    onBeforeRouteLeave: fn => leave = fn, onMounted: fn => fn(), onBeforeUnmount() {},
+    window: { addEventListener() {} }, Blob,
     URL: { createObjectURL: value => { blob = value; return 'blob:test' }, revokeObjectURL() {} },
-    document: { createElement: () => ({ click() { filename = this.download } }) },
-    setTimeout: fn => fn(),
-  }, 'note,failed,download')
-  const a = make(1), b = make(2)
-  assert.equal(a.note.value, '甲作品便笺')
-  assert.equal(b.note.value, '')
-  b.note.value = '另一段灵感\n下一章'
-  assert.equal(storage.get(notebookKey(2)), b.note.value)
-  assert.equal(storage.get(notebookKey(1)), '甲作品便笺')
-  fail = true
-  b.note.value = '存储已满，但这段灵感仍可导出。'
-  assert.equal(b.failed.value, true)
-  b.download()
-  assert.equal(filename, '灵感便笺-2.md')
-  assert.equal(await blob.text(), b.note.value)
+    document: { createElement: () => ({ click() { filename = this.download } }) }, setTimeout: fn => fn(),
+  }, 'download,downloadLegacy,downloadRecovery,dragIdea,migrationOpen,closeEditor,beforeUnload')
+  h.downloadLegacy()
+  assert.equal(await blob.text(), legacy)
+  assert.equal(filename, '灵感便笺-1-原件.md')
+  h.migrationOpen.value = true; h.migrationOpen.value = false
+  assert.equal(inbox.legacyText, legacy)
+  h.download()
+  assert.match(await blob.text(), /已保存素材/)
+  assert.match(await blob.text(), /本机未提交草稿/)
+  assert.ok((await blob.text()).endsWith(legacy))
+  const payloads = new Map()
+  const transfer = { setData(type, value) { payloads.set(type, value) } }
+  h.dragIdea({ dataTransfer: transfer }, inbox.ideas[0])
+  assert.deepEqual(JSON.parse(payloads.get(IDEA_DRAG_MIME)), { novelId: 1, uid: 'idea-a' })
+  assert.equal(transfer.effectAllowed, 'copy')
+  inbox.unsafe = true
+  assert.equal(leave(), false)
+  let prevented = false
+  h.beforeUnload({ preventDefault() { prevented = true } })
+  assert.equal(prevented, true)
+  h.downloadRecovery(); assert.equal(await blob.text(), '{invalid draft')
 })
 
 test('cover uploads on the global bookshelf use the edited novel, without an active context', async () => {

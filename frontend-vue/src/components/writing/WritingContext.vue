@@ -333,7 +333,11 @@
                 @input="writer.changed()"
               />
             </label>
-            <label class="writer-context-field"
+            <label class="writer-context-field writer-idea-drop"
+              :class="{ 'is-dragging': ideaDragging }"
+              @dragover="dragOverIdea"
+              @dragleave="ideaDragging = false"
+              @drop="dropIdea"
               >创作便笺<textarea
                 v-model="writer.current.notes"
                 rows="10"
@@ -357,6 +361,8 @@
             <small
               >本章便笺随作品备份与 WebDAV 同步；正文导出默认不包含便笺。</small
             >
+            <p v-if="ideaMessage" class="writer-context-caption" role="status">{{ ideaMessage }}</p>
+            <IdeaNotebook :novel-id="writer.novelId" compact :can-insert="!insertingIdea && !writer.recovery && !writer.conflict" @insert="insertIdea" />
           </template>
           <section
             v-if="writer.current && chapterForeshadows.length"
@@ -457,6 +463,10 @@ import { request } from '@/api/request'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import SheetNavigation from '@/components/studio/SheetNavigation.vue'
+import IdeaNotebook from '@/components/studio/IdeaNotebook.vue'
+import { useIdeasStore } from '@/stores/ideas'
+import { appendIdeaToNotes, IDEA_DRAG_MIME, readIdeaDrag } from '@/utils/ideas'
+import type { Idea } from '@/types/writingDesk'
 const writer = useWritingStore(),
   app = useAppStore(),
   studio = useStudioStore(),
@@ -467,6 +477,39 @@ const writer = useWritingStore(),
     appearance: '外貌',
     background: '背景',
   }
+const inbox = useIdeasStore()
+const ideaDragging = ref(false), insertingIdea = ref(false), ideaMessage = ref('')
+function dragOverIdea(event: DragEvent) {
+  if (event.dataTransfer?.types.includes(IDEA_DRAG_MIME)) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    ideaDragging.value = true
+  }
+}
+function dropIdea(event: DragEvent) {
+  ideaDragging.value = false
+  if (!event.dataTransfer?.types.includes(IDEA_DRAG_MIME)) return
+  event.preventDefault()
+  const reference = readIdeaDrag(event.dataTransfer.getData(IDEA_DRAG_MIME), writer.novelId)
+  const idea = reference && inbox.novelId === writer.novelId && inbox.ideas.find(row => row.uid === reference.uid)
+  if (!idea) { ideaMessage.value = '无法使用这条灵感，请从当前作品收件箱重新拖入。'; return }
+  void insertIdea(idea)
+}
+async function insertIdea(idea: Idea) {
+  if (!writer.current || writer.recovery || writer.conflict || insertingIdea.value || inbox.novelId !== writer.novelId) return
+  const id = writer.novelId, uid = writer.current.uid
+  insertingIdea.value = true
+  try {
+    const notes = appendIdeaToNotes(writer.current.notes, idea)
+    if (notes === writer.current.notes) { ideaMessage.value = '这条灵感已在本章创作卡中，未重复加入。'; return }
+    writer.current.notes = notes
+    writer.changed()
+    const saved = await writer.flush()
+    if (writer.novelId !== id || writer.current?.uid !== uid) return
+    ideaMessage.value = saved ? '灵感已放入本章创作卡并保存，收件箱原件仍保留。' : writer.localSafe ? '已加入本章草稿，尚未保存到作品。请处理写作区保存提示。' : '创作卡尚未安全保存，请保持页面打开并先导出。'
+  } catch (e) { if (writer.novelId === id && writer.current?.uid === uid) ideaMessage.value = e instanceof Error ? e.message : '加入创作卡失败，请重试。' }
+  finally { insertingIdea.value = false }
+}
 const kind = ref('characters'),
   query = ref(''),
   role = ref('reference'),
@@ -866,6 +909,7 @@ function editAliases(person: Resource) {
 watch(
   () => writer.novelId,
   async (id) => {
+    ideaMessage.value = ''
     relations.value = []
     createOpen.value = false
     aliasPerson.value = null
@@ -880,6 +924,7 @@ watch(
 )
 </script>
 <style scoped>
+.writer-idea-drop.is-dragging { outline: 2px dashed var(--accent); outline-offset: 6px; }
 .writer-context-turn-enter-active,
 .writer-context-turn-leave-active {
   transition:

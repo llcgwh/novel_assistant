@@ -1,5 +1,5 @@
 import { request } from './request'
-import type { Chapter, WritingWorkspace, SessionRecord } from '@/types/writing'
+import type { Chapter, WritingWorkspace, SessionRecord, WritingStats, WritingDate, FocusReceipt } from '@/types/writing'
 const url = (id: number, path = '') => `/novels/${id}/writing${path}`
 export const writingApi = {
   workspace: (id: number) => request.get<any, WritingWorkspace>(url(id)),
@@ -7,7 +7,7 @@ export const writingApi = {
     request.get<any, Chapter>(url(id, `/chapters/${uid}`)),
   create: (id: number, body: Partial<Chapter>) =>
     request.post<any, Chapter>(url(id, '/chapters'), body),
-  save: (id: number, body: Chapter & { checkpoint?: boolean }) =>
+  save: (id: number, body: Chapter & Partial<WritingDate> & { checkpoint?: boolean }) =>
     request.put<any, Chapter>(url(id, `/chapters/${body.uid}`), body),
   structure: (id: number, body: unknown) =>
     request.put<any, WritingWorkspace>(url(id, '/structure'), body),
@@ -26,6 +26,11 @@ export const writingApi = {
     request.get<any, Chapter>(url(id, `/chapters/${uid}/revisions/${r}`)),
   session: (id: number, record: SessionRecord) =>
     request.put(url(id, `/sessions/${record.uid}`), record),
+  stats: (id: number) => request.get<any, WritingStats>(url(id, '/stats')),
+  statsDay: (id: number, body: WritingDate) =>
+    request.post<any, WritingStats>(url(id, '/stats/day'), body),
+  focus: (id: number, body: FocusReceipt) =>
+    request.post<any, WritingStats>(url(id, `/stats/focus/${body.uid}`), body),
   search: (id: number, q: string) =>
     request.get<
       any,

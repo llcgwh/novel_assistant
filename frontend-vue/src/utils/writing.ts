@@ -1,4 +1,4 @@
-import type { Chapter, DocNode, SessionRecord } from '@/types/writing'
+import type { Chapter, DocNode, SessionRecord, WritingDate } from '@/types/writing'
 export const linkRoles: Record<string, string> = {
   reference: '涉及',
   viewpoint: '视角人物',
@@ -77,8 +77,8 @@ export function blockList(doc: DocNode): { id: string; text: string }[] {
   return rows
 }
 export function fingerprint(chapter: Chapter) {
-  const { revision, updatedAt, mutationId, wordCount, position, ...content } =
-    chapter
+  const { revision, updatedAt, mutationId, wordCount, position, date, timezoneOffsetMinutes, checkpoint, ...content } =
+    chapter as Chapter & Partial<WritingDate> & { checkpoint?: boolean }
   return JSON.stringify(content)
 }
 export function localDate(now = new Date()) {

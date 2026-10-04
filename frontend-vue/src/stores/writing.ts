@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { writingApi } from '@/api/writing'
 import { request } from '@/api/request'
 import type {
@@ -8,7 +8,11 @@ import type {
   DraftRecord,
   Resource,
   SessionRecord,
+  WritingDate,
+  WritingStats,
 } from '@/types/writing'
+import { writingDate } from '@/utils/writingActivity'
+import { useFocusStore } from '@/stores/focus'
 import {
   emptyDoc,
   fingerprint,
@@ -19,6 +23,7 @@ import {
 import { saveDraft, deleteDraft, listDrafts } from '@/utils/writingDrafts'
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 export const useWritingStore = defineStore('writing', () => {
+  const focus = useFocusStore()
   const novelId = ref(0),
     workspace = ref<WritingWorkspace | null>(null),
     current = ref<Chapter | null>(null),
@@ -30,6 +35,7 @@ export const useWritingStore = defineStore('writing', () => {
     error = ref(''),
     localError = ref(''),
     localSafe = ref(true),
+    statsError = ref(''),
     recovery = ref<DraftRecord | null>(null),
     conflict = ref<Chapter | null>(null),
     drafts = ref<DraftRecord[]>([])
@@ -44,7 +50,9 @@ export const useWritingStore = defineStore('writing', () => {
     timer: ReturnType<typeof setTimeout> | undefined,
     savePromise: Promise<boolean> | undefined,
     localPromise: Promise<void> = Promise.resolve(),
-    pendingWrite: Chapter | undefined
+    pendingWrite: (Chapter & WritingDate) | undefined
+  let pendingPreferences: { signature: string; body: Record<string, any> } | undefined
+  let statsDay = ''
   let baseline = '',
     tabId = '',
     localSequence = 0
@@ -89,15 +97,54 @@ export const useWritingStore = defineStore('writing', () => {
   function requireContext(id: number, epoch: number) {
     if (!isContext(id, epoch)) throw Error('作品已切换，已停止后续操作')
   }
+  function applyStats(data: WritingStats, id = novelId.value) {
+    if (id !== novelId.value || !workspace.value || data?.schemaVersion !== 1) return
+    if (!workspace.value.stats || data.version >= workspace.value.stats.version)
+      workspace.value.stats = clone(data)
+  }
+  function adoptWorkspace(data: WritingWorkspace, preserve = true) {
+    const existing = workspace.value?.stats
+    if (preserve && workspace.value?.uid === data.uid && existing && (!data.stats || existing.version > data.stats.version))
+      data.stats = existing
+    workspace.value = data
+  }
+  watch(() => focus.stats, (data) => { if (data) applyStats(data, focus.novelId) })
+  async function refreshStats() {
+    const id = novelId.value, epoch = generation
+    try {
+      const data = await writingApi.stats(id)
+      if (isContext(id, epoch)) { applyStats(data, id); statsError.value = '' }
+    } catch (e) {
+      if (isContext(id, epoch)) statsError.value = `创作足迹暂未更新：${message(e)}`
+    }
+  }
+  async function ensureStatsDay() {
+    const id = novelId.value, epoch = generation, date = writingDate()
+    if (!workspace.value?.stats) return false
+    if (statsDay === date.date) return true
+    try {
+      const data = await writingApi.statsDay(id, date)
+      if (isContext(id, epoch)) { applyStats(data, id); statsDay = date.date; statsError.value = '' }
+      return isContext(id, epoch)
+    } catch (e) {
+      if (isContext(id, epoch)) statsError.value = `今日目标快照尚未保存：${message(e)}`
+      return false
+    }
+  }
   async function load(id: number) {
+    const priorId = novelId.value
+    if (priorId !== id) pendingPreferences = undefined
     const epoch = ++generation
     novelId.value = id
     loading.value = true
     error.value = ''
+    statsDay = ''
     try {
       const data = await writingApi.workspace(id)
       if (epoch !== generation) return
-      workspace.value = data
+      adoptWorkspace(data, priorId === id)
+      void ensureStatsDay()
+      if (focus.novelId === id && focus.stats) applyStats(focus.stats, id)
       const found = await listDrafts(data.uid, id).catch(() => [])
       if (!isContext(id, epoch)) return
       drafts.value = found
@@ -112,7 +159,7 @@ export const useWritingStore = defineStore('writing', () => {
     const id = novelId.value,
       epoch = generation
     const data = await writingApi.workspace(id)
-    if (epoch === generation) workspace.value = data
+    if (epoch === generation) adoptWorkspace(data)
   }
   async function loadResources(id = novelId.value, epoch = generation) {
     const groups = await Promise.allSettled(
@@ -292,6 +339,7 @@ export const useWritingStore = defineStore('writing', () => {
         const snapshot = pendingWrite || {
           ...clone(current.value),
           mutationId: crypto.randomUUID(),
+          ...writingDate(),
         }
         pendingWrite = snapshot
         const saved = await writingApi.save(id, { ...snapshot, checkpoint })
@@ -303,6 +351,7 @@ export const useWritingStore = defineStore('writing', () => {
         current.value.mutationId = saved.mutationId
         dirty.value = fingerprint(current.value) !== baseline
         syncMeta(current.value)
+        if (workspace.value?.stats) void refreshStats()
         if (!dirty.value) {
           const sequence = localSequence
           // Serialize deletion with local writes. An edit queued after this
@@ -454,7 +503,7 @@ export const useWritingStore = defineStore('writing', () => {
       chapters,
     })
     requireContext(id, epoch)
-    workspace.value = data
+    adoptWorkspace(data)
     if (before && current.value?.uid === before.uid) {
       const server = await writingApi.chapter(id, before.uid)
       requireContext(id, epoch)
@@ -492,21 +541,54 @@ export const useWritingStore = defineStore('writing', () => {
   async function preferences(value: Record<string, any>) {
     const id = novelId.value,
       epoch = generation
-    const data = await writingApi.preferences(id, {
-      structureVersion: workspace.value!.structureVersion,
-      preferences: value,
-    })
+    const signature = JSON.stringify(value)
+    if (!pendingPreferences || pendingPreferences.signature !== signature)
+      pendingPreferences = { signature, body: {
+        structureVersion: workspace.value!.structureVersion,
+        preferences: clone(value),
+        ...writingDate(),
+      } }
+    const pending = pendingPreferences
+    let data: WritingWorkspace
+    try {
+      data = await writingApi.preferences(id, pending.body)
+    } catch (e) {
+      requireContext(id, epoch)
+      // A preferences write increments structureVersion without a receipt.
+      // Read back before retrying a response that may have been lost.
+      const latest = await writingApi.workspace(id).catch(() => null)
+      requireContext(id, epoch)
+      if (latest && samePreferences(latest.preferences, pending.body.preferences)) {
+        data = latest
+      } else {
+        if (latest && latest.structureVersion !== pending.body.structureVersion) {
+          if (pendingPreferences === pending) pendingPreferences = undefined
+          adoptWorkspace(latest)
+          throw Error('作品设置或结构已变化，请核对后重新保存')
+        }
+        throw e
+      }
+    }
     requireContext(id, epoch)
-    workspace.value = data
+    if (pendingPreferences === pending) pendingPreferences = undefined
+    adoptWorkspace(data)
     await loadResources(id, epoch)
+  }
+  function samePreferences(left: unknown, right: unknown): boolean {
+    if (left === right) return true
+    if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false
+    const a = Object.keys(left), b = Object.keys(right)
+    return a.length === b.length && a.every((key) => Object.prototype.hasOwnProperty.call(right, key) && samePreferences((left as any)[key], (right as any)[key]))
   }
   async function saveSession(record: SessionRecord, id = novelId.value) {
     const epoch = generation
-    await writingApi.session(id, clone(record))
+    const snapshot = clone(record)
+    await writingApi.session(id, snapshot)
     if (isContext(id, epoch) && workspace.value) {
-      const i = workspace.value.sessions.findIndex((r) => r.uid === record.uid)
-      if (i >= 0) workspace.value.sessions[i] = clone(record)
-      else workspace.value.sessions.push(clone(record))
+      const i = workspace.value.sessions.findIndex((r) => r.uid === snapshot.uid)
+      if (i < 0) workspace.value.sessions.push(snapshot)
+      else if (workspace.value.sessions[i].sequence <= snapshot.sequence)
+        workspace.value.sessions[i] = snapshot
     }
   }
   function $reset() {
@@ -529,6 +611,9 @@ export const useWritingStore = defineStore('writing', () => {
     pinned.value = []
     ignored.value = []
     pendingWrite = undefined
+    pendingPreferences = undefined
+    statsDay = ''
+    statsError.value = ''
     savePromise = undefined
     baseline = ''
   }
@@ -544,6 +629,7 @@ export const useWritingStore = defineStore('writing', () => {
     error,
     localError,
     localSafe,
+    statsError,
     recovery,
     conflict,
     drafts,
@@ -568,6 +654,9 @@ export const useWritingStore = defineStore('writing', () => {
     structure,
     preferences,
     saveSession,
+    applyStats,
+    refreshStats,
+    ensureStatsDay,
     adopt,
     $reset,
   }

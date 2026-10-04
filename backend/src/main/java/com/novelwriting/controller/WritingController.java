@@ -26,6 +26,23 @@ public class WritingController {
     return service.workspace(novelId);
   }
 
+  @GetMapping("/stats")
+  public JsonNode stats(@PathVariable Long novelId) {
+    return service.stats(novelId);
+  }
+
+  @PostMapping("/stats/day")
+  public JsonNode statsDay(@PathVariable Long novelId, @RequestBody JsonNode body) {
+    return service.statsDay(novelId, body);
+  }
+
+  @PostMapping("/stats/focus/{uid}")
+  public JsonNode focus(
+    @PathVariable Long novelId, @PathVariable String uid, @RequestBody JsonNode body
+  ) {
+    return service.focus(novelId, uid, body);
+  }
+
   @GetMapping("/desk")
   public JsonNode desk(@PathVariable Long novelId) {
     return desk.get(novelId);

@@ -9,7 +9,9 @@ import com.fasterxml.jackson.databind.node.*;
 import com.novelwriting.entity.*;
 import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayInputStream;
 import java.util.*;
+import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -119,6 +121,247 @@ class WritingDeskServiceTest {
       .put("status", "active")
       .put("createdAt", "2026-09-28T12:00:00Z")
       .put("updatedAt", "2026-09-28T12:00:00Z");
+  }
+
+  ObjectNode idea(String... chapters) {
+    ObjectNode idea = JSON.createObjectNode()
+      .put("uid", UUID.randomUUID().toString())
+      .put("title", "潮汐与回信")
+      .put("body", "  一段尚未写入正文的灵感\n下一行保留原样。\n")
+      .put("category", "plot")
+      .put("createdAt", "2026-10-04T12:00:00Z")
+      .put("updatedAt", "2026-10-04T12:00:00Z");
+    ArrayNode linked = idea.putArray("chapterUids");
+    for (String chapter : chapters) linked.add(chapter);
+    return idea;
+  }
+
+  @Test
+  void ideasPersistAcrossReloadWithRetryConflictAndLegacyClientProtection() {
+    long id = novel();
+    String first = chapter(id, "第一章").path("uid").asText();
+    String second = chapter(id, "第二章").path("uid").asText();
+    ObjectNode legacy = mutation(emptyDesk());
+    legacy.remove("ideas");
+    ObjectNode legacySaved = desk.save(id, legacy);
+    assertTrue(legacySaved.path("ideas").isEmpty());
+    assertEquals(legacySaved, desk.save(id, legacy));
+
+    ObjectNode request = mutation(legacySaved);
+    ObjectNode note = idea(first, second).put("sourceKey", "legacy:sha256-of-exact-text");
+    request.withArray("ideas").add(note);
+    long sequence = writing.workspace(id).path("changeSequence").asLong();
+    ObjectNode saved = desk.save(id, request);
+    em.flush();
+    em.clear();
+    assertEquals(saved, desk.get(id));
+    assertEquals(saved, desk.save(id, request));
+    assertEquals(sequence + 1, writing.workspace(id).path("changeSequence").asLong());
+    assertEquals(note, saved.path("ideas").get(0));
+
+    ObjectNode alteredRetry = request.deepCopy();
+    ((ObjectNode) alteredRetry.path("ideas").get(0)).put("body", "不同的正文");
+    assertConflict(() -> desk.save(id, alteredRetry));
+    assertConflict(() -> desk.save(id, mutation(request)));
+    ObjectNode oldClient = mutation(saved);
+    oldClient.remove("ideas");
+    ResponseStatusException blocked = assertThrows(ResponseStatusException.class, () -> desk.save(id, oldClient));
+    assertEquals(409, blocked.getStatusCode().value());
+    assertTrue(blocked.getReason().contains("未包含灵感收件箱"));
+    assertEquals(saved, desk.get(id));
+
+    ObjectNode clear = mutation(saved);
+    clear.withArray("ideas").removeAll();
+    assertTrue(desk.save(id, clear).path("ideas").isEmpty());
+  }
+
+  @Test
+  void ideasRejectForeignOrInventedAssociationsWhileRetainingDeletedChapters() {
+    long id = novel(), other = novel();
+    String own = chapter(id, "本作").path("uid").asText();
+    String foreign = chapter(other, "另一作品").path("uid").asText();
+    ObjectNode request = mutation(emptyDesk());
+    request.withArray("ideas").add(idea(own));
+    ObjectNode saved = desk.save(id, request);
+    for (String invalid : List.of(foreign, UUID.randomUUID().toString())) {
+      ObjectNode changed = mutation(saved);
+      ((ObjectNode) changed.path("ideas").get(0)).withArray("chapterUids").add(invalid);
+      assertBad(() -> desk.save(id, changed));
+    }
+    assertEquals(emptyDesk(), desk.get(other));
+    ObjectNode deleted = mutation(writing.get(id, own)).put("deleted", true);
+    writing.save(id, own, deleted);
+    ObjectNode edit = mutation(saved);
+    ((ObjectNode) edit.path("ideas").get(0)).put("title", "删除章后仍保留素材");
+    ObjectNode retained = desk.save(id, edit);
+    assertEquals(own, retained.path("ideas").get(0).path("chapterUids").get(0).asText());
+    assertTrue(writing.get(id, own).path("deleted").asBoolean());
+  }
+
+  @Test
+  void ideasFollowBothSplitHalvesThenDeduplicateMergedAssociations() {
+    long id = novel();
+    String first = chapter(id, "拆分源章").path("uid").asText();
+    String unrelated = chapter(id, "另一章").path("uid").asText();
+    ObjectNode request = mutation(emptyDesk());
+    request.withArray("ideas").add(idea(first, unrelated)).add(idea());
+    ObjectNode saved = desk.save(id, request);
+    String second = UUID.randomUUID().toString();
+    ObjectNode split = JSON.createObjectNode().put("revision", 0).put("index", 1)
+      .put("uid", second).put("title", "拆分后章");
+    writing.split(id, first, split);
+    ObjectNode splitDesk = desk.get(id);
+    assertEquals(JSON.createArrayNode().add(first).add(unrelated).add(second),
+      splitDesk.path("ideas").get(0).path("chapterUids"));
+    assertEquals(saved.path("ideas").get(0).path("body"), splitDesk.path("ideas").get(0).path("body"));
+    assertTrue(splitDesk.path("ideas").get(1).path("chapterUids").isEmpty());
+    assertEquals(saved.path("version").asLong() + 1, splitDesk.path("version").asLong());
+    assertFalse(splitDesk.has("mutationId"));
+    writing.split(id, first, split);
+    assertEquals(splitDesk, desk.get(id));
+    assertConflict(() -> desk.save(id, mutation(saved)));
+
+    writing.merge(id, first, JSON.createObjectNode().put("revision", 1)
+      .put("otherRevision", 0).put("otherUid", second));
+    ObjectNode merged = desk.get(id);
+    assertEquals(saved.path("ideas"), merged.path("ideas"));
+    assertEquals(splitDesk.path("version").asLong() + 1, merged.path("version").asLong());
+    assertFalse(merged.has("mutationId"));
+    assertTrue(writing.get(id, second).path("deleted").asBoolean());
+  }
+
+  @Test
+  void ideasBackupKeepsTextCategorySourceAndChapterUidsAndProtectsOlderBackups() {
+    long source = novel(), target = novel();
+    String first = chapter(source, "甲章").path("uid").asText();
+    String second = chapter(source, "乙章").path("uid").asText();
+    ObjectNode request = mutation(emptyDesk());
+    request.withArray("ideas").add(idea(first, second).put("sourceKey", "legacy:digest"));
+    ObjectNode saved = desk.save(source, request);
+    ObjectNode backup = writing.exportBackup(source);
+    assertEquals(saved.path("ideas"), backup.path("desk").path("ideas"));
+    assertFalse(backup.path("desk").has("mutationId"));
+    writing.restoreBackup(target, backup, Map.of());
+    assertEquals(saved.path("ideas"), desk.get(target).path("ideas"));
+    assertEquals(first, writing.get(target, first).path("uid").asText());
+    assertEquals(second, writing.get(target, second).path("uid").asText());
+
+    for (String missing : List.of("ideas", "desk")) {
+      ObjectNode legacy = backup.deepCopy();
+      if (missing.equals("desk")) legacy.remove("desk");
+      else ((ObjectNode) legacy.path("desk")).remove("ideas");
+      assertDoesNotThrow(() -> WritingService.validateBackup(legacy));
+      ResponseStatusException blocked = assertThrows(ResponseStatusException.class,
+        () -> writing.restoreBackup(source, legacy, Map.of()));
+      assertEquals(400, blocked.getStatusCode().value());
+      assertTrue(blocked.getReason().contains("旧备份不含灵感收件箱"));
+      assertEquals(saved, desk.get(source));
+      long fresh = novel();
+      writing.restoreBackup(fresh, legacy, Map.of());
+      assertTrue(desk.get(fresh).path("ideas").isEmpty());
+    }
+  }
+
+  @Test
+  void restoredOrphanIdeaAssociationsRemainEditableWithoutAcceptingNewForeignOnes() {
+    long source = novel(), target = novel();
+    String missing = UUID.randomUUID().toString();
+    ObjectNode backup = writing.exportBackup(source);
+    ((ObjectNode) backup.path("desk")).withArray("ideas").add(idea(missing));
+    writing.restoreBackup(target, backup, Map.of());
+    ObjectNode edit = mutation(desk.get(target));
+    ((ObjectNode) edit.path("ideas").get(0)).put("body", "恢复后仍能整理旧素材");
+    assertEquals(missing, desk.save(target, edit).path("ideas").get(0).path("chapterUids").get(0).asText());
+    ObjectNode newIdea = mutation(desk.get(target));
+    newIdea.withArray("ideas").add(idea(missing));
+    assertBad(() -> desk.save(target, newIdea));
+  }
+
+  @Test
+  void ideasValidateBoundariesAndMigrationSourceIdentityWithoutTrimmingLegacyText() {
+    ObjectNode valid = mutation(emptyDesk());
+    valid.withArray("ideas").add(idea().put("title", "字".repeat(200))
+      .put("body", "字".repeat(20000)).put("sourceKey", "s".repeat(200)));
+    assertDoesNotThrow(() -> validateDesk(valid, true));
+    ObjectNode whitespace = valid.deepCopy();
+    ((ObjectNode) whitespace.path("ideas").get(0)).put("body", " \n\t ");
+    assertEquals(" \n\t ", validateDesk(whitespace, true).path("ideas").get(0).path("body").asText());
+    for (ObjectNode invalid : List.of(
+      idea().put("body", ""), idea().put("body", "字".repeat(20001)),
+      idea().put("title", "字".repeat(201)), idea().putNull("title"),
+      idea().put("category", "unknown"), idea().put("sourceKey", "s".repeat(201)),
+      idea().putNull("sourceKey"), idea().put("createdAt", ""), idea().put("extra", "unknown")
+    )) {
+      ObjectNode bad = mutation(emptyDesk());
+      bad.withArray("ideas").add(invalid);
+      assertBad(() -> validateDesk(bad, true));
+    }
+    ObjectNode duplicate = valid.deepCopy();
+    duplicate.withArray("ideas").add(duplicate.path("ideas").get(0).deepCopy());
+    assertBad(() -> validateDesk(duplicate, true));
+    ((ObjectNode) duplicate.path("ideas").get(1)).put("uid", "different-id");
+    assertBad(() -> validateDesk(duplicate, true)); // Same migration source under another ID.
+    ((ObjectNode) duplicate.path("ideas").get(1)).put("sourceKey", "new-content-digest");
+    assertDoesNotThrow(() -> validateDesk(duplicate, true));
+    ObjectNode badChapters = mutation(emptyDesk());
+    String chapter = UUID.randomUUID().toString();
+    badChapters.withArray("ideas").add(idea(chapter, chapter));
+    assertBad(() -> validateDesk(badChapters, true));
+    ((ObjectNode) badChapters.path("ideas").get(0)).withArray("chapterUids").removeAll().add("invalid");
+    assertBad(() -> validateDesk(badChapters, true));
+    ((ObjectNode) badChapters.path("ideas").get(0)).withArray("chapterUids").removeAll().addNull();
+    assertBad(() -> validateDesk(badChapters, true));
+    ArrayNode chapters = ((ObjectNode) valid.path("ideas").get(0)).withArray("chapterUids");
+    for (int i = 0; i < 200; i++) chapters.add(UUID.randomUUID().toString());
+    assertDoesNotThrow(() -> validateDesk(valid, true));
+    chapters.add(UUID.randomUUID().toString());
+    assertBad(() -> validateDesk(valid, true));
+    assertBad(() -> validateDesk(mutation(emptyDesk()).putNull("ideas"), true));
+  }
+
+  @Test
+  void manuscriptExportIncludesScopedIdeaAppendixOnlyWhenRequested() throws Exception {
+    long id = novel();
+    String first = chapter(id, "第一章").path("uid").asText();
+    String second = chapter(id, "第二章").path("uid").asText();
+    ObjectNode request = mutation(emptyDesk());
+    request.withArray("ideas")
+      .add(idea(first, second).put("title", "共享素材").put("body", "共享灵感原文\n第二行"))
+      .add(idea(second).put("body", "仅属第二章的灵感"))
+      .add(idea().put("body", "未分配的灵感"));
+    desk.save(id, request);
+    assertEquals(8, writing.summaries().path(String.valueOf(id)).path("words").asInt());
+    for (String format : List.of("txt", "md", "docx")) {
+      ObjectNode options = JSON.createObjectNode().put("format", format);
+      String plain = exportedText(id, options);
+      assertTrue(plain.contains("潮声"));
+      assertFalse(plain.contains("共享灵感原文"));
+      assertFalse(plain.contains("灵感收件箱"));
+      options.put("includeNotes", true);
+      String whole = exportedText(id, options);
+      assertTrue(whole.contains("灵感收件箱"));
+      assertTrue(whole.contains("共享灵感原文"));
+      assertTrue(whole.contains("仅属第二章的灵感"));
+      assertTrue(whole.contains("未分配的灵感"));
+      assertTrue(whole.contains("分类：情节"));
+      assertEquals(1, whole.split("共享灵感原文", -1).length - 1);
+      options.putArray("uids").add(first);
+      String partial = exportedText(id, options);
+      assertTrue(partial.contains("共享灵感原文"));
+      assertFalse(partial.contains("仅属第二章的灵感"));
+      assertFalse(partial.contains("未分配的灵感"));
+    }
+  }
+
+  String exportedText(long id, ObjectNode options) throws Exception {
+    byte[] bytes = export.export(id, options);
+    if (!options.path("format").asText().equals("docx")) return new String(bytes, StandardCharsets.UTF_8);
+    try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(bytes))) {
+      for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry())
+        if (entry.getName().equals("word/document.xml")) return new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    fail("Word 导出缺少 document.xml");
+    return "";
   }
 
   ObjectNode withRound(ObjectNode state) {

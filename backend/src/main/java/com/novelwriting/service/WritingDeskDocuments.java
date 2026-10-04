@@ -3,6 +3,7 @@ package com.novelwriting.service;
 import static com.novelwriting.service.WritingDocuments.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.novelwriting.entity.WritingBook;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +31,7 @@ public final class WritingDeskDocuments {
     desk.putArray("tasks");
     desk.putArray("bookmarks");
     desk.putArray("rounds");
+    desk.putArray("ideas");
     return desk;
   }
 
@@ -38,6 +40,7 @@ public final class WritingDeskDocuments {
       ? emptyDesk()
       : (ObjectNode) parse(book.getDeskData());
     if (!desk.has("rounds")) desk.putArray("rounds");
+    if (!desk.has("ideas")) desk.putArray("ideas");
     return desk.put("version", desk.path("version").asLong());
   }
 
@@ -54,7 +57,7 @@ public final class WritingDeskDocuments {
     }
     keys(
       input,
-      Set.of("version", "nextPen", "tasks", "bookmarks", "rounds", "mutationId")
+      Set.of("version", "nextPen", "tasks", "bookmarks", "rounds", "ideas", "mutationId")
     );
     JsonNode version = input.path("version");
     if (
@@ -149,8 +152,41 @@ public final class WritingDeskDocuments {
       string(bookmark, "label", 200, true);
       string(bookmark, "createdAt", 64, false);
     }
+    if (input.has("ideas")) {
+      entries(input, "ideas", 1000);
+      Set<String> sources = new HashSet<>();
+      for (JsonNode idea : input.path("ideas")) {
+        keys(
+          idea,
+          Set.of("uid", "title", "body", "category", "chapterUids", "createdAt", "updatedAt", "sourceKey")
+        );
+        string(idea, "title", 200, true);
+        // Preserve legacy notebook text byte-for-byte, including whitespace-only notes.
+        if (string(idea, "body", 20000, true).isEmpty()) throw WritingService.bad("灵感正文不能为空");
+        choice(idea, "category", Set.of("plot", "character", "scene", "setting", "dialogue", "other"));
+        string(idea, "createdAt", 64, false);
+        string(idea, "updatedAt", 64, false);
+        JsonNode chapters = idea.path("chapterUids");
+        if (!chapters.isArray() || chapters.size() > 200) throw WritingService.bad(
+          "灵感关联章节无效或超过 200 章"
+        );
+        Set<String> chapterIds = new HashSet<>();
+        for (JsonNode chapter : chapters) {
+          if (!chapter.isTextual()) throw WritingService.bad("灵感关联章节标识无效");
+          String uid = WritingService.uuid(chapter.asText());
+          if (!chapterIds.add(uid)) throw WritingService.bad("灵感关联章节重复");
+        }
+        if (idea.has("sourceKey")) {
+          String source = string(idea, "sourceKey", 200, true);
+          if (!source.isEmpty() && !sources.add(source)) throw WritingService.bad(
+            "灵感迁移来源重复，请保留同一条记录后重试"
+          );
+        }
+      }
+    }
     ObjectNode result = input.deepCopy();
     if (!result.has("rounds")) result.putArray("rounds");
+    if (!result.has("ideas")) result.putArray("ideas");
     return result;
   }
 
@@ -244,7 +280,8 @@ public final class WritingDeskDocuments {
     String from,
     String to,
     Set<String> blocks,
-    Map<String, String> remap
+    Map<String, String> remap,
+    boolean merge
   ) {
     ObjectNode desk = read(book);
     boolean changed = false;
@@ -262,6 +299,32 @@ public final class WritingDeskDocuments {
         changed = true;
       }
     }
-    if (changed) replace(book, desk);
+    // Chapter-level inspiration belongs to both halves after a split. On merge,
+    // move associations to the surviving chapter without duplicating an existing link.
+    for (JsonNode idea : desk.path("ideas")) {
+      LinkedHashSet<String> chapters = new LinkedHashSet<>();
+      boolean linked = false;
+      for (JsonNode chapter : idea.path("chapterUids")) {
+        String uid = chapter.asText();
+        if (uid.equals(from)) {
+          linked = true;
+          if (merge) uid = to;
+        }
+        chapters.add(uid);
+      }
+      if (linked) {
+        if (!merge) chapters.add(to);
+        // Never discard links to fit a limit. Fail the enclosing structural
+        // transaction before either manuscript half can be committed.
+        if (chapters.size() > 200) throw WritingService.bad("拆章后灵感关联超过 200 章，请先调整关联");
+        ArrayNode updated = JSON.createArrayNode();
+        chapters.forEach(updated::add);
+        if (!updated.equals(idea.path("chapterUids"))) {
+          ((ObjectNode) idea).set("chapterUids", updated);
+          changed = true;
+        }
+      }
+    }
+    if (changed) replace(book, validateDesk(desk, false));
   }
 }

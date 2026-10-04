@@ -33,6 +33,15 @@ public class WritingDeskService {
     WritingBook book = writing.book(novelId);
     ObjectNode current = read(book);
     if (
+      input != null && input.isObject() && !input.has("ideas") &&
+      !current.path("ideas").isEmpty()
+    ) {
+      throw new ResponseStatusException(
+        HttpStatus.CONFLICT,
+        "此客户端未包含灵感收件箱。请刷新后重试，避免清除现有灵感。"
+      );
+    }
+    if (
       input != null &&
       input.isObject() &&
       !input.has("rounds") &&
@@ -80,6 +89,21 @@ public class WritingDeskService {
       old.path(key).forEach(row -> previous.put(row.path("uid").asText(), row));
       for (JsonNode row : next.path(key))
         checkAnchor(row, previous.get(row.path("uid").asText()), owned);
+    }
+    Map<String, Set<String>> previousIdeas = new HashMap<>();
+    for (JsonNode idea : old.path("ideas")) {
+      Set<String> chapters = new HashSet<>();
+      idea.path("chapterUids").forEach(uid -> chapters.add(uid.asText()));
+      previousIdeas.put(idea.path("uid").asText(), chapters);
+    }
+    for (JsonNode idea : next.path("ideas")) {
+      Set<String> previous = previousIdeas.getOrDefault(idea.path("uid").asText(), Set.of());
+      for (JsonNode chapter : idea.path("chapterUids")) {
+        String uid = chapter.asText();
+        if (!owned.contains(uid) && !previous.contains(uid)) throw WritingService.bad(
+          "灵感引用的章节不属于当前作品"
+        );
+      }
     }
   }
 

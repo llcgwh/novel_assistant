@@ -8,7 +8,7 @@
       <button
         v-for="minutes in [15, 25, 45]"
         :key="minutes"
-        :disabled="running"
+        :disabled="running || focus.blocked"
         :aria-pressed="duration === minutes * 60"
         @click="choose(minutes)"
       >
@@ -35,104 +35,42 @@
       }}
     </p>
     <div class="timer-actions">
-      <button class="btn-primary" @click="toggle">
+      <button type="button" class="btn-primary" :disabled="focus.blocked" @click="focus.toggle">
         {{
-          running ? '暂停片刻' : seconds === 0 ? '再来一段' : '开始专注'
-        }}</button
-      ><button class="icon-button" aria-label="重置专注计时" @click="reset">
+          running ? '暂停片刻' : seconds === 0 ? '再来一段' : focus.state.uid ? '继续专注' : '开始专注'
+        }}</button>
+      <button v-if="focus.state.uid || running || focus.state.legacy" type="button" class="btn-secondary" :disabled="focus.blocked" @click="focus.reset()">结束本段</button>
+      <button type="button" class="icon-button" :disabled="focus.blocked" aria-label="取消当前时段并重置专注计时" @click="focus.reset()">
         ↺
       </button>
     </div>
+    <p class="focus-accounting">
+      {{ focus.state.legacy ? '已恢复旧计时；此时段不补记统计，重新开始后记录。' : '暂停不计时；取消或重置会保留已专注时长，完成时才记作一段。' }}
+    </p>
+    <p v-if="focus.state.pending.length" role="status">
+      {{ focus.saving ? '正在保存专注记录…' : `${focus.state.pending.length} 条专注记录待上传` }}
+      <button type="button" class="focus-retry" :disabled="focus.saving" @click="focus.retry">重试</button>
+    </p>
+    <p v-if="focus.storageError || focus.syncError" class="focus-error" role="alert">{{ focus.storageError || focus.syncError }}</p>
+    <p v-if="focus.storageError || focus.syncError"><button type="button" class="focus-retry" @click="focus.download">导出专注记录</button></p>
   </section>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { remainingSeconds } from '@/utils/studio'
+import { computed, watch } from 'vue'
+import { useFocusStore } from '@/stores/focus'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 const props = defineProps<{ novelId: number }>()
-const duration = ref(1500),
-  seconds = ref(1500),
-  running = ref(false)
-let deadline = 0,
-  interval: ReturnType<typeof setInterval> | undefined
-const key = `ink-studio-timer-${props.novelId}`
-try {
-  const saved = JSON.parse(localStorage.getItem(key) || 'null')
-  if (
-    saved &&
-    [900, 1500, 2700].includes(saved.duration) &&
-    Number.isFinite(saved.seconds) &&
-    saved.seconds >= 0 &&
-    saved.seconds <= saved.duration &&
-    Number.isFinite(saved.deadline) &&
-    saved.deadline >= 0
-  ) {
-    duration.value = saved.duration
-    seconds.value = saved.seconds
-    deadline = saved.deadline
-    if (deadline) {
-      seconds.value = Math.min(
-        duration.value,
-        remainingSeconds(deadline, Date.now()),
-      )
-      running.value = seconds.value > 0
-    }
-  }
-} catch {
-  /* discard damaged timer state */
-}
-function persist() {
-  try {
-    localStorage.setItem(
-      key,
-      JSON.stringify({
-        duration: duration.value,
-        seconds: seconds.value,
-        deadline,
-      }),
-    )
-  } catch {
-    /* timer still works in this tab */
-  }
-}
-function tick() {
-  if (!running.value) return
-  seconds.value = Math.min(
-    duration.value,
-    remainingSeconds(deadline, Date.now()),
-  )
-  if (seconds.value === 0) {
-    running.value = false
-    deadline = 0
-    persist()
-  }
-}
-function toggle() {
-  if (running.value) {
-    tick()
-    running.value = false
-    deadline = 0
-  } else {
-    if (!seconds.value) seconds.value = duration.value
-    deadline = Date.now() + seconds.value * 1000
-    running.value = true
-  }
-  persist()
-}
-function reset() {
-  running.value = false
-  deadline = 0
-  seconds.value = duration.value
-  persist()
-}
+const focus = useFocusStore()
+watch(() => props.novelId, (id) => focus.load(id), { immediate: true })
+const duration = computed(() => focus.state.duration)
+const seconds = computed(() => focus.state.seconds)
+const running = computed(() => focus.running)
 function choose(minutes: number) {
-  duration.value = minutes * 60
-  reset()
+  focus.reset(minutes * 60)
 }
-onMounted(() => {
-  interval = setInterval(tick, 500)
-})
-onBeforeUnmount(() => {
-  clearInterval(interval)
-})
 </script>
+<style scoped>
+.focus-accounting { line-height: 1.65; }
+.focus-timer > .focus-error { color: var(--text); line-height: 1.65; overflow-wrap: anywhere; }
+.focus-retry { border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; color: var(--accent); background: var(--field); font: inherit; cursor: pointer; }
+</style>

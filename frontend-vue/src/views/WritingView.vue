@@ -323,6 +323,7 @@ import { useStudioStore } from '@/stores/studio'
 import { useAppStore } from '@/stores/app'
 import { writingApi } from '@/api/writing'
 import { chapterStatuses, documentText, blockList } from '@/utils/writing'
+import { clearUploadedSession } from '@/utils/writingActivity'
 import ManuscriptEditor from '@/components/writing/ManuscriptEditor.vue'
 import WritingTools from '@/components/writing/WritingTools.vue'
 import WritingSync from '@/components/writing/WritingSync.vue'
@@ -332,15 +333,18 @@ import NextPen from '@/components/writing/NextPen.vue'
 import ReaderWorkspace from '@/components/writing/ReaderWorkspace.vue'
 import RevisionDesk from '@/components/writing/RevisionDesk.vue'
 import { useWritingDeskStore } from '@/stores/writingDesk'
+import { useIdeasStore } from '@/stores/ideas'
 const writer = useWritingStore(),
   studio = useStudioStore(),
   app = useAppStore(),
   route = useRoute(),
   router = useRouter()
 const desk = useWritingDeskStore()
+const ideas = useIdeasStore()
 const reading = computed(() => route.query.mode === 'read')
 const readerEntry = ref(0)
 let routeFollowTicket = 0
+let activityDayTimer: ReturnType<typeof setInterval> | undefined
 type ReaderPosition = { chapterUid: string; blockId?: string }
 let readerRouteTarget: ReaderPosition | null = null
 let pendingReaderPosition: ReaderPosition | null = null
@@ -739,6 +743,7 @@ function emergencyExport() {
     )
 }
 async function followRoute() {
+  if (route.query.ideas === '1') writer.contextTab = 'notes'
   // Reading can cross chapters without replacing the editor's last saved draft.
   // Only position events from this reader skip selection; external links still load.
   if (
@@ -819,7 +824,7 @@ watch(
 )
 function beforeUnload(event: BeforeUnloadEvent) {
   void writer.persistLocal()
-  if (writer.dirty || writer.recovery || writer.conflict || desk.saving) {
+  if (writer.dirty || writer.recovery || writer.conflict || desk.saving || ideas.unsafe || ideas.saving) {
     event.preventDefault()
     event.returnValue = ''
   }
@@ -837,8 +842,10 @@ async function retryOffline() {
     k.startsWith(`ink-session-${novelId}-`),
   )) {
     try {
-      await writer.saveSession(JSON.parse(localStorage.getItem(key)!), novelId)
-      localStorage.removeItem(key)
+      const snapshot = JSON.parse(localStorage.getItem(key)!)
+      if (!snapshot) continue
+      await writer.saveSession(snapshot, novelId)
+      clearUploadedSession(localStorage, key, snapshot)
       if (!active()) return
     } catch {}
   }
@@ -865,9 +872,14 @@ onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   window.addEventListener('keydown', shortcut)
   window.addEventListener('online', retryOffline)
+  activityDayTimer = setInterval(() => { void writer.ensureStatsDay() }, 30000)
   void retryOffline()
 })
 onBeforeRouteLeave(async () => {
+  if (ideas.novelId === writer.novelId && ideas.unsafe) {
+    app.showToast('灵感草稿尚未安全保存，请先保存到作品或导出。', 'error')
+    return false
+  }
   readerClosing = true
   clearReaderPosition()
   await editorPanel.value?.flushStats()
@@ -880,6 +892,7 @@ onBeforeRouteLeave(async () => {
   return true
 })
 onBeforeUnmount(() => {
+  clearInterval(activityDayTimer)
   disposed = true
   clearReaderPosition()
   if (desk.novelId === novelId) desk.$reset()

@@ -207,4 +207,40 @@ class BackupBundleTest {
     @Test void boundedReaderRejectsOversizedInput() {
         assertThrows(IOException.class, () -> BackupBundleService.readLimited(new ByteArrayInputStream(new byte[11]), 10));
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"desk", "ideas"})
+    void ideaBundlesRoundTripAndLegacyRestoresProtectIdeasBeforeChangingImages(String missing) throws Exception {
+        Novel source = novel("灵感来源"), target = novel("恢复目标");
+        Image cover = image(source, "novel_cover");
+        ObjectNode chapter = writing.create(source.getId(), mapper.createObjectNode()
+                .put("uid", UUID.randomUUID().toString()).put("title", "海上的信"));
+        ObjectNode data = WritingDeskDocuments.emptyDesk().put("mutationId", UUID.randomUUID().toString());
+        ObjectNode idea = data.withArray("ideas").addObject().put("uid", "legacy-note-id")
+                .put("title", "旧便笺").put("body", "  保留旧文换行\n海鸟带来的线索。\n")
+                .put("category", "plot").put("sourceKey", "legacy:content-sha256")
+                .put("createdAt", "2026-10-04T12:00:00Z").put("updatedAt", "2026-10-04T12:00:00Z");
+        idea.putArray("chapterUids").add(chapter.path("uid").asText());
+        ObjectNode saved = desk.save(source.getId(), data);
+        byte[] bundle = bundles.exportBundle(source.getId());
+        bundles.restore(target.getId(), bundle);
+        assertEquals(saved.path("ideas"), desk.get(target.getId()).path("ideas"));
+        assertEquals(chapter.path("uid"), writing.get(target.getId(), chapter.path("uid").asText()).path("uid"));
+        ObjectNode legacy = (ObjectNode) mapper.readTree(bundle);
+        ObjectNode backupWriting = (ObjectNode) legacy.path("data").path("writing");
+        if (missing.equals("desk")) backupWriting.remove("desk");
+        else ((ObjectNode) backupWriting.path("desk")).remove("ideas");
+        clearInvocations(importer);
+        var blocked = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> bundles.restore(source.getId(), mapper.writeValueAsBytes(legacy)));
+        assertEquals(400, blocked.getStatusCode().value());
+        assertTrue(blocked.getReason().contains("旧备份不含灵感收件箱"));
+        verify(importer, never()).importFromJson(eq(source.getId()), any(byte[].class));
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> importer.importFromJson(source.getId(), mapper.writeValueAsBytes(legacy.path("data"))));
+        assertEquals(saved, desk.get(source.getId()));
+        assertEquals(chapter, writing.get(source.getId(), chapter.path("uid").asText()));
+        assertEquals(cover.getId(), images.findByNovelId(source.getId()).get(0).getId());
+        assertArrayEquals(PNG, Files.readAllBytes(Path.of(cover.getFilePath())));
+    }
 }

@@ -30,7 +30,7 @@
         ><input
           v-model="includeNotes"
           type="checkbox"
-        />附加创作笔记与关联资料</label
+        />附加创作笔记、关联资料与灵感</label
       >
       <template v-if="format === 'docx'"
         ><label class="writer-check"
@@ -43,7 +43,7 @@
         ></template
       >
       <p>
-        正文导出保留篇卷与章节顺序。完整资料、图片和历史版本请使用设置页的含图片备份。
+        正文导出保留篇卷与章节顺序。附加灵感时，全书包含全部素材，部分章节包含与所选章节关联的素材。完整资料、图片和历史版本请使用设置页的含图片备份。
       </p>
     </template>
     <template v-else-if="mode === 'import'">
@@ -159,6 +159,18 @@
           <small>峰值速率</small><b>{{ peak }}</b
           ><span>字/分 · 完整 60 秒窗口</span>
         </article>
+        <article>
+          <small>今日修订保存</small><b>{{ todayActivity?.revisionSaves ?? 0 }}</b>
+          <span>正文文本有变化并成功保存 · 不等于净增字数</span>
+        </article>
+        <article>
+          <small>今日定稿章节</small><b>{{ new Set(todayActivity?.completedChapterUids || []).size }}</b>
+          <span>进入定稿的章节按日去重</span>
+        </article>
+        <article>
+          <small>今日专注</small><b>{{ Math.floor((todayActivity?.focusSeconds ?? 0) / 60) }} <small>分</small></b>
+          <span>完成 {{ todayActivity?.focusCompleted ?? 0 }} 段 · 与正文输入活跃时间分别统计</span>
+        </article>
       </div>
       <label
         >每日目标<input
@@ -168,17 +180,19 @@
           max="1000000" /></label
       ><progress
         :value="Math.max(0, today.net)"
-        :max="dailyGoal || 1"
+        :max="todayActivity?.goal || 1"
       ></progress>
       <p>
         {{
-          dailyGoal
-            ? Math.round((Math.max(0, today.net) / dailyGoal) * 100) + '%'
-            : '未设置目标'
+          todayActivity?.goal
+            ? Math.round((Math.max(0, today.net) / todayActivity.goal) * 100) + '%'
+            : todayActivity?.goal === 0 ? '未设置目标' : '未记录目标'
         }}
         · 今日进度
       </p>
-      <WritingHeatmap :sessions="sessions" :daily-goal="dailyGoal" />
+      <p>保存每日目标后更新今天与后续新日期，历史日期保留各自目标。</p>
+      <p v-if="writer.statsError" role="alert">{{ writer.statsError }} <button type="button" class="btn-secondary" @click="reloadStats">重试统计</button></p>
+      <WritingHeatmap :sessions="sessions" :stats="writer.workspace?.stats" />
       <p>
         汉字按字，英文按词，数字按组；标点与空白不计。粘贴、撤销和恢复不抬高速率。正文不包含回收站、资料和便笺。
       </p>
@@ -374,6 +388,12 @@ const dailyGoal = ref(writer.workspace?.preferences.dailyGoal ?? 2000),
     () => writer.workspace?.chapters.filter((c) => !c.deleted) || [],
   )
 const sessions = computed(() => writer.workspace?.sessions || [])
+const todayDate = ref(localDate())
+const todayActivity = computed(() => writer.workspace?.stats?.days.find((day) => day.date === todayDate.value))
+let dateTimer: ReturnType<typeof setInterval> | undefined
+async function reloadStats() {
+  if (await writer.ensureStatsDay()) await writer.refreshStats()
+}
 const volumeWords = computed(() =>
   currentVolumeWords(chapters.value, writer.current),
 )
@@ -394,7 +414,7 @@ const currentCharacters = computed(() =>
 )
 const today = computed(() =>
   sessions.value
-    .filter((s) => s.date === localDate())
+    .filter((s) => s.date === todayDate.value)
     .reduce(
       (a, s) => ({
         net: a.net + s.net,
@@ -609,6 +629,13 @@ async function perform() {
   }
 }
 onMounted(async () => {
+  if (props.mode === 'stats') {
+    void reloadStats()
+    dateTimer = setInterval(() => {
+      const date = localDate()
+      if (todayDate.value !== date) { todayDate.value = date; void reloadStats() }
+    }, 10000)
+  }
   if (props.mode === 'history' && writer.current) {
     try {
       history.value = await writingApi.revisions(
@@ -620,6 +647,7 @@ onMounted(async () => {
     }
   }
 })
+onBeforeUnmount(() => clearInterval(dateTimer))
 </script>
 
 <style scoped>

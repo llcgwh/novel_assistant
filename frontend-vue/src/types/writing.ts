@@ -51,6 +51,31 @@ export interface SessionRecord {
   activeSeconds: number
   peak: number
 }
+export interface WritingDate {
+  date: string
+  timezoneOffsetMinutes: number
+}
+export interface WritingStatsDay {
+  date: string
+  goal: number | null
+  revisionSaves: number
+  finalTransitions: number
+  completedChapterUids: string[]
+  focusSeconds: number
+  focusCompleted: number
+}
+export interface WritingStats {
+  schemaVersion: 1
+  version: number
+  days: WritingStatsDay[]
+}
+export interface FocusReceipt {
+  uid: string
+  endedOn: string
+  completed: boolean
+  secondsByDate: Record<string, number>
+  timezoneOffsetMinutes: number
+}
 export interface WritingWorkspace {
   uid: string
   structureVersion: number
@@ -58,6 +83,7 @@ export interface WritingWorkspace {
   chapters: ChapterMeta[]
   preferences: Record<string, any>
   sessions: SessionRecord[]
+  stats?: WritingStats
   changeSequence: number
   syncedSequence: number
   syncMessage?: string

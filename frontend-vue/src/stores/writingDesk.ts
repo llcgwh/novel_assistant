@@ -130,6 +130,12 @@ export const useWritingDeskStore = defineStore('writingDesk', () => {
     mutate((draft) => {
       draft.bookmarks = draft.bookmarks.filter((row) => row.uid !== uid)
     })
+  // Another panel may save this same versioned document. Accept only confirmed
+  // snapshots while idle; never supersede an in-flight or uncertain request.
+  function acceptExternal(id: number, value: WritingDesk) {
+    if (novelId.value !== id || loading.value || saving.value || pending) return
+    if (!data.value || value.version > data.value.version) data.value = clone(value)
+  }
   function $reset() {
     generation++
     readSequence++
@@ -155,6 +161,7 @@ export const useWritingDeskStore = defineStore('writingDesk', () => {
     deleteTask,
     saveBookmark,
     deleteBookmark,
+    acceptExternal,
     $reset,
   }
 })

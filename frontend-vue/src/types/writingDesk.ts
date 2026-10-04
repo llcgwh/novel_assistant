@@ -39,11 +39,22 @@ export interface ReaderBookmark extends ChapterAnchor {
   label: string
   createdAt: string
 }
+export interface Idea {
+  uid: string
+  title: string
+  body: string
+  category: 'plot' | 'character' | 'scene' | 'setting' | 'dialogue' | 'other'
+  chapterUids: string[]
+  createdAt: string
+  updatedAt: string
+  sourceKey?: string
+}
 export interface WritingDesk {
   version: number
   nextPen: NextPen | null
   tasks: RevisionTask[]
   rounds?: RevisionRound[]
   bookmarks: ReaderBookmark[]
+  ideas?: Idea[]
   mutationId?: string
 }

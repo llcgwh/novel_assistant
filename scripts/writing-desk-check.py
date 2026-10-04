@@ -110,7 +110,7 @@ def main():
     })
     foreign_chapter = api("POST", f"/novels/{foreign}/writing/chapters", {"uid": uid(), "title": "另一本书"})
     empty = api("GET", prefix + "/writing/desk")
-    require(content(empty) == {"nextPen": None, "tasks": [], "bookmarks": [], "rounds": []}, "New work has nonempty desk")
+    require(content(empty) == {"nextPen": None, "tasks": [], "bookmarks": [], "rounds": [], "ideas": []}, "New work has nonempty desk")
     moment = datetime.datetime.now(datetime.timezone.utc).isoformat()
     anchor = {"chapterUid": chapter_uid, "blockId": block_id, "excerpt": "潮声穿过灯塔。"}
     request = {

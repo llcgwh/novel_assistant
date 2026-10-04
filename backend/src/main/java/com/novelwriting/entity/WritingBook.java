@@ -26,6 +26,10 @@ public class WritingBook {
   @Column(columnDefinition = "TEXT")
   private String deskData;
 
+  // Server-owned activity aggregates and idempotent focus receipts.
+  @Column(columnDefinition = "TEXT")
+  private String statsData;
+
   private long changeSequence;
   private long syncedSequence;
 

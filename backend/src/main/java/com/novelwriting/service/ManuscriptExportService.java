@@ -65,7 +65,7 @@ public class ManuscriptExportService {
     ) throw WritingService.bad("导出范围含无效章节");
     String format = options.path("format").asText("txt");
     List<AppendixSection> appendix = options.path("includeNotes").asBoolean()
-      ? appendix(novelId, chapters, titles)
+      ? appendix(novelId, chapters, titles, book, chapters.size() == all.size())
       : List.of();
     if (format.equals("docx")) return docx(
       novel,
@@ -137,7 +137,9 @@ public class ManuscriptExportService {
   private List<AppendixSection> appendix(
     Long novelId,
     List<WritingChapter> chapters,
-    Map<String, String> titles
+    Map<String, String> titles,
+    WritingBook book,
+    boolean wholeBook
   ) {
     List<AppendixSection> sections = new ArrayList<>();
     Map<String, ResourceNote> cache = new HashMap<>();
@@ -173,6 +175,39 @@ public class ManuscriptExportService {
         new AppendixSection(titles.get(chapter.getUid()), notes, resources)
       );
     }
+    Set<String> selected = new HashSet<>();
+    chapters.forEach(chapter -> selected.add(chapter.getUid()));
+    Map<String, String> ideaChapterTitles = new HashMap<>(titles);
+    for (WritingChapter chapter : writing.chapters(novelId)) {
+      if (chapter.isDeleted()) ideaChapterTitles.put(chapter.getUid(), chapter.getTitle() + "（回收站）");
+    }
+    List<ResourceNote> ideas = new ArrayList<>();
+    for (JsonNode idea : WritingDeskDocuments.read(book).path("ideas")) {
+      List<String> linked = new ArrayList<>();
+      boolean inScope = wholeBook;
+      for (JsonNode chapter : idea.path("chapterUids")) {
+        String uid = chapter.asText();
+        inScope |= selected.contains(uid);
+        linked.add(ideaChapterTitles.getOrDefault(uid, "已不存在的章节（" + uid + "）"));
+      }
+      if (!inScope) continue;
+      String category = switch (idea.path("category").asText()) {
+        case "plot" -> "情节";
+        case "character" -> "人物";
+        case "scene" -> "场景";
+        case "setting" -> "设定";
+        case "dialogue" -> "对白";
+        default -> "其他";
+      };
+      String title = idea.path("title").asText();
+      if (title.isBlank()) title = "未命名灵感";
+      ideas.add(new ResourceNote(title, List.of(
+        "分类：" + category,
+        "关联章节：" + (linked.isEmpty() ? "未关联章节" : String.join("、", linked)),
+        idea.path("body").asText()
+      )));
+    }
+    if (!ideas.isEmpty()) sections.add(new AppendixSection("灵感收件箱", "", ideas));
     return sections;
   }
 

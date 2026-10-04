@@ -88,6 +88,29 @@ python3 scripts/writing-integration-check.py /输出目录/run.json
 python3 scripts/writing-desk-check.py /输出目录/run.json
 ```
 
-它创建自己的虚构作品，验证下一笔、任务、书签、轮次的版本保护、跨作品拒绝、备份往返和实际 WebDAV 文件，不修改浏览器验收作品。`writing_books.desk_data` 为可空 TEXT；旧记录读取为默认空文档。缺少 desk 或 rounds 的旧包禁止静默清除对应已有数据；遇到该提示应恢复到新作品。轮次属于 desk 文档，没有新增独立数据表。
+它创建自己的虚构作品，验证下一笔、任务、书签、轮次的版本保护、跨作品拒绝、备份往返和实际 WebDAV 文件，不修改浏览器验收作品。`writing_books.desk_data` 为可空 TEXT；旧记录读取为默认空文档。缺少 desk、rounds 或 ideas 的旧包禁止静默清除对应已有数据；遇到该提示应恢复到新作品。轮次和灵感属于 desk 文档，没有新增独立数据表。灵感最多 1,000 条，单条正文最多 20,000 字符、关联最多 200 章，与其他创作便签共用 2 MiB 上限。
+
+灵感与创作统计有单独的真实接口回归，继续使用 `integration-check.py --keep` 创建的独立环境：
+
+```sh
+python3 scripts/idea-inbox-check.py /输出目录/run.json
+python3 scripts/writing-stats-check.py /输出目录/run.json
+# 加测 20,000 条专注回执、36,600 个日期的完整保留与容量拒绝
+python3 scripts/writing-stats-check.py /输出目录/run.json --capacity
+```
+
+这些脚本创建各自的虚构作品，不启动或停止服务；统计回归检查历史目标、正文修改和定稿口径、专注终态幂等、备份／WebDAV 往返及旧包保护。使用非默认 PostgreSQL 端口时传入相同的 `PGPORT`；服务地址可用 `IT_PORT` 指定。输出分别为 `idea-inbox-result.json`、`writing-stats-result.json`，最终验收记录见 [实施记录](writing-implementation.md)。
+
+## C12 统计升级与兼容
+
+新增 `writing_books.stats_data` 可空 TEXT，旧书读取为空统计，不从现有正文、会话或今日目标反推历史。启用 `spring.jpa.hibernate.ddl-auto=update` 时由后端启动补列；手动管理结构时，先停止使用同一数据库的后端、备份数据库及对应上传目录和密钥，再对已有写作表执行 [database/migration_v6.sql](../database/migration_v6.sql)，随后部署新后端和前端。此迁移只增加统计列，不修改既有正文或会话。
+
+原手输、粘贴、净增和活跃时间仍保存在 `writing_sessions`，按会话标识和递增序号更新。修订保存、定稿转换、每日目标及专注结果由服务端独立聚合，旧客户端替换 `preferences` 不会清空它们。成功正文保存对比前后纯文本；仅元数据或文字样式变化、失败和重试不会增加修订次数。新建、拆合章及整本恢复不产生这类活动，采用历史正文后正常保存则按实际文本变化处理。
+
+新客户端向正文保存、偏好更新和 `/writing/stats/day` 发送顶层 `date` 与 `timezoneOffsetMinutes`，后者使用 JavaScript `getTimezoneOffset()` 的分钟及符号约定。请求初次构造时固定日期，重试不重取新日期。服务端据偏移判断当前本地日，只为当前日捕获或更新目标；旧日缺少快照保持未知。旧客户端未传日期／偏移时兼容使用服务端本地日，因此升级前的历史记录可能采用不同日期口径。
+
+专注只在完成或取消后提交终态；每部作品内使用固定 UUID 去重，相同回执重试不改变统计，不同结果使用相同 UUID 返回冲突。前端保留冲突原件并提供 JSON 导出，同时继续上传其他正常时段；不会自动用另一终态覆盖服务端结果。回执随完整备份和 WebDAV 保存，恢复后仍可去重；备份校验同时核对回执与每日专注合计。缺少 `writing.stats` 的旧包若要覆盖已有统计，会在恢复前拒绝；可导入新作品。公开统计接口不返回全部回执，也不接受客户端整体覆盖统计文档。
+
+统计文档上限 8 MiB、每日记录上限 36,600 行、专注终态上限 20,000 条；不自动清理。专注单次合计最多 24 小时、最多 366 个日期分段。超限或数据无效明确拒绝写入，不截断现有统计；容量满时已接收回执的相同重试仍可确认成功。前端保留失败的待上传记录并提示重试，容量不足需先解决容量原因，当前没有统计清理入口。未提交的专注、灵感和正文草稿不属于服务端备份，迁移前应先确认本机待保存状态。
 
 已用 PostgreSQL 18 和 WsgiDAV 4.3.5 通过集成测试；这不代表已验证每一家云盘或 NAS 的特殊行为。前端 npm 审计在 2026-09-26 为 0 项告警，后端已升级 Spring Boot 3.5.16 并使用 Hibernate 6 对应的 Jackson 模块；未声称后端或未来依赖永久无漏洞。

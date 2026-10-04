@@ -12,6 +12,8 @@ props = dict(line.split('=', 1) for line in (ROOT/'backend/src/main/resources/ap
 env = os.environ.copy()
 env['PGPASSWORD'] = os.environ.get('PGPASSWORD', props['spring.datasource.password'])
 USER = os.environ.get('PGUSER', props['spring.datasource.username'])
+PGPORT = int(os.environ.get('PGPORT', '5432'))
+if not 1 <= PGPORT <= 65535: raise ValueError('Invalid PostgreSQL port')
 def sql(database, command):
     return subprocess.check_output([str(PG/'psql'), '-h', 'localhost', '-U', USER, '-d', database, '-v', 'ON_ERROR_STOP=1', '-Atc', command], env=env, text=True).strip()
 def stop(pid):
@@ -73,7 +75,7 @@ app=WsgiDAVApp({'provider_mapping': {'/': os.environ['DAV_ROOT']}, 'verbose':0,
 Server(('127.0.0.1',int(os.environ['DAV_PORT'])),app).start()
 '''
     launch([DAV_PYTHON,'-c',dav_code], dav_env, run/'dav.log')
-    app_env = env.copy(); app_env.update(SPRING_DATASOURCE_URL=f'jdbc:postgresql://localhost:5432/{name}', SPRING_DATASOURCE_USERNAME=USER,
+    app_env = env.copy(); app_env.update(SPRING_DATASOURCE_URL=f'jdbc:postgresql://localhost:{PGPORT}/{name}', SPRING_DATASOURCE_USERNAME=USER,
         SPRING_DATASOURCE_PASSWORD=env['PGPASSWORD'], SERVER_PORT=str(port), SERVER_ADDRESS='127.0.0.1', SPRING_JPA_SHOW_SQL='false',
         APP_UPLOAD_DIR=str(run/'uploads'), NOVEL_CREDENTIAL_KEY_FILE=str(run/'old.key'))
     app_env.pop('NOVEL_CREDENTIAL_KEY',None)
