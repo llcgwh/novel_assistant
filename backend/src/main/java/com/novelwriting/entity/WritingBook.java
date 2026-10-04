@@ -30,6 +30,10 @@ public class WritingBook {
   @Column(columnDefinition = "TEXT")
   private String statsData;
 
+  // Independent, versioned local copies of the shared series setting templates.
+  @Column(columnDefinition = "TEXT")
+  private String seriesData;
+
   private long changeSequence;
   private long syncedSequence;
 

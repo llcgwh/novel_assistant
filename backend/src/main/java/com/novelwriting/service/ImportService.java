@@ -16,6 +16,7 @@ import java.util.*;
 public class ImportService {
 
     @Autowired private WritingService writingService;
+    @Autowired private SeriesService seriesService;
 
     @Autowired
     private NovelRepository novelRepository;
@@ -57,6 +58,7 @@ public class ImportService {
         JsonNode root = mapper.readTree(jsonData);
         BackupValidator.validate(root);
         writingService.protectLegacyRestore(novelId,root);
+        seriesService.preflightRestore(novelId, root); // Novel -> catalog locks; before any native data deletion.
         Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new IllegalArgumentException("Novel not found"));
 
@@ -401,6 +403,8 @@ public class ImportService {
         }
 
         writingService.restoreBackup(novelId,root.get("writing"),Map.of("characters",oldToNewCharacterIds,"timeline",oldToNewTimelineIds,"foreshadows",oldToNewForeshadowIds,"outlines",oldToNewOutlineIds,"scenes",oldToNewSceneIds,"worldview",oldToNewWorldviewIds,"map",oldToNewMapLocationIds,"tags",oldToNewTagIds));
+
+        seriesService.restoreNovel(novelId, root.path("series"));
 
         // Novel info update (keep existing, just update title/description if present)
         JsonNode novelNode = root.get("novel");

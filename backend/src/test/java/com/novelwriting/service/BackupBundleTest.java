@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(showSql = false, properties = "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect")
-@Import({com.novelwriting.security.TestCredentials.class, BackupBundleService.class, ExportService.class, ImportService.class, WritingService.class, WritingDeskService.class})
+@Import({com.novelwriting.security.TestCredentials.class, BackupBundleService.class, ExportService.class, SeriesService.class, ImportService.class, WritingService.class, WritingDeskService.class})
 class BackupBundleTest {
     static final Path ROOT = tempDirectory();
     static final byte[] PNG = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=");

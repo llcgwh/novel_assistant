@@ -32,12 +32,13 @@ public class BackupBundleService {
     @Autowired private ExportService exporter;
     @Autowired private ImportService importer;
     @Autowired private WritingService writing;
+    @Autowired private SeriesService series;
     @Autowired private ImageRepository images;
     @Autowired private NovelRepository novels;
     @Value("${app.upload.dir:uploads}") private String uploadDir;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    @Transactional(rollbackFor = Exception.class, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public byte[] exportBundle(Long novelId) throws Exception {
         ObjectNode bundle = mapper.createObjectNode();
         bundle.put("format", FORMAT);
@@ -97,8 +98,23 @@ public class BackupBundleService {
         rewriteImages(rawData.deepCopy(), sourceId, sourceId, ids);
     }
 
+    /** All input identities and assets must pass before even the recovery copy replaces any records. */
+    @Transactional(rollbackFor = Exception.class)
+    public void preflightRestore(Long novelId, byte[] bytes) throws Exception {
+        if (bytes.length > MAX_BACKUP_BYTES) throw new IOException("Backup exceeds 48 MiB limit");
+        JsonNode root = mapper.readTree(bytes);
+        JsonNode data = root;
+        if (root != null && root.has("format")) {
+            validateRecoveryBundle(root);
+            data = root.path("data");
+        } else BackupValidator.validate(root);
+        writing.protectLegacyRestore(novelId, data);
+        series.preflightRestore(novelId, data);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Long restoreWithCopy(Long novelId, byte[] bytes) throws Exception {
+        preflightRestore(novelId, bytes);
         writing.book(novelId); // Lock before capturing the original so concurrent writing cannot escape the safety copy.
         Novel source = novels.findById(novelId).orElseThrow(() -> new IOException("Novel not found"));
         byte[] local = exportBundle(novelId);
@@ -122,6 +138,7 @@ public class BackupBundleService {
         JsonNode rawData = bundle.path("data");
         BackupValidator.validate(rawData);
         writing.protectLegacyRestore(novelId, rawData);
+        series.preflightRestore(novelId, rawData); // Validate C08 identities/capacity before image records or files change.
         ObjectNode data = (ObjectNode) rawData;
         long sourceId = data.path("novel").path("id").asLong();
         if (sourceId <= 0) throw new IOException("Missing source novel ID");

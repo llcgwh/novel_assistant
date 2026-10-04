@@ -402,6 +402,7 @@ public class WritingCloudService {
         WritingBook target = writing.book(id);
         Novel source = em.find(Novel.class, id);
         try {
+          bundles.preflightRestore(id, JSON.writeValueAsBytes(cloud.path("bundle")));
           byte[] local = bundles.exportBundle(id);
           Novel copy = new Novel();
           String copyTitle =

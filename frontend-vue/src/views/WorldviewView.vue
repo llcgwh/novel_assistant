@@ -16,9 +16,12 @@
           placeholder="搜索世界观..."
           @input="debouncedSearch"
         />
+        <button class="btn-secondary" type="button" :aria-expanded="seriesOpen" @click="seriesOpen = true">系列设定母本</button>
         <button class="btn-primary" @click="showCreateModal = true">+ 添加条目</button>
       </div>
     </div>
+
+    <SeriesWorkspace v-if="seriesOpen" :key="seriesNovelId" :novel-id="seriesNovelId" @close="seriesOpen = false" />
 
     <LoadingState v-if="worldviewStore.loading" />
 
@@ -181,6 +184,8 @@
 
 <script setup lang="ts">
 import StudioIcon from '@/components/common/StudioIcon.vue'
+import SeriesWorkspace from '@/components/series/SeriesWorkspace.vue'
+import { useRoute } from 'vue-router'
 import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted, watch, computed } from 'vue'
@@ -200,6 +205,9 @@ import TagList from '@/components/tags/TagList.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 
+const seriesRoute = useRoute()
+const seriesNovelId = computed(() => Number(seriesRoute.params.novelId))
+const seriesOpen = ref(false)
 const worldviewStore = useWorldviewStore()
 const formSaver = useFormSave('worldview', () => worldviewStore.entries)
 const tagsStore = useTagsStore()

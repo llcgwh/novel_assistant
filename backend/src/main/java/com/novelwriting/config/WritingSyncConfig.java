@@ -58,6 +58,8 @@ public class WritingSyncConfig implements WebMvcConfigurer {
           String path = m.group(2) == null ? "" : m.group(2);
           if (
             path.startsWith("writing") ||
+            path.equals("series") ||
+            path.startsWith("series/") ||
             path.startsWith("webdav") ||
             path.startsWith("export") ||
             (request.getMethod().equals("DELETE") && path.isEmpty())

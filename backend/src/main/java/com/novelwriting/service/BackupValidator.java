@@ -18,8 +18,9 @@ final class BackupValidator {
             require(root.get("schemaVersion").isIntegralNumber(), "Invalid schemaVersion");
             require(root.get("schemaVersion").canConvertToInt(), "Invalid schemaVersion");
             version = root.get("schemaVersion").asInt();
-            require(version >= 1 && version <= 3, "Unsupported backup version");
+            require(version >= 1 && version <= 4, "Unsupported backup version");
         }
+        if (version >= 4 || root.has("series")) SeriesDocuments.validateBackup(root.path("series"));
         List<String> sections = new ArrayList<>(REQUIRED);
         sections.addAll(OPTIONAL);
         Map<String, Set<Long>> ids = new HashMap<>();

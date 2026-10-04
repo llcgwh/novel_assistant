@@ -2,6 +2,7 @@ package com.novelwriting.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.novelwriting.service.WritingCloudService;
+import com.novelwriting.service.SeriesProblem;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +55,9 @@ public class WritingCloudController {
 
   @ExceptionHandler(ResponseStatusException.class)
   public ResponseEntity<?> status(ResponseStatusException e) {
+    if (e instanceof SeriesProblem series) return ResponseEntity.status(series.getStatusCode()).body(
+      Map.of("code", series.getCode(), "message", series.getReason())
+    );
     return ResponseEntity.status(e.getStatusCode()).body(
       Map.of("message", e.getReason() == null ? "同步未完成" : e.getReason())
     );

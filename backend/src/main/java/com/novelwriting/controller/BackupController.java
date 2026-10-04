@@ -1,6 +1,7 @@
 package com.novelwriting.controller;
 
 import com.novelwriting.service.BackupBundleService;
+import com.novelwriting.service.SeriesProblem;
 import com.novelwriting.service.BackupOperationService;
 import static com.novelwriting.service.WritingDocuments.JSON;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,8 @@ public class BackupController {
             return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=novel.backup.json")
                     .body(operations.run(novelId, "BACKUP_EXPORT", () -> backups.exportBundle(novelId)));
+        } catch (SeriesProblem e) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getCode(), "message", e.getReason()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", BackupOperationService.failureMessage(e)));
         }
@@ -35,6 +38,8 @@ public class BackupController {
                 Long copy = backups.restoreWithCopy(novelId, data);
                 return JSON.createObjectNode().put("message", "恢复成功；原稿保留为作品 #" + copy).put("copyNovelId", copy);
             }));
+        } catch (SeriesProblem e) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("code", e.getCode(), "message", e.getReason()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", BackupOperationService.failureMessage(e)));
         }

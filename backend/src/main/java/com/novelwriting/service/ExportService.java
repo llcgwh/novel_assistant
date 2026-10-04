@@ -19,6 +19,7 @@ import java.util.*;
 public class ExportService {
 
     @Autowired private WritingService writingService;
+    @Autowired private SeriesService seriesService;
 
     @Autowired
     private NovelRepository novelRepository;
@@ -53,7 +54,7 @@ public class ExportService {
     @Autowired
     private RelationshipGroupRepository relationshipGroupRepository;
 
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public byte[] exportNovelToJson(Long novelId) throws Exception {
         Map<String, Object> exportData = buildExportData(novelId);
 
@@ -407,7 +408,9 @@ public class ExportService {
 
         Novel novel = novelRepository.findById(novelId)
                 .orElseThrow(() -> new RuntimeException("Novel not found"));
-        data.put("schemaVersion", 3);
+        data.put("schemaVersion", 4);
+        // Initialize the server-owned empty series state and book before exporting either section.
+        data.put("series", seriesService.exportNovel(novelId));
         data.put("writing", writingService.exportBackup(novelId));
         data.put("novel", novel);
 
