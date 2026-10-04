@@ -85,6 +85,7 @@
       ><button
         class="icon-button"
         :aria-label="studio.theme === 'dark' ? '切换晨雾主题' : '切换夜航主题'"
+        @pointerdown="studio.preserveThemeFocus"
         @click="studio.toggleTheme"
       >
         <StudioIcon :name="studio.theme === 'dark' ? 'sun' : 'moon'" />

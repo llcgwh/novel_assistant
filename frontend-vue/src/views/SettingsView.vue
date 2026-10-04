@@ -8,7 +8,7 @@
 
     <div class="settings-section">
       <h3>工作室外观</h3><p>夜航适合沉浸构思，晨雾适合日间阅读。</p>
-      <div class="theme-choices"><button class="theme-choice" :aria-pressed="studio.theme === 'dark'" @click="studio.theme = 'dark'"><span class="theme-swatch night"></span>夜航 · 深墨与青光</button><button class="theme-choice" :aria-pressed="studio.theme === 'light'" @click="studio.theme = 'light'"><span class="theme-swatch day"></span>晨雾 · 纸白与松绿</button></div>
+      <div class="theme-choices"><button class="theme-choice" :aria-pressed="studio.themePreference === 'dark'" @pointerdown="studio.preserveThemeFocus" @click="studio.requestTheme('dark', $event)"><span class="theme-swatch night"></span>夜航 · 深墨与青光</button><button class="theme-choice" :aria-pressed="studio.themePreference === 'light'" @pointerdown="studio.preserveThemeFocus" @click="studio.requestTheme('light', $event)"><span class="theme-swatch day"></span>晨雾 · 纸白与松绿</button><button class="theme-choice" :aria-pressed="studio.themePreference === 'system'" @pointerdown="studio.preserveThemeFocus" @click="studio.requestTheme('system', $event)">跟随系统</button></div>
     </div>
     <div v-if="inNovel" class="settings-section">
       <h3>作品导出</h3><p>把当前作品的资料带到你喜欢的写作环境。</p><div class="export-actions"><button class="btn-secondary" @click="exportApi.downloadMarkdown()">完整 Markdown</button><button class="btn-secondary" @click="exportApi.downloadJson()">数据 JSON</button><button class="btn-secondary" @click="exportApi.downloadCharactersMarkdown()">人物档案</button><button class="btn-secondary" @click="exportApi.downloadOutlinesMarkdown()">章节大纲</button><button class="btn-secondary" @click="exportApi.downloadWorldviewMarkdown()">世界设定</button></div>

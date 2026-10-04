@@ -14,6 +14,7 @@
   ></div>
   <router-view :key="String(route.params.novelId || 'global')" />
   <BookPassage />
+  <ThemeTransition />
   <ProjectSignature v-if="route.name !== 'NovelSelector'" />
   <Toast />
 </template>
@@ -24,6 +25,7 @@ import { watchEffect } from 'vue'
 import { useStudioStore } from '@/stores/studio'
 import Toast from '@/components/common/Toast.vue'
 import BookPassage from '@/components/studio/BookPassage.vue'
+import ThemeTransition from '@/components/studio/ThemeTransition.vue'
 import ProjectSignature from '@/components/studio/ProjectSignature.vue'
 import { useAppStore } from '@/stores/app'
 

@@ -184,3 +184,18 @@ C08 已完成。世界设定页新增可收起的母本编辑区，不调整侧�
 截图：[本作副本与按钮对齐](screenshots/series-local-copy.png)、[窄屏比较入口](screenshots/series-compare-aligned-mobile.png)、[三方字段比较](screenshots/series-comparison.png)、[窄屏字段比较](screenshots/series-comparison-mobile.png)、[窄屏草稿编辑](screenshots/series-editor-mobile.png)、[历史恢复预览](screenshots/series-history-preview.png)、[母本导入预览](screenshots/series-import-mobile.png)、[存储失败保护](screenshots/series-storage-protection.png)。
 
 构建仍提示既有 Sass 弃用和写作页分块超过 500 kB，未阻止构建；未将这些检查当作 C16 长章输入性能验收。第三方 WebDAV 服务兼容性没有逐家实测；完整共享母本库也不自动跨服务器同步。
+
+## 主题过渡与跟随系统（2026-10-04）
+
+主动切换夜航／晨雾时，当前主题画布从按钮位置圆形展开覆盖全屏，中央显示当前主题的月亮／太阳；短暂停留后，同一个 SVG 图形与背景一起连续变为目标主题，再淡出回到页面。四段标称时间为 260／140／380／200 ms，双向共用同一流程。颜色取自实际主题变量，太阳使用晨雾的暖色，月亮使用夜航的正文亮色；提前固定两端颜色，完整遮住页面并完成形变后才提交主题，等待页面更新后退场。
+
+新增全局 `ThemeTransition`，通过 Teleport 放到 body，不改变路由键或编辑器生命周期。四处既有主题入口共用同一请求；重复触发不会排队，Escape、缩放／旋转、路由变化、原生弹窗出现、动画取消或组件卸载都会落到目标并清理。动画期间拦截遮罩上的误点与触摸拖动，不接管页面滚动锁或焦点。系统减少动态、关闭空间转场或缺少动画能力时直接切换；首次加载不播放。
+
+设置页增加“跟随系统”。保存的偏好与当前有效配色分开，保留已有夜航／晨雾偏好和默认值；系统变化直接更新有效主题，不播放动画、不把“跟随系统”覆盖成手动值。主动切换会退出跟随模式。系统事件与正在进行的手动选择竞争时保留手动意图；正在切入跟随模式时则结束动画并使用最新系统配色。主题偏好仍保存在本浏览器，不混入作品数据或云端备份。
+
+- **测试与构建通过**：前端 **420/420**，新增 82 项覆盖时序、中断、WAAPI 故障、监听释放、真实组件逻辑与 Pinia 系统偏好竞争；`vue-tsc -b && vite build` 通过。既有 Sass 弃用及写作页超过 500 kB 的提示仍在。后端、依赖和数据库结构未改，本批未重新运行后端测试。
+- **实际动态验收通过**：在 Mac Chrome 的隔离写作样本中录制双向过渡，共 57 帧，实测约 1,001／983 ms；每次捕获 23 种中间背景色，目标主题在退场前已就绪，主题偏好各写入一次。逐帧检查月牙、射线、背景和退场，编辑器节点、选区、焦点与滚动位置保持不变。
+- **22 项补充浏览器检查通过**：键盘 Enter、快速重复、Escape、窗口变化、方向事件、原生动画取消、弹窗出现、系统／应用减少动态、中途关闭动效、缺少 WAAPI、深滚动、320 px 窄屏、触摸模拟拖动、system 初始化／变化／刷新／竞争、顶部按钮退出跟随、卸载及刷新保留。无浏览器运行时错误。真实手机输入法、Safari 和 Firefox 尚未单独实测。
+- 演示与截图：[双向动效实录](screenshots/theme-transition.gif)、[中途形变](screenshots/theme-morph.jpg)、[窄屏月相](screenshots/theme-mobile-moon.png)、[跟随系统](screenshots/theme-system-settings.png)、[窄屏设置](screenshots/theme-system-settings-mobile.png)。这些补充完成了本次主题需求，不将整个 C15 标记完成。
+
+实现参考官方文档：[Vue Teleport](https://vuejs.org/guide/built-ins/teleport.html)、[Vue nextTick](https://vuejs.org/api/general.html#nexttick)、[CSS clip-path](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/clip-path)、[SVG mask](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/mask)、[Animation.finished](https://developer.mozilla.org/en-US/docs/Web/API/Animation/finished) 与 [prefers-reduced-motion](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-reduced-motion)。取消动画会拒绝其完成 Promise，因此实际实现统一消费该结果并在收尾释放资源。

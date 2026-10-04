@@ -41,7 +41,10 @@
           <StudioIcon :name="studio.theme === 'dark' ? 'moon' : 'sun'" />
         </div>
         <div class="sheet-settings-controls">
-          <button @click="studio.toggleTheme">
+          <button
+            @pointerdown="studio.preserveThemeFocus"
+            @click="studio.toggleTheme"
+          >
             {{ studio.theme === 'dark' ? '夜航 · 切换晨雾' : '晨雾 · 切换夜航'
             }}<StudioIcon name="arrow" /></button
           ><button
