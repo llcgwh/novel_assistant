@@ -58,7 +58,7 @@ function updateDock() {
   if (!dock.value || !signature.value) return
   const target = dock.value.getBoundingClientRect()
   const badge = signature.value
-  // Start moving before the footer enters, then settle into its reserved row.
+  // Start moving before the footer enters, then settle into its reserved space.
   const nearFooter = target.top <= window.innerHeight + 80
   dockStyle.value = {
     '--signature-x': nearFooter
@@ -92,18 +92,22 @@ onBeforeUnmount(() => {
 <style>
 .studio-page-footer.library-footer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
   gap: 20px;
 }
+.library-footer > span:first-child {
+  grid-column: 1;
+}
 .library-footer > span:nth-child(2) {
+  grid-column: 3;
   text-align: right;
 }
 .library-footer > span {
-  grid-row: 2;
+  grid-row: 1;
 }
 .project-signature-anchor {
-  grid-column: 1 / -1;
+  grid-column: 2;
   grid-row: 1;
   min-height: 44px;
 }
@@ -204,6 +208,19 @@ onBeforeUnmount(() => {
   }
   .studio-page-footer.library-footer {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+@media (max-width: 720px) {
+  .studio-page-footer.library-footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .library-footer > span:nth-child(2) {
+    grid-column: 2;
+  }
+  .project-signature-anchor {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }
 </style>
