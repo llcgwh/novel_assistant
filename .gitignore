@@ -12,6 +12,7 @@ backend/uploads/
 # Frontend
 frontend-vue/node_modules/
 frontend-vue/dist/
+frontend-vue/*.tsbuildinfo
 
 # Temp files
 tmpclaude-*
