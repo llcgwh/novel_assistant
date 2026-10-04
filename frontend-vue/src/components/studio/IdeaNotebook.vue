@@ -5,11 +5,11 @@
       <button type="button" class="icon-button" aria-label="导出全部灵感 Markdown" :disabled="!exportable" @click="download"><StudioIcon name="download" /></button>
     </div>
     <p class="idea-caption">已保存素材随作品同步与完整备份。未提交草稿只在本机。</p>
-    <div class="idea-toolbar">
+    <div class="idea-toolbar idea-actions">
       <button class="btn-secondary" type="button" :disabled="busy || (!inbox.data && !inbox.draft)" @click="openNew">{{ inbox.draft ? '继续本机草稿' : '记下灵感' }}</button>
       <button class="btn-secondary" type="button" :disabled="busy" @click="run(() => inbox.reload())">重新读取</button>
-      <label>分类<BaseSelect v-model="category" aria-label="筛选灵感分类" :options="[{ value: 'all', label: '全部分类' }, ...ideaCategories]" /></label>
     </div>
+    <label class="idea-filter"><span>分类</span><BaseSelect v-model="category" aria-label="筛选灵感分类" :options="[{ value: 'all', label: '全部分类' }, ...ideaCategories]" /></label>
     <p v-if="inbox.loading" role="status">正在取回灵感…</p>
     <p v-if="displayError || inbox.error" class="idea-warning" role="alert">{{ displayError || inbox.error }}</p>
     <p v-if="inbox.storageError" class="idea-warning" role="alert">{{ inbox.storageError }}</p>
@@ -154,9 +154,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .idea-caption { color: var(--muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .idea-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin: 12px 0; }
 .idea-toolbar button, .idea-legacy button, .idea-warning button { font-size: 12px; padding: 7px 10px; }
-.idea-toolbar label { display: flex; gap: 7px; align-items: center; font-size: 12px; }
+.idea-actions > button { min-height: 36px; }
+.idea-filter { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 12px; margin: 12px 0; font-size: 12px; color: var(--muted); --select-height: 36px; --select-padding-y: 8px; --select-font-size: 12px; }
+.idea-filter > span { white-space: nowrap; }
 .idea-toolbar a { font-size: 12px; }
-.idea-toolbar select { max-width: 150px; }
 .idea-list { display: grid; gap: 12px; max-height: 540px; overflow-y: auto; }
 .idea-card { border: 1px solid var(--line); border-radius: 10px; padding: 13px; min-width: 0; }
 .idea-card[draggable='true'] { cursor: grab; }
