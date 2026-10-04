@@ -24,6 +24,7 @@ export interface SyncResult {
   message: string
   timestamp?: string
   filename?: string
+  copyNovelId?: number
   size?: number
 }
 

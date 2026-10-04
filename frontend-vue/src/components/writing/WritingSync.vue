@@ -57,7 +57,7 @@
       >
         查看云端版本</button
       ><RouterLink :to="`/novel/${writer.novelId}/settings`"
-        >配置 WebDAV ↗</RouterLink
+        >WebDAV 设置、同步记录与清理 ↗</RouterLink
       >
     </div>
     <details>
@@ -104,7 +104,7 @@
       v-if="remote"
       :busy="busy"
       title="比较云端与本机稿件"
-      @close="remote = null"
+      @close="cancelPreview"
       ><p>云端作品：{{ remote.title }} · {{ remote.chapters.length }} 章</p>
       <p>
         下载会恢复整部作品，包括正文和资料。本机当前作品会先复制成独立作品，方便保留、比较与取回。
@@ -147,7 +147,7 @@
           type="button"
           class="btn-secondary"
           :disabled="busy"
-          @click="remote = null"
+          @click="cancelPreview"
         >
           取消</button
         ><button
@@ -163,7 +163,7 @@
   </section>
 </template>
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { writingApi } from '@/api/writing'
 import { documentText } from '@/utils/writing'
 import { request } from '@/api/request'
@@ -179,7 +179,7 @@ const writer = useWritingStore(),
   error = ref(''),
   versions = ref<any[]>([]),
   remote = ref<any>(null),
-  file = ref(''),
+  previewTarget = ref<{ book: string; file: string } | null>(null),
   confirmed = ref(false)
 const compareUid = ref(''),
   localText = ref('')
@@ -187,9 +187,73 @@ const novelId = writer.novelId
 let disposed = false
 const active = () => !disposed && writer.novelId === novelId
 let comparisonRequest = 0
+let inspectingUid: string | null = null
+let requestSequence = 0
+let pending: { id: number; action: string } | null = null
+const book = () => remoteUid.value || writer.workspace?.uid || ''
+const current = (id: number) =>
+  active() && pending?.id === id && requestSequence === id
+function begin(action: string, message: string) {
+  if (!active() || pending) return
+  const id = ++requestSequence
+  pending = { id, action }
+  busy.value = true
+  operation.value = message
+  error.value = ''
+  return id
+}
+function finish(id: number) {
+  if (pending?.id !== id) return
+  pending = null
+  if (!active()) return
+  busy.value = false
+  operation.value = ''
+}
+function clearPreview() {
+  comparisonRequest++
+  inspectingUid = null
+  remote.value = null
+  previewTarget.value = null
+  confirmed.value = false
+  compareUid.value = ''
+  localText.value = ''
+}
+function invalidate(releaseMutation = false) {
+  requestSequence++
+  // A sent mutation keeps its lock until it settles, even if its input changes.
+  if (!releaseMutation && (pending?.action === 'push' || pending?.action === 'pull'))
+    return
+  pending = null
+  busy.value = false
+  operation.value = ''
+}
+function cancelPreview() {
+  if (pending?.action === 'pull') return
+  if (pending?.action === 'preview') invalidate()
+  clearPreview()
+  error.value = ''
+}
+watch(remoteUid, () => {
+  invalidate()
+  clearPreview()
+  versions.value = []
+  error.value = ''
+}, { flush: 'sync' })
+watch(() => writer.novelId, () => {
+  invalidate(true)
+  clearPreview()
+  versions.value = []
+  error.value = ''
+  remoteUid.value = ''
+}, { flush: 'sync' })
 async function inspect(uid: string) {
+  if (!active() || !remote.value || inspectingUid === uid) return
+  const snapshot = remote.value
+  inspectingUid = null
   compareUid.value = uid
   const requestId = ++comparisonRequest
+  const currentComparison = () =>
+    active() && comparisonRequest === requestId && remote.value === snapshot
   localText.value = '正在读取…'
   if (writer.current?.uid === uid) {
     localText.value = documentText(writer.current.doc)
@@ -199,13 +263,16 @@ async function inspect(uid: string) {
     localText.value = '本机没有这一章'
     return
   }
+  inspectingUid = uid
   try {
-    const chapter = await writingApi.chapter(writer.novelId, uid)
-    if (comparisonRequest === requestId)
+    const chapter = await writingApi.chapter(novelId, uid)
+    if (currentComparison())
       localText.value = documentText(chapter.doc)
   } catch {
-    if (comparisonRequest === requestId)
+    if (currentComparison())
       localText.value = '本机正文读取失败，请重试'
+  } finally {
+    if (currentComparison()) inspectingUid = null
   }
 }
 const comparison = computed(() => {
@@ -235,77 +302,102 @@ function url(path: string) {
   return `/novels/${novelId}/writing/cloud/${path}`
 }
 async function load() {
-  busy.value = true
-  operation.value = '正在读取云端版本…'
-  error.value = ''
+  const id = begin('load', '正在读取云端版本…')
+  if (id === undefined) return
+  const targetBook = book()
+  clearPreview()
   try {
-    versions.value = await request.get<any, any[]>(url('versions'), {
-      params: { book: remoteUid.value },
-      timeout: 60000,
-    })
+    await readVersions(id, targetBook)
   } catch (e: any) {
-    error.value = e?.response?.data?.message || '云端读取失败，请检查设置'
+    if (current(id))
+      error.value = e?.response?.data?.message || '云端读取失败，请检查设置'
   } finally {
-    busy.value = false
+    finish(id)
   }
+}
+async function readVersions(id: number, targetBook: string) {
+  const data = await request.get<any, any[]>(url('versions'), {
+    params: { book: targetBook },
+    timeout: 60000,
+  })
+  if (current(id)) versions.value = data
 }
 async function preview(name: string) {
-  busy.value = true
-  operation.value = '正在读取版本内容…'
-  error.value = ''
+  const id = begin('preview', '正在读取版本内容…')
+  if (id === undefined) return
+  const target = { book: book(), file: name }
+  clearPreview()
   try {
-    remote.value = await request.post(
+    const data = await request.post(
       url('preview'),
-      { book: remoteUid.value, file: name },
+      target,
       { timeout: 60000 },
     )
-    file.value = name
-    confirmed.value = false
+    if (!current(id)) return
+    remote.value = data
+    previewTarget.value = target
     await inspect(writer.current?.uid || remote.value.chapters[0]?.uid || '')
   } catch (e: any) {
-    error.value = e?.response?.data?.message || '版本读取失败'
+    if (current(id))
+      error.value = e?.response?.data?.message || '版本读取失败'
   } finally {
-    busy.value = false
+    finish(id)
   }
 }
-async function act(action: string) {
-  busy.value = true
-  operation.value =
-    action === 'pull' ? '正在保留本机副本并恢复…' : '正在保存正文并上传作品…'
-  error.value = ''
+async function act(action: 'push' | 'pull') {
+  if (action === 'pull' && (!confirmed.value || !remote.value || !previewTarget.value))
+    return
+  const target = action === 'pull'
+    ? { ...previewTarget.value! }
+    : { book: book(), file: '' }
+  const id = begin(action,
+    action === 'pull' ? '正在保留本机副本并恢复…' : '正在保存正文并上传作品…')
+  if (id === undefined) return
   try {
-    if (!(await writer.flush())) throw Error('请先保存正文或处理本机冲突')
-    if (!active()) return
+    const saved = await writer.flush()
+    if (!current(id)) return
+    if (!saved) throw Error('请先保存正文或处理本机冲突')
     await request.post(
       url(action),
-      { book: remoteUid.value, file: file.value },
+      target,
       { timeout: 120000 },
     )
-    if (!active()) return
+    if (!current(id)) return
     if (action === 'pull') {
       writer.current = null
       await writer.load(novelId)
-      if (!active()) return
+      if (!current(id)) return
       await desk.load(novelId)
-      if (!active()) return
+      if (!current(id)) return
       const first = writer.workspace?.chapters.find((c) => !c.deleted)
       if (first) await writer.select(first.uid)
-      remote.value = null
+      if (!current(id)) return
+      clearPreview()
     } else await writer.refresh()
-    await load()
+    if (!current(id)) return
+    await readVersions(id, target.book)
   } catch (e: any) {
-    error.value =
-      e?.response?.data?.message || e.message || '同步失败，本机正文仍保留'
+    if (current(id))
+      error.value =
+        e?.response?.data?.message || e.message || '同步失败，本机正文仍保留'
   } finally {
-    busy.value = false
+    finish(id)
   }
 }
 let refreshTimer: ReturnType<typeof setInterval> | undefined
+let refreshing = false
+async function refreshStatus() {
+  if (!active() || busy.value || refreshing) return
+  refreshing = true
+  try { await writer.refresh() } catch {} finally { refreshing = false }
+}
 onMounted(() => {
-  void writer.refresh().catch(() => {})
-  refreshTimer = setInterval(() => void writer.refresh().catch(() => {}), 30000)
+  void refreshStatus()
+  refreshTimer = setInterval(() => void refreshStatus(), 30000)
 })
 onBeforeUnmount(() => {
+  invalidate(true)
+  clearPreview()
   disposed = true
   clearInterval(refreshTimer)
 })

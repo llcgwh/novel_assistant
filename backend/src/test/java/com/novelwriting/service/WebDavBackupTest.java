@@ -18,7 +18,8 @@ class WebDavBackupTest {
     @Mock NovelRepository novels;
     @Mock BackupBundleService bundles;
     @Mock Sardine sardine;
-    @InjectMocks WebDavSyncService service;
+    @Mock BackupOperationService operations;
+    @Spy @InjectMocks WebDavSyncService service;
 
     Novel novel(String title) {
         Novel novel = new Novel(); novel.setId(1L); novel.setTitle(title);
@@ -30,25 +31,27 @@ class WebDavBackupTest {
         Novel novel = novel("Story"); byte[] bytes = {1, 2, 3};
         when(novels.findById(1L)).thenReturn(Optional.of(novel));
         when(bundles.exportBundle(1L)).thenReturn(bytes);
-        try (MockedStatic<SardineFactory> factory = mockStatic(SardineFactory.class)) {
-            factory.when(() -> SardineFactory.begin("user", "secret")).thenReturn(sardine);
+        when(sardine.get(anyString())).thenReturn(new ByteArrayInputStream(bytes));
+        {
+            doReturn(sardine).when(service).client("user", "secret");
             var result = service.syncUpload(1L);
             assertEquals(true, result.get("success"));
             assertTrue(result.get("filename").toString().endsWith(".backup.json"));
-            verify(sardine).put(eq("https://dav.example/novel-backups/" + result.get("filename")), eq(bytes));
+            verify(sardine).put(eq("https://dav.example/novel-backups/" + result.get("filename")), any(java.io.InputStream.class), eq(java.util.Map.of("If-None-Match", "*")));
         }
     }
 
     @Test void downloadDoesNotOverwriteRestoredMetadataWithStaleNovel() throws Exception {
         Novel before = novel("Before"); Novel after = novel("Restored"); byte[] bytes = {1, 2, 3};
         when(novels.findById(1L)).thenReturn(Optional.of(before), Optional.of(after));
+        when(bundles.restoreWithCopy(eq(1L), eq(bytes))).thenReturn(2L);
         when(sardine.get("https://dav.example/novel-backups/test.backup.json")).thenReturn(new ByteArrayInputStream(bytes));
-        try (MockedStatic<SardineFactory> factory = mockStatic(SardineFactory.class)) {
-            factory.when(() -> SardineFactory.begin("user", "secret")).thenReturn(sardine);
+        {
+            doReturn(sardine).when(service).client("user", "secret");
             assertEquals(true, service.syncDownload(1L, "test.backup.json").get("success"));
-            verify(bundles).restore(eq(1L), eq(bytes));
-            verify(novels).save(same(after));
-            verify(novels, never()).save(same(before));
+            verify(bundles).restoreWithCopy(eq(1L), eq(bytes));
+            verify(novels).updateLastWebdavSync(eq(1L), any(java.time.LocalDateTime.class));
+            verify(novels, never()).save(any());
         }
     }
 }

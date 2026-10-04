@@ -34,6 +34,8 @@ public class WritingCloudService {
   @Autowired
   private PlatformTransactionManager transactions;
 
+  @Autowired private BackupOperationService operations;
+
   private final Map<Long, Object> locks = new ConcurrentHashMap<>();
   static final Pattern FILE = Pattern.compile(
     "^(\\d{14})_([a-f0-9-]{36})_(root|[a-f0-9-]{36})\\.ink\\.json$"
@@ -61,7 +63,7 @@ public class WritingCloudService {
     return new TransactionTemplate(transactions).execute(status -> work.get());
   }
 
-  private Config config(Long id) {
+  Config config(Long id) {
     return tx(() -> {
       Novel n = em.find(Novel.class, id);
       if (n == null) throw WritingService.missing();
@@ -80,26 +82,16 @@ public class WritingCloudService {
     });
   }
 
-  private String folder(Config c, String book) {
+  String folder(Config c, String book) {
     return c.url() + "novel-backups/ink-" + WritingService.uuid(book) + "/";
   }
 
-  private String bookUid(Long id) {
+  String bookUid(Long id) {
     return tx(() -> writing.book(id).getUid());
   }
 
-  private Sardine client(Config c) {
-    return new com.github.sardine.impl.SardineImpl(
-      org.apache.http.impl.client.HttpClients.custom().setDefaultRequestConfig(
-        org.apache.http.client.config.RequestConfig.custom()
-          .setConnectTimeout(10000)
-          .setConnectionRequestTimeout(10000)
-          .setSocketTimeout(45000)
-          .build()
-      ),
-      c.username(),
-      c.password()
-    );
+  Sardine client(Config c) {
+    return new ConditionalDavClient(c.username(), c.password());
   }
 
   private void directory(Sardine dav, String url) throws IOException {
@@ -163,7 +155,12 @@ public class WritingCloudService {
     );
   }
 
-  public ArrayNode versions(Long id, String remote) throws IOException {
+  public ArrayNode versions(Long id, String remote) throws Exception {
+    return operations.run(id, "CLOUD_LIST", () -> versionsWork(id, remote));
+  }
+
+  private ArrayNode versionsWork(Long id, String remote) throws IOException {
+    operations.stage("CONFIG");
     Config c = config(id);
     String uid = remote == null || remote.isBlank()
       ? bookUid(id)
@@ -197,7 +194,7 @@ public class WritingCloudService {
     }
   }
 
-  private JsonNode download(Sardine dav, String dir, String file, String book)
+  JsonNode download(Sardine dav, String dir, String file, String book)
     throws IOException {
     Matcher name = FILE.matcher(file);
     if (!name.matches()) throw WritingService.bad("云端文件名无效");
@@ -213,14 +210,20 @@ public class WritingCloudService {
     if (
       !data.path("format").asText().equals("ink-cloud-v1") ||
       !data.path("bookUid").asText().equals(book) ||
-      !data.path("revision").asText().equals(name.group(2))
+      !data.path("revision").asText().equals(name.group(2)) ||
+      !Objects.equals(data.path("parent").isNull() ? "root" : data.path("parent").asText(), name.group(3))
     ) throw WritingService.bad("云端版本身份不匹配");
     BackupValidator.validate(data.path("bundle").path("data"));
     return data;
   }
 
-  public ObjectNode preview(Long id, String remote, String file)
+  public ObjectNode preview(Long id, String remote, String file) throws Exception {
+    return operations.run(id, "CLOUD_PREVIEW", () -> previewWork(id, remote, file));
+  }
+
+  private ObjectNode previewWork(Long id, String remote, String file)
     throws IOException {
+    operations.stage("CONFIG");
     Config c = config(id);
     String uid = WritingService.uuid(remote);
     Sardine dav = client(c);
@@ -264,19 +267,31 @@ public class WritingCloudService {
     });
   }
 
-  public ObjectNode push(Long id) throws IOException {
+  public ObjectNode push(Long id) throws Exception {
+    return operations.run(id, "CLOUD_PUSH", () -> pushWork(id));
+  }
+
+  private ObjectNode pushWork(Long id) throws IOException {
     synchronized (locks.computeIfAbsent(id, key -> new Object())) {
-      Config c = config(id);
+      operations.stage("CONFIG");
+    Config c = config(id);
+      operations.stage("CAPTURE");
       Snapshot snapshot = capture(id);
       Sardine dav = client(c);
       try {
         directory(dav, c.url() + "novel-backups/");
         String dir = folder(c, snapshot.uid());
         directory(dav, dir);
-        List<Version> heads = list(dav, dir)
-          .stream()
-          .filter(Version::head)
-          .toList();
+        operations.stage("LIST");
+        List<Version> remoteVersions = list(dav, dir);
+        // A remembered resolution cannot authorize an upload from a baseline
+        // that retention (or another device) has since removed.
+        if (snapshot.parent() != null && remoteVersions.stream().noneMatch(v -> v.revision().equals(snapshot.parent()))) {
+          String message = "本机同步基线已不在云端，请重新比较并恢复保留版本；本机正文未覆盖";
+          note(id, message);
+          throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, message);
+        }
+        List<Version> heads = remoteVersions.stream().filter(Version::head).toList();
         Set<String> resolved = tx(() -> {
           String stored = writing.book(id).getResolvedHeads();
           Set<String> set = new HashSet<>();
@@ -326,8 +341,10 @@ public class WritingCloudService {
           .put("savedAt", Instant.now().toString());
         data.set("bundle", JSON.readTree(snapshot.bundle()));
         byte[] bytes = JSON.writeValueAsBytes(data);
-        dav.put(dir + name, bytes);
+        operations.stage("UPLOAD");
+        dav.put(dir + name, new ByteArrayInputStream(bytes), Map.of("If-None-Match", "*"));
         // Read back the exact immutable file before acknowledging a successful upload.
+        operations.stage("VERIFY");
         JsonNode verified = download(dav, dir, name, snapshot.uid());
         if (
           !verified.path("revision").asText().equals(revision)
@@ -335,8 +352,9 @@ public class WritingCloudService {
         if (resolving) for (String parent : resolved)
           if (!Objects.equals(parent, snapshot.parent())) dav.put(
             dir + parent + "_" + revision + ".resolved",
-            "{}".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            new ByteArrayInputStream("{}".getBytes(java.nio.charset.StandardCharsets.UTF_8)), Map.of("If-None-Match", "*")
           );
+        operations.stage("COMMIT");
         tx(() -> {
           WritingBook b = writing.book(id);
           b.setRemoteBase(revision);
@@ -355,15 +373,21 @@ public class WritingCloudService {
     }
   }
 
-  public ObjectNode pull(Long id, String remote, String file)
+  public ObjectNode pull(Long id, String remote, String file) throws Exception {
+    return operations.run(id, "CLOUD_PULL", () -> pullWork(id, remote, file));
+  }
+
+  private ObjectNode pullWork(Long id, String remote, String file)
     throws IOException {
     synchronized (locks.computeIfAbsent(id, key -> new Object())) {
-      Config c = config(id);
+      operations.stage("CONFIG");
+    Config c = config(id);
       String uid = WritingService.uuid(remote);
       Sardine dav = client(c);
       JsonNode cloud;
       List<String> heads;
       try {
+        operations.stage("DOWNLOAD");
         cloud = download(dav, folder(c, uid), file, uid);
         heads = list(dav, folder(c, uid))
           .stream()
@@ -373,6 +397,7 @@ public class WritingCloudService {
       } finally {
         dav.shutdown();
       }
+      operations.stage("RESTORE");
       return tx(() -> {
         WritingBook target = writing.book(id);
         Novel source = em.find(Novel.class, id);

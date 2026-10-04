@@ -37,7 +37,7 @@ public class BackupBundleService {
     @Value("${app.upload.dir:uploads}") private String uploadDir;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public byte[] exportBundle(Long novelId) throws Exception {
         ObjectNode bundle = mapper.createObjectNode();
         bundle.put("format", FORMAT);
@@ -72,6 +72,42 @@ public class BackupBundleService {
         byte[] result = mapper.writeValueAsBytes(bundle);
         if (result.length > MAX_BACKUP_BYTES) throw new IOException("Backup exceeds 48 MiB limit");
         return result;
+    }
+
+    /** Validate a recovery baseline without changing records or creating image files. */
+    public void validateRecoveryBundle(JsonNode bundle) throws Exception {
+        if (mapper.writeValueAsBytes(bundle).length > MAX_BACKUP_BYTES) throw new IOException("Backup exceeds 48 MiB limit");
+        if (!FORMAT.equals(bundle.path("format").asText())) throw new IOException("Unsupported backup format");
+        JsonNode rawData = bundle.path("data");
+        BackupValidator.validate(rawData);
+        JsonNode assets = bundle.path("images");
+        if (!assets.isArray() || assets.size() > 1000) throw new IOException("Invalid image manifest");
+        int total = 0; Map<Long, Long> ids = new HashMap<>();
+        for (JsonNode asset : assets) {
+            long id = asset.path("id").asLong();
+            if (!asset.path("id").isIntegralNumber() || !asset.path("id").canConvertToLong() || id <= 0 || ids.put(id, id) != null) throw new IOException("Invalid image ID");
+            extension(text(asset, "mimeType", 100)); text(asset, "originalName", 255); text(asset, "imageType", 50);
+            byte[] bytes = Base64.getDecoder().decode(text(asset, "content", (MAX_IMAGE_BYTES + 2) / 3 * 4));
+            total += bytes.length;
+            if (bytes.length == 0 || bytes.length > MAX_IMAGE_BYTES || total > MAX_TOTAL_BYTES || !digest(bytes).equals(asset.path("sha256").asText()))
+                throw new IOException("Image checksum or size invalid");
+        }
+        long sourceId = rawData.path("novel").path("id").asLong();
+        if (sourceId <= 0) throw new IOException("Missing source novel ID");
+        rewriteImages(rawData.deepCopy(), sourceId, sourceId, ids);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long restoreWithCopy(Long novelId, byte[] bytes) throws Exception {
+        writing.book(novelId); // Lock before capturing the original so concurrent writing cannot escape the safety copy.
+        Novel source = novels.findById(novelId).orElseThrow(() -> new IOException("Novel not found"));
+        byte[] local = exportBundle(novelId);
+        String title = source.getTitle().substring(0, Math.min(150, source.getTitle().length())) + "（恢复前副本 " +
+                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMdd-HHmmss")) + "）";
+        Novel copy = new Novel(); copy.setTitle(title); copy = novels.saveAndFlush(copy);
+        restore(copy.getId(), local); copy.setTitle(title); novels.save(copy);
+        restore(novelId, bytes);
+        return copy.getId();
     }
 
     @Transactional(rollbackFor = Exception.class)

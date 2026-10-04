@@ -15,20 +15,21 @@
     </div>
     <div v-if="inNovel" class="settings-section">
       <h3>备份与恢复</h3>
-      <p>包含小说数据和已上传图片。恢复会替换当前小说数据及封面；外部图片链接和浏览器外观设置不打包。</p>
+      <p>包含小说数据和已上传图片。恢复前会保留当前作品的完整副本，再替换当前小说数据及封面；外部图片链接和浏览器外观设置不打包。</p>
       <p>每张图片最多 8 MiB，图片总计最多 32 MiB，备份文件最多 48 MiB。</p>
       <div class="backup-actions">
-        <button class="btn-primary" :disabled="backupBusy" @click="backupApi.download(Number(route.params.novelId))">下载含图片备份</button>
+        <button class="btn-primary" :disabled="backupBusy || syncInProgress" @click="downloadLocalBackup">下载含图片备份</button>
         <BaseFilePicker
           label="从备份恢复"
           accept=".json,application/json"
           hint="JSON 备份 · 最大 48 MiB"
-          :busy="backupBusy"
+          :busy="backupBusy || syncInProgress"
           busy-label="正在恢复…"
           @change="restoreLocalBackup"
         />
       </div>
       <p role="status">{{ backupMessage }}</p>
+      <RouterLink v-if="restoredCopyId" :to="`/novel/${restoredCopyId}/overview`" class="btn-secondary">查看恢复前副本 #{{ restoredCopyId }}</RouterLink>
     </div>
 
     <div class="settings-section">
@@ -74,6 +75,7 @@
         <div class="setting-control">
           <input
             v-model="webdavForm.serverUrl"
+            :disabled="configSaving || syncInProgress || backupBusy"
             type="text"
             placeholder="https://your-server.com/remote.php/dav/files/username/"
             @blur="saveWebDavConfig"
@@ -85,6 +87,7 @@
         <div class="setting-control">
           <input
             v-model="webdavForm.username"
+            :disabled="configSaving || syncInProgress || backupBusy"
             type="text"
             placeholder="WebDAV 用户名"
             @blur="saveWebDavConfig"
@@ -96,6 +99,7 @@
         <div class="setting-control">
           <input
             v-model="webdavForm.password"
+            :disabled="configSaving || syncInProgress || backupBusy"
             type="password"
             :placeholder="hasPasswordSaved ? '密码已保存，留空则不修改' : 'WebDAV 密码'"
             @blur="saveWebDavConfig"
@@ -110,6 +114,7 @@
             <input
               type="checkbox"
               v-model="webdavForm.autoSync"
+              :disabled="configSaving || syncInProgress || backupBusy"
               @change="saveWebDavConfig"
             />
             <span class="toggle-slider"></span>
@@ -125,7 +130,7 @@
         <div class="setting-control">
           <button
             class="btn-secondary"
-            :disabled="connectionStatus === 'connecting' || !webdavForm.serverUrl"
+            :disabled="connectionStatus === 'connecting' || configSaving || !webdavForm.serverUrl"
             @click="testConnection"
           >
             {{ connectionStatus === 'connecting' ? '连接中...' : '🔗 测试连接' }}
@@ -135,6 +140,8 @@
         </div>
       </div>
 
+      <p v-if="configError" class="status-text error" role="alert">{{ configError }} <button type="button" class="btn-secondary" :disabled="configSaving" @click="saveWebDavConfig">重试保存配置</button></p>
+      <p v-if="statusError" class="status-text error" role="alert">{{ statusError }} <button type="button" class="btn-secondary" @click="loadStatus">重新读取配置</button></p>
       <!-- 同步状态 -->
       <div v-if="syncStatus.lastSyncTime" class="setting-row">
         <div class="setting-label">上次同步</div>
@@ -149,14 +156,14 @@
         <div class="setting-control sync-buttons">
           <button
             class="btn-primary"
-            :disabled="syncInProgress || !syncStatus.configured"
+            :disabled="syncInProgress || backupBusy || configSaving || !syncStatus.configured"
             @click="syncNow"
           >
             {{ syncInProgress ? '同步中...' : '☁️ 立即同步（上传）' }}
           </button>
           <button
             class="btn-secondary"
-            :disabled="syncInProgress || !syncStatus.configured"
+            :disabled="syncInProgress || backupBusy || configSaving || !syncStatus.configured"
             @click="showRemoteFiles = true"
           >
             📂 从云端恢复
@@ -170,6 +177,8 @@
         </div>
       </div>
     </div>
+
+    <BackupMaintenance v-if="inNovel" :key="currentNovelId" :novel-id="currentNovelId" :refresh-key="maintenanceRefresh" />
 
     <div class="settings-section">
       <h3>🏠 导航</h3>
@@ -186,9 +195,10 @@
       v-if="showRemoteFiles"
       title="云端备份文件"
       @close="showRemoteFiles = false"
-      :submit="restoreFromCloud"
+      :busy="syncInProgress"
     >
       <div v-if="remoteFilesLoading" class="loading">加载中...</div>
+      <p v-else-if="remoteFilesError" class="status-text error" role="alert">{{ remoteFilesError }} <button type="button" class="btn-secondary" @click="loadRemoteFiles">重试读取</button></p>
       <div v-else-if="remoteFiles.length === 0" class="empty-hint">
         云端没有找到备份文件
       </div>
@@ -213,20 +223,22 @@
               </span>
             </div>
           </label>
-          <button
-            class="btn-delete-file"
-            title="删除此备份"
-            @click.stop="deleteCloudFile(file.name)"
-          >🗑️</button>
         </div>
       </div>
+      <p class="remote-hint">清理远端历史请使用下方“同步与备份记录”，先预览保留基线与删除列表。</p>
+      <p v-if="syncError && syncMessage" class="status-text error" role="alert">{{ syncMessage }}</p>
+      <template #actions>
+        <button type="button" class="btn-secondary" :disabled="syncInProgress" @click="showRemoteFiles = false">取消</button>
+        <button type="button" class="btn-primary" :disabled="syncInProgress || remoteFilesLoading || !selectedFile" @click="restoreFromCloud">{{ syncInProgress ? '正在恢复…' : '恢复选中备份' }}</button>
+      </template>
     </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import AppearanceTransfer from '@/components/settings/AppearanceTransfer.vue'
-import { ref, reactive, watch, computed, onMounted } from 'vue'
+import BackupMaintenance from '@/components/settings/BackupMaintenance.vue'
+import { ref, reactive, watch, computed, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useStudioStore } from '@/stores/studio'
@@ -236,253 +248,190 @@ import BaseModal from '@/components/common/BaseModal.vue'
 import BaseFilePicker from '@/components/common/BaseFilePicker.vue'
 import { webdavApi } from '@/api/webdav'
 import { backupApi } from '@/api/backup'
-import type { RemoteFile } from '@/types/webdav'
+import type { RemoteFile, WebDavConfig } from '@/types/webdav'
 
-const appStore = useAppStore()
-const studio = useStudioStore()
-const router = useRouter()
-const route = useRoute()
-
-const backupBusy = ref(false)
-const backupMessage = ref('')
-async function restoreLocalBackup(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file || backupBusy.value) return
-  if (file.size > 48 * 1024 * 1024) { backupMessage.value = '备份文件超过 48 MiB'; return }
-  if (!confirm('恢复将替换当前小说数据及封面。确定继续？')) return
-  backupBusy.value = true
-  backupMessage.value = '正在恢复…'
-  try {
-    await backupApi.restore(Number(route.params.novelId), file)
-    localStorage.removeItem(`mapBackground_${route.params.novelId}`)
-    window.location.reload()
-  } catch (error: unknown) {
-    const failure = error as { response?: { data?: { message?: string } } }
-    backupMessage.value = failure.response?.data?.message || '恢复失败，请检查备份文件或网络连接'
-  } finally {
-    backupBusy.value = false
-  }
-}
-
-const inNovel = computed(() => !!route.params.novelId)
-
-const bgImage = ref(appStore.settings.backgroundImage)
-const bgOpacity = ref(appStore.settings.backgroundOpacity)
-watch(() => [appStore.settings.backgroundImage, appStore.settings.backgroundOpacity] as const, ([image, opacity]) => { bgImage.value = image; bgOpacity.value = opacity })
-
-watch(bgImage, (val) => {
-  appStore.updateSetting('backgroundImage', val)
-})
-
-watch(bgOpacity, (val) => {
-  appStore.updateSetting('backgroundOpacity', val)
-})
-
-function clearBackground() {
-  bgImage.value = ''
-  bgOpacity.value = 0.55
-}
-
-function goBack() {
-  const novelId = route.params.novelId
-  if (novelId) {
-    router.push(`/novel/${novelId}/timeline`)
-  } else {
-    router.push('/')
-  }
-}
-
-// ===== WebDAV State =====
-const webdavForm = reactive({
-  serverUrl: '',
-  username: '',
-  password: '',
-  autoSync: false
-})
-
+const appStore = useAppStore(), studio = useStudioStore(), router = useRouter(), route = useRoute()
+const currentNovelId = computed(() => Number(route.params.novelId) || 0)
+const inNovel = computed(() => currentNovelId.value > 0)
+const backupBusy = ref(false), backupMessage = ref(''), maintenanceRefresh = ref(0), restoredCopyId = ref<number | null>(null)
+const webdavForm = reactive({ serverUrl: '', username: '', password: '', autoSync: false })
 const connectionStatus = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
-const connectionMessage = ref('')
-const syncStatus = reactive({
-  configured: false,
-  serverUrl: '',
-  lastSyncTime: null as string | null
-})
-const syncInProgress = ref(false)
-const syncMessage = ref('')
-const syncError = ref(false)
-const showRemoteFiles = ref(false)
-const remoteFiles = ref<RemoteFile[]>([])
-const remoteFilesLoading = ref(false)
-const selectedFile = ref('')
+const connectionMessage = ref(''), configSaving = ref(false), configError = ref(''), statusError = ref('')
+const syncStatus = reactive({ configured: false, serverUrl: '', lastSyncTime: null as string | null })
+const syncInProgress = ref(false), syncMessage = ref(''), syncError = ref(false)
+const showRemoteFiles = ref(false), remoteFiles = ref<RemoteFile[]>([]), remoteFilesLoading = ref(false)
+const selectedFile = ref(''), remoteFilesError = ref(''), hasPasswordSaved = ref(false)
+let generation = 0, statusRequest = 0, filesRequest = 0, disposed = false
+function context() { return { novelId: currentNovelId.value, generation } }
+function active(ctx: ReturnType<typeof context>) { return !disposed && ctx.generation === generation && ctx.novelId === currentNovelId.value }
+function failureMessage(error: unknown, fallback: string) {
+  const e = error as { response?: { data?: { message?: string } }; message?: string }
+  return e?.response?.data?.message || e?.message || fallback
+}
 
-// Track whether there's a saved password in the database
-const hasPasswordSaved = ref(false)
+async function downloadLocalBackup() {
+  if (!inNovel.value || backupBusy.value || syncInProgress.value) return
+  const ctx = context()
+  backupBusy.value = true; backupMessage.value = '正在生成完整备份…'
+  try {
+    const blob = await backupApi.download(ctx.novelId)
+    if (!active(ctx)) return
+    const url = URL.createObjectURL(blob), link = document.createElement('a')
+    link.href = url; link.download = `novel-${ctx.novelId}.backup.json`; link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    backupMessage.value = '备份已生成，请确认浏览器已保存下载文件。'
+  } catch (error) {
+    if (active(ctx)) backupMessage.value = failureMessage(error, '备份下载失败，请重试')
+  } finally { if (active(ctx)) { backupBusy.value = false; maintenanceRefresh.value++ } }
+}
+async function restoreLocalBackup(event: Event) {
+  const input = event.target as HTMLInputElement, file = input.files?.[0]
+  input.value = ''
+  if (!file || !inNovel.value || backupBusy.value || syncInProgress.value) return
+  if (file.size > 48 * 1024 * 1024) { backupMessage.value = '备份文件超过 48 MiB'; return }
+  if (!confirm('恢复前会保留当前作品的完整副本，再替换当前小说数据及封面。确定继续？')) return
+  const ctx = context()
+  backupBusy.value = true; backupMessage.value = '正在恢复…'
+  try {
+    const result = await backupApi.restore(ctx.novelId, file)
+    if (!active(ctx)) return
+    rememberRestore(ctx.novelId, result)
+    try { localStorage.removeItem(`mapBackground_${ctx.novelId}`) } catch { /* Restore succeeded even if browser storage is unavailable. */ }
+    window.location.reload()
+  } catch (error) {
+    if (active(ctx)) backupMessage.value = failureMessage(error, '恢复失败，请检查备份文件或网络连接')
+  } finally { if (active(ctx)) { backupBusy.value = false; maintenanceRefresh.value++ } }
+}
 
-onMounted(async () => {
-  if (inNovel.value) {
-    try {
-      const status = await webdavApi.getStatus()
-      webdavForm.serverUrl = status.serverUrl || ''
-      webdavForm.username = status.username || ''
-      webdavForm.password = ''
-      webdavForm.autoSync = status.autoSync
-      hasPasswordSaved.value = status.hasPassword
-      syncStatus.configured = status.configured
-      syncStatus.serverUrl = status.serverUrl || ''
-      syncStatus.lastSyncTime = status.lastSyncTime
-    } catch (e) {
-      // Settings not configured yet
-    }
-  }
-})
+function rememberRestore(novelId: number, result: { message?: string; copyNovelId?: number }) {
+  const notice = { message: result.message || '恢复成功，原稿已保留为独立作品副本。', copyNovelId: result.copyNovelId }
+  backupMessage.value = notice.message
+  restoredCopyId.value = Number.isSafeInteger(notice.copyNovelId) && Number(notice.copyNovelId) > 0 ? notice.copyNovelId! : null
+  try { globalThis.sessionStorage?.setItem(`backup-restore-notice:${novelId}`, JSON.stringify(notice)) } catch { /* The permanent server log also retains the safety-copy ID. */ }
+}
+function readRestoreNotice(novelId: number) {
+  try {
+    const key = `backup-restore-notice:${novelId}`, raw = globalThis.sessionStorage?.getItem(key)
+    if (!raw) return
+    const notice = JSON.parse(raw)
+    if (typeof notice.message === 'string') backupMessage.value = notice.message
+    if (Number.isSafeInteger(notice.copyNovelId) && notice.copyNovelId > 0) restoredCopyId.value = notice.copyNovelId
+    globalThis.sessionStorage?.removeItem(key)
+  } catch { /* A missing browser notice does not change the completed server restore. */ }
+}
 
-async function saveWebDavConfig() {
+const bgImage = ref(appStore.settings.backgroundImage), bgOpacity = ref(appStore.settings.backgroundOpacity)
+watch(() => [appStore.settings.backgroundImage, appStore.settings.backgroundOpacity] as const, ([image, opacity]) => { bgImage.value = image; bgOpacity.value = opacity })
+watch(bgImage, (val) => appStore.updateSetting('backgroundImage', val))
+watch(bgOpacity, (val) => appStore.updateSetting('backgroundOpacity', val))
+function clearBackground() { bgImage.value = ''; bgOpacity.value = 0.55 }
+function goBack() { router.push(inNovel.value ? `/novel/${currentNovelId.value}/timeline` : '/') }
+
+async function loadStatus() {
   if (!inNovel.value) return
+  const ctx = context(), attempt = ++statusRequest
+  statusError.value = ''
   try {
-    const config: any = {
-      serverUrl: webdavForm.serverUrl,
-      username: webdavForm.username,
-      autoSync: webdavForm.autoSync
-    }
-    // Only send password if user entered a new one
-    if (webdavForm.password) {
-      config.password = webdavForm.password
-      hasPasswordSaved.value = true
-    }
-    await webdavApi.saveConfig(config)
-    syncStatus.configured = !!webdavForm.serverUrl
-  } catch (e) {
-    console.error('保存 WebDAV 配置失败:', e)
-  }
+    const status = await webdavApi.getStatus(ctx.novelId)
+    if (!active(ctx) || attempt !== statusRequest) return
+    Object.assign(webdavForm, { serverUrl: status.serverUrl || '', username: status.username || '', password: '', autoSync: status.autoSync })
+    hasPasswordSaved.value = status.hasPassword
+    Object.assign(syncStatus, { configured: status.configured, serverUrl: status.serverUrl || '', lastSyncTime: status.lastSyncTime })
+  } catch (error) { if (active(ctx) && attempt === statusRequest) statusError.value = failureMessage(error, '配置读取失败，请重试') }
 }
-
+async function saveWebDavConfig() {
+  if (!inNovel.value || configSaving.value || syncInProgress.value || backupBusy.value) return
+  const ctx = context(), config: Partial<WebDavConfig> = { serverUrl: webdavForm.serverUrl, username: webdavForm.username, autoSync: webdavForm.autoSync }
+  if (webdavForm.password) config.password = webdavForm.password
+  ++statusRequest
+  configSaving.value = true; configError.value = ''; connectionStatus.value = 'idle'
+  try {
+    await webdavApi.saveConfig(ctx.novelId, config)
+    if (!active(ctx)) return
+    if (config.password) { hasPasswordSaved.value = true; webdavForm.password = '' }
+    syncStatus.configured = !!config.serverUrl
+    syncStatus.serverUrl = config.serverUrl || ''
+    statusError.value = ''
+    maintenanceRefresh.value++
+  } catch (error) { if (active(ctx)) configError.value = failureMessage(error, '保存 WebDAV 配置失败，请重试') }
+  finally { if (active(ctx)) configSaving.value = false }
+}
 async function testConnection() {
-  if (!webdavForm.serverUrl) return
-  connectionStatus.value = 'connecting'
-  connectionMessage.value = ''
+  if (!webdavForm.serverUrl || configSaving.value || connectionStatus.value === 'connecting') return
+  const ctx = context()
+  connectionStatus.value = 'connecting'; connectionMessage.value = ''
   try {
-    const result = await webdavApi.testConnection({
-      serverUrl: webdavForm.serverUrl,
-      username: webdavForm.username,
-      password: webdavForm.password
-    })
-    if (result.success) {
-      connectionStatus.value = 'success'
-      connectionMessage.value = result.message
-    } else {
-      connectionStatus.value = 'error'
-      connectionMessage.value = result.message
-    }
-  } catch (e: any) {
-    connectionStatus.value = 'error'
-    connectionMessage.value = e?.message || '连接测试失败'
-  }
-  setTimeout(() => { connectionStatus.value = 'idle' }, 5000)
+    const result = await webdavApi.testConnection(ctx.novelId, { serverUrl: webdavForm.serverUrl, username: webdavForm.username, password: webdavForm.password })
+    if (!active(ctx)) return
+    connectionStatus.value = result.success ? 'success' : 'error'; connectionMessage.value = result.message
+  } catch (error) { if (active(ctx)) { connectionStatus.value = 'error'; connectionMessage.value = failureMessage(error, '连接测试失败') } }
+  finally { if (active(ctx)) maintenanceRefresh.value++ }
 }
-
 async function syncNow() {
-  syncInProgress.value = true
-  syncMessage.value = ''
-  syncError.value = false
+  if (!inNovel.value || syncInProgress.value || backupBusy.value || configSaving.value) return
+  const ctx = context()
+  syncInProgress.value = true; syncMessage.value = ''; syncError.value = false
   try {
-    const result = await webdavApi.syncUpload()
-    if (result.success) {
-      syncMessage.value = result.message
-      syncError.value = false
-      syncStatus.lastSyncTime = result.timestamp || null
-    } else {
-      syncMessage.value = result.message
-      syncError.value = true
-    }
-  } catch (e: any) {
-    syncMessage.value = e?.message || '同步失败'
-    syncError.value = true
-  }
-  syncInProgress.value = false
+    const result = await webdavApi.syncUpload(ctx.novelId)
+    if (!active(ctx)) return
+    syncMessage.value = result.message; syncError.value = !result.success
+    if (result.success) syncStatus.lastSyncTime = result.timestamp || null
+  } catch (error) { if (active(ctx)) { syncMessage.value = failureMessage(error, '同步失败，请重试'); syncError.value = true } }
+  finally { if (active(ctx)) { syncInProgress.value = false; maintenanceRefresh.value++ } }
 }
-
 async function restoreFromCloud() {
-  if (!selectedFile.value) {
-    alert('请选择一个备份文件')
-    return
-  }
-  if (!confirm('恢复将替换当前小说数据及封面。确定继续？')) return
-  showRemoteFiles.value = false
-  syncInProgress.value = true
-  syncMessage.value = ''
-  syncError.value = false
+  if (!selectedFile.value || !showRemoteFiles.value || syncInProgress.value || backupBusy.value || remoteFilesLoading.value) return
+  if (!remoteFiles.value.some(file => file.name === selectedFile.value)) return
+  if (!confirm('恢复前会保留当前作品的完整副本，再替换当前小说数据及封面。确定继续？')) return
+  const ctx = context(), filename = selectedFile.value
+  syncInProgress.value = true; syncMessage.value = ''; syncError.value = false
   try {
-    const result = await webdavApi.syncDownload(selectedFile.value)
+    const result = await webdavApi.syncDownload(ctx.novelId, filename)
+    if (!active(ctx)) return
+    syncMessage.value = result.message; syncError.value = !result.success
     if (result.success) {
-      syncMessage.value = result.message
-      syncError.value = false
+      showRemoteFiles.value = false
+      rememberRestore(ctx.novelId, result)
       syncStatus.lastSyncTime = result.timestamp || null
-      localStorage.removeItem(`mapBackground_${route.params.novelId}`)
+      try { localStorage.removeItem(`mapBackground_${ctx.novelId}`) } catch { /* Server recovery is already complete. */ }
       window.location.reload()
-    } else {
-      syncMessage.value = result.message
-      syncError.value = true
     }
-  } catch (e: any) {
-    syncMessage.value = e?.message || '从云端恢复失败'
-    syncError.value = true
-  }
-  syncInProgress.value = false
-  selectedFile.value = ''
+  } catch (error) { if (active(ctx)) { syncMessage.value = failureMessage(error, '从云端恢复失败，请重试'); syncError.value = true } }
+  finally { if (active(ctx)) { syncInProgress.value = false; maintenanceRefresh.value++ } }
 }
-
-async function deleteCloudFile(filename: string) {
-  if (!confirm(`确定要删除云端备份「${filename}」吗？此操作不可撤销。`)) return
+async function loadRemoteFiles() {
+  if (!showRemoteFiles.value || syncInProgress.value) return
+  const ctx = context(), attempt = ++filesRequest
+  remoteFilesLoading.value = true; remoteFiles.value = []; remoteFilesError.value = ''; selectedFile.value = ''
   try {
-    const result = await webdavApi.deleteRemoteFile(filename)
-    if (result.success) {
-      remoteFiles.value = remoteFiles.value.filter(f => f.name !== filename)
-      if (selectedFile.value === filename) selectedFile.value = ''
-      alert(result.message)
-    } else {
-      alert(result.message)
-    }
-  } catch (e: any) {
-    alert('删除失败: ' + (e?.message || '未知错误'))
-  }
+    const files = await webdavApi.getRemoteFiles(ctx.novelId)
+    if (active(ctx) && showRemoteFiles.value && attempt === filesRequest) remoteFiles.value = files
+  } catch (error) { if (active(ctx) && showRemoteFiles.value && attempt === filesRequest) remoteFilesError.value = failureMessage(error, '云端列表读取失败，请重试') }
+  finally { if (active(ctx) && attempt === filesRequest) remoteFilesLoading.value = false }
 }
-
-// Watch for remote files modal opening
-watch(showRemoteFiles, async (val) => {
-  if (val) {
-    remoteFilesLoading.value = true
-    remoteFiles.value = []
-    try {
-      remoteFiles.value = await webdavApi.getRemoteFiles()
-    } catch (e) {
-      remoteFiles.value = []
-    }
-    remoteFilesLoading.value = false
-  }
+watch(showRemoteFiles, (open) => {
+  ++filesRequest; selectedFile.value = ''; remoteFiles.value = []; remoteFilesError.value = ''
+  if (open) void loadRemoteFiles()
+  else remoteFilesLoading.value = false
 })
-
-function formatTime(timeStr: string): string {
-  if (!timeStr) return ''
-  try {
-    const d = new Date(timeStr)
-    return d.toLocaleString('zh-CN')
-  } catch {
-    return timeStr
-  }
-}
-
+watch(currentNovelId, () => {
+  ++generation; ++statusRequest; ++filesRequest
+  Object.assign(webdavForm, { serverUrl: '', username: '', password: '', autoSync: false })
+  Object.assign(syncStatus, { configured: false, serverUrl: '', lastSyncTime: null })
+  backupBusy.value = false; backupMessage.value = ''; restoredCopyId.value = null; configSaving.value = false; configError.value = ''; statusError.value = ''
+  connectionStatus.value = 'idle'; connectionMessage.value = ''; hasPasswordSaved.value = false
+  syncInProgress.value = false; syncMessage.value = ''; syncError.value = false; showRemoteFiles.value = false
+  remoteFiles.value = []; remoteFilesLoading.value = false; remoteFilesError.value = ''; selectedFile.value = ''
+  if (inNovel.value) readRestoreNotice(currentNovelId.value)
+  void loadStatus()
+}, { immediate: true, flush: 'sync' })
+onBeforeUnmount(() => { disposed = true; ++generation })
+function formatTime(value: string): string { const date = new Date(value); return Number.isNaN(date.valueOf()) ? value : date.toLocaleString('zh-CN') }
 function formatFileSize(bytes: number): string {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let i = 0
-  let size = bytes
-  while (size >= 1024 && i < units.length - 1) {
-    size /= 1024
-    i++
-  }
-  return size.toFixed(1) + ' ' + units[i]
+  if (!Number.isFinite(bytes) || bytes < 0) return '未知'
+  const units = ['B', 'KiB', 'MiB', 'GiB']; let i = 0, size = bytes
+  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
+  return `${size.toFixed(i ? 1 : 0)} ${units[i]}`
 }
 </script>
 

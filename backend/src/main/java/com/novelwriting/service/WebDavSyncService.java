@@ -1,244 +1,118 @@
 package com.novelwriting.service;
 
-import com.github.sardine.Sardine;
-import com.github.sardine.SardineFactory;
+import com.github.sardine.*;
 import com.novelwriting.entity.Novel;
 import com.novelwriting.repository.NovelRepository;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.io.InputStream;
+import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import static com.novelwriting.service.WritingDocuments.JSON;
 
 @Service
 public class WebDavSyncService {
+  @Autowired private NovelRepository novelRepository;
+  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
+  @Autowired private BackupBundleService backupBundleService;
+  @Autowired private BackupOperationService operations;
 
-    @Autowired
-    private NovelRepository novelRepository;
+  Sardine client(String username, String password) { return new ConditionalDavClient(username, password); }
 
-    @Autowired
-    private BackupBundleService backupBundleService;
-
-
-    public Map<String, Object> testConnection(String serverUrl, String username, String password) {
-        Map<String, Object> result = new HashMap<>();
-        try {
-            Sardine sardine = SardineFactory.begin(username, password);
-            List<com.github.sardine.DavResource> resources = sardine.list(serverUrl);
-            result.put("success", true);
-            result.put("message", "连接成功，找到 " + resources.size() + " 个资源");
-        } catch (Exception e) {
-            result.put("success", false);
-            result.put("message", "连接失败: " + e.getMessage());
-        }
-        return result;
+  private Map<String, Object> recorded(Long id, String type, BackupOperationService.Work<Map<String, Object>> work) {
+    long operation = operations.start(id, type);
+    try {
+      Map<String, Object> result = work.run(); result.put("operationId", operation);
+      operations.finish(operation, "SUCCEEDED", "FINISHED", Objects.toString(result.get("message"), "操作完成"), JSON.valueToTree(result), null);
+      return result;
+    } catch (Exception e) {
+      String message = BackupOperationService.failureMessage(e);
+      operations.finish(operation, "FAILED", type, message, null, e);
+      return new LinkedHashMap<>(Map.of("success", false, "message", message, "operationId", operation));
     }
-
-    public Map<String, Object> syncUpload(Long novelId) {
-        Map<String, Object> result = new HashMap<>();
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
-
-        if (novel.getWebdavServerUrl() == null || novel.getWebdavServerUrl().isEmpty()) {
-            result.put("success", false);
-            result.put("message", "未配置 WebDAV 服务器");
-            return result;
+  }
+  private Novel configured(Long id) {
+    Novel n = novelRepository.findById(id).orElseThrow(WritingService::missing);
+    if (n.getWebdavServerUrl() == null || n.getWebdavServerUrl().isBlank()) throw WritingService.bad("请先在设置页配置 WebDAV");
+    if (!n.getWebdavServerUrl().matches("https?://.+")) throw WritingService.bad("WebDAV 地址必须使用 HTTP 或 HTTPS");
+    return n;
+  }
+  private String dir(Novel n) { String url = n.getWebdavServerUrl(); return (url.endsWith("/") ? url : url + "/") + "novel-backups/"; }
+  private void filename(String name) {
+    if (name == null || name.length() > 255 || !name.matches("[a-zA-Z0-9_.-]+\\.json") || name.contains("..")) throw WritingService.bad("备份文件名无效");
+  }
+  public Map<String, Object> testConnection(Long id, String serverUrl, String username, String password) {
+    return recorded(id, "CONNECTION_TEST", () -> {
+      if (serverUrl == null || !serverUrl.matches("https?://.+")) throw WritingService.bad("WebDAV 地址必须使用 HTTP 或 HTTPS");
+      Sardine dav = client(username, password);
+      try { int count = dav.list(serverUrl).size(); return new LinkedHashMap<>(Map.of("success", true, "message", "连接成功，找到 " + count + " 个资源")); }
+      finally { dav.shutdown(); }
+    });
+  }
+  public Map<String, Object> syncUpload(Long id) {
+    return recorded(id, "WEBDAV_UPLOAD", () -> {
+      Novel n = configured(id); byte[] data = backupBundleService.exportBundle(id);
+      String title = n.getTitle().replaceAll("[^a-zA-Z0-9_\\-]", "_"); title = title.substring(0, Math.min(40, title.length()));
+      String name = title + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + "_" + UUID.randomUUID() + ".backup.json";
+      Sardine dav = client(n.getWebdavUsername(), n.getWebdavPassword());
+      try {
+        String folder = dir(n);
+        if (!dav.exists(folder)) try { dav.createDirectory(folder); } catch (IOException e) { if (!dav.exists(folder)) throw e; }
+        dav.put(folder + name, new ByteArrayInputStream(data), Map.of("If-None-Match", "*"));
+        try (InputStream stream = dav.get(folder + name)) {
+          if (!Arrays.equals(data, BackupBundleService.readLimited(stream, BackupBundleService.MAX_BACKUP_BYTES))) throw new IOException("Backup verification failed");
         }
-
-        try {
-            Sardine sardine = SardineFactory.begin(novel.getWebdavUsername(), novel.getWebdavPassword());
-
-            byte[] exportData = backupBundleService.exportBundle(novelId);
-            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-            String safeTitle = novel.getTitle().replaceAll("[^a-zA-Z0-9_\\-]", "_");
-            if (safeTitle.length() > 40) {
-                safeTitle = safeTitle.substring(0, 40);
-            }
-            String filename = safeTitle + "_" + timestamp + ".backup.json";
-
-            String baseUrl = novel.getWebdavServerUrl();
-            if (!baseUrl.endsWith("/")) {
-                baseUrl += "/";
-            }
-
-            // 坚果云需要文件放在子目录下，先确保备份目录存在
-            String backupDir = baseUrl + "novel-backups/";
-            System.out.println("[WebDAV] Ensuring directory: " + backupDir);
-            try {
-                sardine.createDirectory(backupDir);
-                System.out.println("[WebDAV] Directory ready");
-            } catch (Exception e) {
-                // Directory may already exist, continue
-                System.out.println("[WebDAV] Directory exists or create failed: " + e.getMessage());
-            }
-
-            String uploadUrl = backupDir + filename;
-            System.out.println("[WebDAV Sardine PUT] URL: " + uploadUrl);
-            System.out.println("[WebDAV Sardine PUT] Size: " + exportData.length + " bytes");
-            sardine.put(uploadUrl, exportData);
-            System.out.println("[WebDAV Sardine PUT] Success!");
-
-            novel.setLastWebdavSync(LocalDateTime.now());
-            novelRepository.save(novel);
-
-            result.put("success", true);
-            result.put("message", "同步上传成功: " + filename);
-            result.put("timestamp", novel.getLastWebdavSync().toString());
-            result.put("filename", filename);
-        } catch (Exception e) {
-            System.err.println("[WebDAV Sardine PUT] Error: " + e.getClass().getName() + " - " + e.getMessage());
-            result.put("success", false);
-            result.put("message", "同步上传失败: " + e.getMessage());
-        }
-        return result;
-    }
-
-    public Map<String, Object> syncDownload(Long novelId, String remoteFilename) {
-        Map<String, Object> result = new HashMap<>();
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
-
-        if (novel.getWebdavServerUrl() == null || novel.getWebdavServerUrl().isEmpty()) {
-            result.put("success", false);
-            result.put("message", "未配置 WebDAV 服务器");
-            return result;
-        }
-
-        try {
-            Sardine sardine = SardineFactory.begin(novel.getWebdavUsername(), novel.getWebdavPassword());
-
-            String baseUrl = novel.getWebdavServerUrl();
-            if (!baseUrl.endsWith("/")) {
-                baseUrl += "/";
-            }
-            String backupDir = baseUrl + "novel-backups/";
-            String downloadUrl = backupDir + remoteFilename;
-
-            System.out.println("[WebDAV Sardine GET] URL: " + downloadUrl);
-            byte[] downloadedData;
-            try (InputStream inputStream = sardine.get(downloadUrl)) {
-                downloadedData = BackupBundleService.readLimited(inputStream, BackupBundleService.MAX_BACKUP_BYTES);
-            }
-            System.out.println("[WebDAV Sardine GET] Downloaded: " + downloadedData.length + " bytes");
-
-            // Import the downloaded JSON data into the database
-            backupBundleService.restore(novelId, downloadedData);
-            novel = novelRepository.findById(novelId).orElseThrow();
-            System.out.println("[WebDAV Sardine GET] Import complete");
-
-            novel.setLastWebdavSync(LocalDateTime.now());
-            novelRepository.save(novel);
-
-            result.put("success", true);
-            result.put("message", "从云端恢复成功: " + remoteFilename + " (" + (downloadedData.length / 1024) + " KB)，数据已导入");
-            result.put("timestamp", novel.getLastWebdavSync().toString());
-            result.put("size", downloadedData.length);
-        } catch (Exception e) {
-            result.put("success", false);
-            result.put("message", "从云端下载失败: " + e.getMessage());
-        }
-        return result;
-    }
-
-    public List<Map<String, Object>> getRemoteFiles(Long novelId) {
+        LocalDateTime syncedAt = LocalDateTime.now(); novelRepository.updateLastWebdavSync(id, syncedAt);
+        return new LinkedHashMap<>(Map.of("success", true, "message", "同步上传成功: " + name, "timestamp", syncedAt.toString(), "filename", name, "size", data.length));
+      } finally { dav.shutdown(); }
+    });
+  }
+  public Map<String, Object> syncDownload(Long id, String name) {
+    return recorded(id, "WEBDAV_RESTORE", () -> {
+      filename(name); Novel n = configured(id); Sardine dav = client(n.getWebdavUsername(), n.getWebdavPassword());
+      byte[] data;
+      try (InputStream input = dav.get(dir(n) + name)) { data = BackupBundleService.readLimited(input, BackupBundleService.MAX_BACKUP_BYTES); }
+      finally { dav.shutdown(); }
+      Long copy = backupBundleService.restoreWithCopy(id, data);
+      LocalDateTime syncedAt = LocalDateTime.now(); novelRepository.updateLastWebdavSync(id, syncedAt);
+      return new LinkedHashMap<>(Map.of("success", true, "message", "从云端恢复成功；原稿保留为作品 #" + copy,
+        "timestamp", syncedAt.toString(), "size", data.length, "copyNovelId", copy));
+    });
+  }
+  public List<Map<String, Object>> getRemoteFiles(Long id) throws Exception {
+    return operations.run(id, "WEBDAV_LIST", () -> {
+      Novel n = configured(id); Sardine dav = client(n.getWebdavUsername(), n.getWebdavPassword());
+      try {
+        if (!dav.exists(dir(n))) return List.of();
         List<Map<String, Object>> files = new ArrayList<>();
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
-
-        if (novel.getWebdavServerUrl() == null || novel.getWebdavServerUrl().isEmpty()) {
-            return files;
-        }
-
-        try {
-            Sardine sardine = SardineFactory.begin(novel.getWebdavUsername(), novel.getWebdavPassword());
-            // List from the novel-backups subdirectory
-            String backupDir = novel.getWebdavServerUrl();
-            if (!backupDir.endsWith("/")) { backupDir += "/"; }
-            backupDir += "novel-backups/";
-            List<com.github.sardine.DavResource> resources = sardine.list(backupDir);
-
-            for (com.github.sardine.DavResource resource : resources) {
-                if (!resource.isDirectory()) {
-                    Map<String, Object> file = new HashMap<>();
-                    file.put("name", resource.getName());
-                    file.put("path", resource.getPath());
-                    file.put("size", resource.getContentLength());
-                    file.put("modified", resource.getModified() != null ? resource.getModified().toString() : null);
-                    files.add(file);
-                }
-            }
-        } catch (Exception e) {
-            // Return empty list on error
+        for (DavResource r : dav.list(dir(n))) if (!r.isDirectory()) {
+          Map<String, Object> file = new LinkedHashMap<>(); file.put("name", r.getName()); file.put("path", r.getPath());
+          file.put("size", r.getContentLength()); file.put("modified", r.getModified() == null ? null : r.getModified().toInstant().toString()); files.add(file);
         }
         return files;
-    }
-
-    public Map<String, Object> getSyncStatus(Long novelId) {
-        Map<String, Object> status = new HashMap<>();
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
-
-        status.put("serverUrl", novel.getWebdavServerUrl() != null ? novel.getWebdavServerUrl() : "");
-        status.put("username", novel.getWebdavUsername() != null ? novel.getWebdavUsername() : "");
-        status.put("hasPassword", novel.getWebdavPassword() != null && !novel.getWebdavPassword().isEmpty());
-        status.put("autoSync", novel.getWebdavAutoSync() != null ? novel.getWebdavAutoSync() : false);
-        status.put("lastSyncTime", novel.getLastWebdavSync() != null ? novel.getLastWebdavSync().toString() : null);
-        status.put("configured", novel.getWebdavServerUrl() != null && !novel.getWebdavServerUrl().isEmpty());
-
-        return status;
-    }
-
-    public Map<String, Object> deleteRemoteFile(Long novelId, String filename) {
-        Map<String, Object> result = new HashMap<>();
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
-
-        if (novel.getWebdavServerUrl() == null || novel.getWebdavServerUrl().isEmpty()) {
-            result.put("success", false);
-            result.put("message", "未配置 WebDAV 服务器");
-            return result;
-        }
-
-        try {
-            Sardine sardine = SardineFactory.begin(novel.getWebdavUsername(), novel.getWebdavPassword());
-            String baseUrl = novel.getWebdavServerUrl();
-            if (!baseUrl.endsWith("/")) { baseUrl += "/"; }
-            String deleteUrl = baseUrl + "novel-backups/" + filename;
-
-            System.out.println("[WebDAV DELETE] URL: " + deleteUrl);
-            sardine.delete(deleteUrl);
-            System.out.println("[WebDAV DELETE] Success");
-
-            result.put("success", true);
-            result.put("message", "已删除: " + filename);
-        } catch (Exception e) {
-            result.put("success", false);
-            result.put("message", "删除失败: " + e.getMessage());
-        }
-        return result;
-    }
-
-    public void saveConfig(Long novelId, Map<String, Object> config) {
-        Novel novel = novelRepository.findById(novelId)
-                .orElseThrow(() -> new RuntimeException("Novel not found"));
-
-        if (config.containsKey("serverUrl")) {
-            novel.setWebdavServerUrl((String) config.get("serverUrl"));
-        }
-        if (config.containsKey("username")) {
-            novel.setWebdavUsername((String) config.get("username"));
-        }
-        if (config.containsKey("password") && config.get("password") != null
-                && !((String) config.get("password")).isEmpty()) {
-            novel.setWebdavPassword((String) config.get("password"));
-        }
-        if (config.containsKey("autoSync")) {
-            novel.setWebdavAutoSync((Boolean) config.get("autoSync"));
-        }
-
-        novelRepository.save(novel);
-    }
-
+      } finally { dav.shutdown(); }
+    });
+  }
+  public Map<String, Object> getSyncStatus(Long id) {
+    Novel n = novelRepository.findById(id).orElseThrow(WritingService::missing); Map<String, Object> out = new LinkedHashMap<>();
+    out.put("serverUrl", Objects.toString(n.getWebdavServerUrl(), "")); out.put("username", Objects.toString(n.getWebdavUsername(), ""));
+    out.put("hasPassword", n.getWebdavPassword() != null && !n.getWebdavPassword().isEmpty());
+    out.put("autoSync", Boolean.TRUE.equals(n.getWebdavAutoSync())); out.put("lastSyncTime", n.getLastWebdavSync() == null ? null : n.getLastWebdavSync().toString());
+    out.put("configured", n.getWebdavServerUrl() != null && !n.getWebdavServerUrl().isBlank()); return out;
+  }
+  public Map<String, Object> deleteRemoteFile(Long id, String filename) {
+    throw BackupMaintenanceService.stale("直接删除已停用；请使用清理预览并明确确认。共享旧备份永久保留");
+  }
+  @org.springframework.transaction.annotation.Transactional
+  public void saveConfig(Long id, Map<String, Object> config) {
+    Novel n = em.find(Novel.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+    if (n == null) throw WritingService.missing();
+    if (config.containsKey("serverUrl")) n.setWebdavServerUrl((String) config.get("serverUrl"));
+    if (config.containsKey("username")) n.setWebdavUsername((String) config.get("username"));
+    if (config.get("password") instanceof String password && !password.isEmpty()) n.setWebdavPassword(password);
+    if (config.containsKey("autoSync")) n.setWebdavAutoSync((Boolean) config.get("autoSync"));
+    novelRepository.save(n);
+  }
 }
