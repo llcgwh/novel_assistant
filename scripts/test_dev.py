@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -195,6 +196,79 @@ class LauncherLifecycleTests(unittest.TestCase):
                     self.manager.start('backend')
                 self.assertTrue(all(p.poll() is not None for p in self.processes))
                 self.assert_stopped('backend')
+
+    def test_threaded_start_waits_for_delayed_worker_before_checking_identity(self):
+        marker = self.root / 'worker-entered'
+        shim = self.root / 'delayed_worker.py'
+        shim.write_text(
+            'import pathlib, runpy, time\n'
+            'time.sleep(.2)\n'
+            f'pathlib.Path({str(marker)!r}).write_text("entered")\n'
+            f'runpy.run_path({str(dev.SCRIPT)!r}, run_name="__main__")\n'
+        )
+        original = dev.process_info
+        results, errors = [], []
+
+        def after_worker_ready(pid):
+            self.assertTrue(marker.exists(), 'identity checked before worker initialized')
+            return original(pid)
+
+        def start():
+            try:
+                results.append(self.manager.start('backend'))
+            except BaseException as error:
+                errors.append(error)
+
+        with mock.patch.object(dev, 'SCRIPT', shim), mock.patch.object(dev, 'process_info', after_worker_ready):
+            thread = threading.Thread(target=start)
+            thread.start()
+            thread.join(timeout=8)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(errors, [])
+            self.assertEqual(len(results), 1)
+        self.assertTrue(self.manager.status('backend')['ready'])
+        self.assertIn('启动进程已就绪', self.manager.log_path('backend').read_text())
+
+    def test_transient_identity_queries_recover_during_startup(self):
+        original = dev.process_info
+        attempts = []
+
+        def intermittent(pid):
+            attempts.append(pid)
+            # First two identity reads and the first HTTP-loop ownership read fail.
+            if len(attempts) in (1, 2, 4):
+                return None
+            return original(pid)
+
+        with mock.patch.object(dev, 'process_info', intermittent):
+            self.manager.start('backend')
+        self.assertGreaterEqual(len(attempts), 6)
+        self.assertTrue(self.manager.status('backend')['ready'])
+
+    def test_worker_exit_before_handshake_logs_stage_and_exit_code(self):
+        shim = self.root / 'early_exit_worker.py'
+        shim.write_text('raise SystemExit(23)\n')
+        with mock.patch.object(dev, 'SCRIPT', shim):
+            with self.assertRaisesRegex(RuntimeError, '退出码 23'):
+                self.manager.start('backend')
+        log = self.manager.log_path('backend').read_text()
+        self.assertIn('[控制台] 等待启动进程就绪失败', log)
+        self.assertIn('退出码 23', log)
+        self.assertTrue(all(p.poll() is not None for p in self.processes))
+        self.assert_stopped('backend')
+
+    def test_worker_handshake_timeout_logs_reason_and_cleans_process(self):
+        shim = self.root / 'unready_worker.py'
+        shim.write_text('import time\ntime.sleep(30)\n')
+        self.manager.timeout = .2
+        with mock.patch.object(dev, 'SCRIPT', shim):
+            with self.assertRaisesRegex(RuntimeError, '就绪超时'):
+                self.manager.start('backend')
+        log = self.manager.log_path('backend').read_text()
+        self.assertIn('[控制台] 等待启动进程就绪失败', log)
+        self.assertIn('就绪超时', log)
+        self.assertTrue(all(p.poll() is not None for p in self.processes))
+        self.assert_stopped('backend')
 
 
 if __name__ == '__main__':

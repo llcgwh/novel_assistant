@@ -8,6 +8,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import select
 import shlex
 import shutil
 import signal
@@ -48,7 +49,7 @@ def read_env(path):
 def process_info(pid):
     try:
         result = subprocess.run(
-            ['ps', '-p', str(int(pid)), '-o', 'pgid=', '-o', 'lstart=', '-o', 'args='],
+            ['ps', '-ww', '-p', str(int(pid)), '-o', 'pgid=', '-o', 'lstart=', '-o', 'args='],
             capture_output=True, text=True, timeout=2,
         )
         parts = result.stdout.strip().split(None, 6)
@@ -57,6 +58,31 @@ def process_info(pid):
     except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     return None
+
+
+def wait_worker_ready(process, descriptor, token, timeout):
+    """Wait until Python has exec'd and installed the worker signal handlers."""
+    deadline = time.monotonic() + timeout
+    received = b''
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f'启动进程在就绪前退出（退出码 {process.returncode}）')
+        if not select.select([descriptor], [], [], min(.1, max(0, deadline - time.monotonic())))[0]:
+            continue
+        chunk = os.read(descriptor, 4096)
+        if not chunk:
+            # Reap only our own child; its stderr is already in the service log.
+            try:
+                code = process.wait(timeout=.2)
+            except subprocess.TimeoutExpired:
+                code = '尚未退出'
+            raise RuntimeError(f'启动进程就绪通道关闭（退出码 {code}）')
+        received += chunk
+        if b'\n' in received:
+            if received != (token + '\n').encode():
+                raise RuntimeError('启动进程就绪标识不匹配')
+            return
+    raise RuntimeError('等待启动进程就绪超时')
 
 
 def port_busy(port):
@@ -175,34 +201,63 @@ class Manager:
         token = uuid.uuid4().hex
         env['INK_DEV_COMMAND_JSON'] = json.dumps(command)
         env['INK_DEV_CWD'] = str(self.root / ('backend' if name == 'backend' else 'frontend-vue'))
-        with self.log_path(name).open('ab') as log:
-            log.write(f'\n--- {time.strftime("%Y-%m-%d %H:%M:%S")} 启动 {name} ---\n'.encode())
-            log.flush()
-            process = subprocess.Popen([sys.executable, str(SCRIPT), '_worker', name, token],
-                cwd=self.root, env=env, stdin=subprocess.DEVNULL, stdout=log,
-                stderr=subprocess.STDOUT, start_new_session=True)
+        ready_read, ready_write = os.pipe()
+        env['INK_DEV_READY_FD'] = str(ready_write)
+        process = None
+        phase = '创建启动进程'
         try:
-            info = process_info(process.pid)
-            if not info or info['group'] != process.pid:
-                raise RuntimeError(f'{name} 启动失败，未能确认本次进程身份')
+            with self.log_path(name).open('ab') as log:
+                log.write(f'\n--- {time.strftime("%Y-%m-%d %H:%M:%S")} 启动 {name} ---\n'.encode())
+                log.flush()
+                try:
+                    process = subprocess.Popen([sys.executable, str(SCRIPT), '_worker', name, token],
+                        cwd=self.root, env=env, stdin=subprocess.DEVNULL, stdout=log,
+                        stderr=subprocess.STDOUT, start_new_session=True, pass_fds=(ready_write,))
+                finally:
+                    os.close(ready_write)
+                    ready_write = None
+            phase = '等待启动进程就绪'
+            wait_worker_ready(process, ready_read, token, min(10, self.timeout))
+            phase = '确认启动进程身份'
+            identity_deadline = time.monotonic() + min(2, self.timeout)
+            while True:
+                info = process_info(process.pid)
+                if (info and info['group'] == process.pid
+                        and f'_worker {name} {token}' in info['command']):
+                    break
+                if process.poll() is not None or time.monotonic() >= identity_deadline:
+                    raise RuntimeError(f'{name} 启动失败，未能确认本次进程身份（退出码 {process.returncode}）')
+                time.sleep(.05)
             record = dict(pid=process.pid, born=info['born'], token=token,
                           name=name, port=self.ports[name])
             path = self.directory / f'{name}.json'
             temp = path.with_suffix('.tmp')
             temp.write_text(json.dumps(record))
             temp.replace(path)
+            phase = '等待服务 HTTP 就绪'
             deadline = time.monotonic() + self.timeout
+            identity_missing_since = None
             while time.monotonic() < deadline:
-                if process.poll() is not None or not self.owned(record):
-                    raise RuntimeError(f'{name} 启动失败；请查看 {self.log_path(name)}')
+                if process.poll() is not None:
+                    raise RuntimeError(f'{name} 启动失败（退出码 {process.returncode}）；请查看 {self.log_path(name)}')
+                if not self.owned(record):
+                    identity_missing_since = identity_missing_since or time.monotonic()
+                    if time.monotonic() - identity_missing_since >= 2:
+                        raise RuntimeError(f'{name} 启动进程身份持续无法确认；请查看 {self.log_path(name)}')
+                    time.sleep(.1)
+                    continue
+                identity_missing_since = None
                 if self.status(name)['ready']:
                     return f'{name} 已启动，端口 {self.ports[name]}'
                 time.sleep(.3)
             raise RuntimeError(f'{name} 启动超时，已清理本次进程；请查看日志（数据库需已运行）')
-        except BaseException:
+        except BaseException as error:
+            with contextlib.suppress(OSError):
+                with self.log_path(name).open('a') as log:
+                    log.write(f'\n[控制台] {phase}失败：{error or type(error).__name__}\n')
             # This unreaped Popen handle is authoritative even if writing the
             # ownership record failed. Never infer ownership from an open port.
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(process.pid, signal.SIGTERM)
                 try:
@@ -212,6 +267,10 @@ class Manager:
                         os.killpg(process.pid, signal.SIGKILL)
                     process.wait(timeout=2)
             raise
+        finally:
+            os.close(ready_read)
+            if ready_write is not None:
+                os.close(ready_write)
 
     def start(self, name):
         with self.lock():
@@ -265,6 +324,11 @@ def worker():
 
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
+    ready_fd = os.environ.pop('INK_DEV_READY_FD', None)
+    if ready_fd is not None:
+        with os.fdopen(int(ready_fd), 'wb', buffering=0) as channel:
+            channel.write((sys.argv[3] + '\n').encode())
+    print('[控制台] 启动进程已就绪，正在运行服务命令。', flush=True)
     child = subprocess.Popen(json.loads(os.environ.pop('INK_DEV_COMMAND_JSON')),
                              cwd=os.environ.pop('INK_DEV_CWD'), stdin=subprocess.DEVNULL)
     while child.poll() is None and not stopping:
