@@ -46,10 +46,28 @@ public class WebDavSyncService {
   public Map<String, Object> testConnection(Long id, String serverUrl, String username, String password) {
     return recorded(id, "CONNECTION_TEST", () -> {
       if (serverUrl == null || !serverUrl.matches("https?://.+")) throw WritingService.bad("WebDAV 地址必须使用 HTTP 或 HTTPS");
-      Sardine dav = client(username, password);
+      String testPassword = password;
+      if (testPassword == null || testPassword.isEmpty()) {
+        Novel saved = novelRepository.findById(id).orElseThrow(WritingService::missing);
+        if (saved.getWebdavPassword() != null && !saved.getWebdavPassword().isEmpty()) {
+          // The settings form intentionally never receives the saved secret.
+          // Reuse it only for the saved destination and account, never a newly typed URL.
+          if (!sameDestination(serverUrl, saved.getWebdavServerUrl()) || !Objects.equals(username, saved.getWebdavUsername()))
+            throw WritingService.bad("服务器地址或用户名已更改，请填写对应密码后再测试连接");
+          testPassword = saved.getWebdavPassword();
+        }
+      }
+      Sardine dav = client(username, testPassword);
       try { int count = dav.list(serverUrl).size(); return new LinkedHashMap<>(Map.of("success", true, "message", "连接成功，找到 " + count + " 个资源")); }
       finally { dav.shutdown(); }
     });
+  }
+  private static boolean sameDestination(String first, String second) {
+    if (first == null || second == null) return false;
+    try {
+      return java.net.URI.create(first.replaceAll("/+$", "")).normalize()
+        .equals(java.net.URI.create(second.replaceAll("/+$", "")).normalize());
+    } catch (IllegalArgumentException invalid) { return false; }
   }
   public Map<String, Object> syncUpload(Long id) {
     return recorded(id, "WEBDAV_UPLOAD", () -> {

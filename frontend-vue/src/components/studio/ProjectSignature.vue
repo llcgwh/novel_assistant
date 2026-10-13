@@ -58,14 +58,16 @@ function updateDock() {
   if (!dock.value || !signature.value) return
   const target = dock.value.getBoundingClientRect()
   const badge = signature.value
-  // Start moving before the footer enters, then settle into its reserved space.
-  const nearFooter = target.top <= window.innerHeight + 80
+  // Dock only once the reserved footer row reaches the badge's resting baseline.
+  // Moving earlier would place the centered badge over the final book cards.
+  const targetTop = target.top + (target.height - badge.offsetHeight) / 2
+  const nearFooter = targetTop <= badge.offsetTop
   dockStyle.value = {
     '--signature-x': nearFooter
       ? `${target.left + (target.width - badge.offsetWidth) / 2 - badge.offsetLeft}px`
       : '0px',
     '--signature-y': nearFooter
-      ? `${Math.min(0, target.top + (target.height - badge.offsetHeight) / 2 - badge.offsetTop)}px`
+      ? `${Math.min(0, targetTop - badge.offsetTop)}px`
       : '0px',
   }
 }

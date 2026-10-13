@@ -43,9 +43,28 @@ public class NovelService {
 
     @org.springframework.transaction.annotation.Transactional
     public void deleteNovel(Long id) {
-        for(String entity : List.of("WritingRevision","WritingSession","WritingChapter","WritingBook"))
-            em.createQuery("delete from "+entity+" where novelId=:id").setParameter("id",id).executeUpdate();
+        // Serialize with manuscript/restore writes before removing any owned data.
+        if (em.find(Novel.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE) == null) return;
+        // Databases upgraded by Hibernate and the original SQL scripts have different
+        // FK cascade rules. Delete owners in dependency order: Hibernate also removes
+        // each owner's mapped join-table rows before its bulk entity deletion.
+        em.createQuery("update RelationshipGroup set parentGroupId=null where novelId=:id")
+                .setParameter("id", id).executeUpdate();
+        em.createQuery("update MapLocation set parentLocation=null where novelId=:id")
+                .setParameter("id", id).executeUpdate();
+        for (String entity : List.of(
+                "RelationshipGroup", "CharacterRelationship", "WorldviewEntry", "TimelineEvent",
+                "Foreshadow", "Outline", "Scene", "MapLocation", "Character", "Tag", "Image",
+                "WritingRevision", "WritingSession", "WritingChapter", "WritingBook",
+                "FormSubmission", "BackupCleanup", "BackupRetention")) {
+            em.createQuery("delete from " + entity + " where novelId=:id")
+                    .setParameter("id", id).executeUpdate();
+        }
+        em.createQuery("delete from SeriesMutationReceipt where scope like :scope")
+                .setParameter("scope", "novel:" + id + ":%").executeUpdate();
+        // Keep device-local audit history, shared templates and recoverable files.
         novelRepository.deleteById(id);
+        em.flush();
     }
 
     public List<Novel> searchNovels(String title) {

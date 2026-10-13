@@ -58,6 +58,101 @@ class ConditionalDavClientTest {
     finally { if (server != null) server.stop(0); }
   }
 
+  @Test void directoryExistsUsesDepthZeroPropfindWhenHeadIsForbidden() throws Exception {
+    respond = exchange -> reply(exchange, exchange.getRequestMethod().equals("HEAD") ? 403 : 207,
+      exchange.getRequestMethod().equals("HEAD") ? null : directoryXml(200));
+    assertTrue(client.exists(directory));
+    WireRequest probe = request();
+    assertEquals("PROPFIND", probe.method());
+    assertEquals("0", probe.header("Depth"));
+    assertTrue(probe.body().contains("resourcetype"));
+    assertFalse(probe.body().contains("allprop"));
+    assertTrue(requests.isEmpty());
+  }
+
+  @Test void directoryProbeCompletesAuthenticationWithTheSameDepthAndBody() throws Exception {
+    respond = exchange -> {
+      if (exchange.getRequestHeaders().getFirst("Authorization") == null) {
+        exchange.getResponseHeaders().set("WWW-Authenticate", "Basic realm=\"isolated-directory-test\"");
+        reply(exchange, 401, null);
+      } else reply(exchange, 207, directoryXml(200));
+    };
+    assertTrue(client.exists(directory));
+    WireRequest first = request(), authenticated = request();
+    assertNull(first.header("Authorization"));
+    assertEquals("Basic " + Base64.getEncoder().encodeToString("user:secret".getBytes(StandardCharsets.UTF_8)),
+      authenticated.header("Authorization"));
+    assertEquals(first.body(), authenticated.body());
+    for (WireRequest probe : List.of(first, authenticated)) {
+      assertEquals("PROPFIND", probe.method());
+      assertEquals("0", probe.header("Depth"));
+    }
+    assertTrue(requests.isEmpty());
+  }
+
+  static Stream<Integer> directoryStatuses() { return Stream.of(404, 401, 403); }
+
+  @ParameterizedTest @MethodSource("directoryStatuses")
+  void directoryProbeOnlyTreatsHttp404AsMissing(int status) throws Exception {
+    respond = exchange -> reply(exchange, status, null);
+    if (status == 404) assertFalse(client.exists(directory));
+    else assertEquals(status, assertThrows(SardineException.class, () -> client.exists(directory)).getStatusCode());
+    assertEquals("PROPFIND", request().method());
+    assertTrue(requests.isEmpty());
+  }
+
+  @ParameterizedTest @MethodSource("directoryStatuses")
+  void directoryProbeDoesNotHideErrorsInsideMultiStatus(int status) throws Exception {
+    respond = exchange -> reply(exchange, 207, directoryXml(status));
+    if (status == 404) assertFalse(client.exists(directory));
+    else assertEquals(status, assertThrows(SardineException.class, () -> client.exists(directory)).getStatusCode());
+    assertEquals("PROPFIND", request().method());
+    assertTrue(requests.isEmpty());
+  }
+
+  @ParameterizedTest @MethodSource("directoryStatuses")
+  void directoryProbeChecksResourceLevelErrorsInsideMultiStatus(int status) throws Exception {
+    String xml = "<d:multistatus xmlns:d=\"DAV:\"><d:response><d:href>/book/</d:href>" +
+      "<d:status>HTTP/1.1 " + status + " Result</d:status></d:response></d:multistatus>";
+    respond = exchange -> reply(exchange, 207, xml);
+    if (status == 404) assertFalse(client.exists(directory));
+    else assertEquals(status, assertThrows(SardineException.class, () -> client.exists(directory)).getStatusCode());
+    assertEquals("PROPFIND", request().method());
+    assertTrue(requests.isEmpty());
+  }
+
+  static Stream<String> invalidDirectoryResponses() {
+    return Stream.of("empty", "other", "duplicate", "file", "missingStatus", "malformedStatus", "mixedStatus");
+  }
+
+  @ParameterizedTest @MethodSource("invalidDirectoryResponses")
+  void directoryProbeRequiresOneMatchingCollection(String variant) throws Exception {
+    String xml = switch (variant) {
+      case "empty" -> "<d:multistatus xmlns:d=\"DAV:\"/>";
+      case "other" -> directoryXml(200).replace("/book/", "/other/");
+      case "duplicate" -> directoryXml(200).replace("</d:multistatus>",
+        "<d:response><d:href>/book/</d:href><d:status>HTTP/1.1 200 OK</d:status></d:response></d:multistatus>");
+      case "file" -> directoryXml(200).replace("<d:collection/>", "");
+      case "missingStatus" -> directoryXml(200).replace("<d:status>HTTP/1.1 200 Result</d:status>", "");
+      case "malformedStatus" -> directoryXml(200).replace("HTTP/1.1 200 Result", "not a status line");
+      case "mixedStatus" -> directoryXml(403).replace("</d:response>",
+        "<d:status>HTTP/1.1 200 OK</d:status></d:response>");
+      default -> throw new AssertionError(variant);
+    };
+    respond = exchange -> reply(exchange, 207, xml);
+    assertThrows(IOException.class, () -> client.exists(directory));
+    assertEquals("PROPFIND", request().method());
+    assertTrue(requests.isEmpty());
+  }
+
+  @Test void fileExistenceStillUsesHeadAndPreservesForbiddenErrors() throws Exception {
+    respond = exchange -> reply(exchange, 403, null);
+    assertEquals(403, assertThrows(SardineException.class,
+      () -> client.exists(directory + "snapshot.ink.json")).getStatusCode());
+    assertEquals("HEAD", request().method());
+    assertTrue(requests.isEmpty());
+  }
+
   @Test void deleteSendsBothConditionsAndDoesNotRetryPreconditionFailure() throws Exception {
     respond = exchange -> reply(exchange, 412, null);
     String condition = "(<" + TOKEN + ">)";
@@ -342,6 +437,14 @@ class ConditionalDavClientTest {
       <d:lockroot><d:href>/book/</d:href></d:lockroot>
       </d:activelock></d:lockdiscovery></d:prop>
       """.formatted(TOKEN);
+  }
+
+  private String directoryXml(int status) {
+    return """
+      <d:multistatus xmlns:d="DAV:"><d:response><d:href>/book/</d:href>
+      <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+      <d:status>HTTP/1.1 %d Result</d:status></d:propstat></d:response></d:multistatus>
+      """.formatted(status);
   }
 
   private WireRequest request() throws InterruptedException {

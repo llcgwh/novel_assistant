@@ -460,3 +460,24 @@ function statusLabel(status: NovelStatus): string {
   )
 }
 </script>
+
+<style scoped>
+.library-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.library-topbar {
+  flex-shrink: 0;
+}
+.library-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  margin: 0 auto;
+}
+.library-footer {
+  margin-top: auto;
+}
+</style>

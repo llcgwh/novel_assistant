@@ -27,6 +27,38 @@ class WebDavBackupTest {
         return novel;
     }
 
+    @Test void connectionTestUsesSavedPasswordWhenFormIsBlank() throws Exception {
+        when(novels.findById(1L)).thenReturn(Optional.of(novel("Story")));
+        doReturn(sardine).when(service).client("user", "secret");
+        var result = service.testConnection(1L, "https://dav.example/", "user", "");
+        assertEquals(true, result.get("success"));
+        verify(sardine).list("https://dav.example/");
+        verify(sardine).shutdown();
+    }
+
+    @Test void connectionTestAcceptsMissingPasswordAndEquivalentTrailingSlash() {
+        when(novels.findById(1L)).thenReturn(Optional.of(novel("Story")));
+        doReturn(sardine).when(service).client("user", "secret");
+        assertEquals(true, service.testConnection(1L, "https://dav.example", "user", null).get("success"));
+    }
+
+    @Test void connectionTestUsesNewlyTypedPasswordWithoutChangingStoredConfig() {
+        doReturn(sardine).when(service).client("new-user", "new-secret");
+        assertEquals(true, service.testConnection(1L, "https://new.example/", "new-user", "new-secret").get("success"));
+        verifyNoInteractions(novels);
+    }
+
+    @Test void connectionTestNeverSendsStoredPasswordToChangedDestinationOrAccount() {
+        when(novels.findById(1L)).thenReturn(Optional.of(novel("Story")));
+        for (String url : java.util.List.of("https://other.example/", "http://dav.example/", "https://dav.example/other/", "https://dav.example:444/")) {
+            assertEquals(false, service.testConnection(1L, url, "user", "").get("success"));
+        }
+        assertEquals(false, service.testConnection(1L, "https://dav.example/", "someone-else", "").get("success"));
+        verify(service, never()).client(any(), any());
+        verifyNoInteractions(sardine);
+        verify(novels, never()).save(any());
+    }
+
     @Test void uploadSendsImageBundle() throws Exception {
         Novel novel = novel("Story"); byte[] bytes = {1, 2, 3};
         when(novels.findById(1L)).thenReturn(Optional.of(novel));

@@ -2,8 +2,10 @@ package com.novelwriting.service;
 
 import com.github.sardine.impl.SardineImpl;
 import com.github.sardine.impl.SardineException;
+import com.github.sardine.impl.handler.MultiStatusResponseHandler;
 import com.github.sardine.impl.handler.VoidResponseHandler;
 import com.github.sardine.impl.methods.HttpLock;
+import com.github.sardine.impl.methods.HttpPropFind;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,12 +17,14 @@ import java.util.Map;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.http.HttpResponse;
+import org.apache.http.ParseException;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicLineParser;
 import org.apache.http.client.config.RequestConfig;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -39,6 +43,51 @@ class ConditionalDavClient extends SardineImpl {
 
   ConditionalDavClient(String username, String password) {
     super(HttpClients.custom().disableAutomaticRetries().setDefaultRequestConfig(REQUEST_CONFIG), username, password);
+  }
+
+  /** DAV collections may support PROPFIND while rejecting HTTP HEAD (for example Nutstore). */
+  @Override public boolean exists(String url) throws IOException {
+    if (!URI.create(url).getPath().endsWith("/")) return super.exists(url);
+    try {
+      // Only request the property needed here: optional allprop failures must
+      // not turn an existing collection into a missing directory.
+      HttpPropFind request = new HttpPropFind(url);
+      request.setDepth("0");
+      request.setHeader("Content-Type", "application/xml; charset=UTF-8");
+      request.setEntity(new StringEntity(
+        "<d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>", StandardCharsets.UTF_8));
+      var resources = execute(request, response -> {
+        int status = response.getStatusLine().getStatusCode();
+        if (status != 207) throw new SardineException("Unexpected PROPFIND response", status, "Directory check failed");
+        return new MultiStatusResponseHandler().handleResponse(response);
+      }).getResponse();
+      if (resources.size() != 1 || resources.get(0).getHref().size() != 1 ||
+          !sameResource(url, resources.get(0).getHref().get(0)))
+        throw new IOException("WebDAV directory check did not return the requested resource");
+      var resource = resources.get(0);
+      var properties = resource.getPropstat();
+      String statusLine = resource.getStatus();
+      if (statusLine != null && !properties.isEmpty())
+        throw new IOException("WebDAV directory response mixes resource and property statuses");
+      if (statusLine == null && properties.size() == 1) statusLine = properties.get(0).getStatus();
+      // DavResource defaults an absent status to 200; existence needs an
+      // explicit successful response, not that permissive parser default.
+      if (statusLine == null) throw new IOException("WebDAV directory status is missing");
+      int status;
+      try { status = BasicLineParser.parseStatusLine(statusLine, null).getStatusCode(); }
+      catch (ParseException invalid) { throw new IOException("WebDAV directory status is invalid", invalid); }
+      if (status == 404) return false;
+      if (status != 200)
+        throw new SardineException("Unexpected PROPFIND resource status", status, "Directory check failed");
+      if (properties.size() != 1 || properties.get(0).getProp() == null ||
+          properties.get(0).getProp().getResourcetype() == null ||
+          properties.get(0).getProp().getResourcetype().getCollection() == null)
+        throw new IOException("WebDAV resource is not a directory");
+      return true;
+    } catch (SardineException failure) {
+      if (failure.getStatusCode() == 404) return false;
+      throw failure;
+    }
   }
 
   record HeadMetadata(String etag, long size) {}
