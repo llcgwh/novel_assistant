@@ -64,11 +64,23 @@ python3 scripts/dev.py start backend   # 单独启动后端（frontend 同理）
 python3 scripts/dev.py logs backend -f # 持续查看后端日志，Ctrl+C 退出查看
 ```
 
-默认地址为 [http://localhost:3000](http://localhost:3000)，后端为 `127.0.0.1:8080`。控制台需要 Python 3.9+，使用标准库；macOS 优先寻找已安装的 Java 17，也可使用 IntelliJ IDEA 自带的 Maven。首次拉取请先在 `frontend-vue/` 执行 `npm ci`；数据库仍按下文准备并运行。
+Windows 可双击根目录的 **`墨境控制台.bat`**，打开启停菜单。使用系统自带的 Windows PowerShell 5.1，无需 Python；可启动／关闭全部或单独服务、查看状态、打开网页，以及在独立窗口持续查看后端／前端日志。退出菜单和关闭日志窗口都不会关闭服务，停止请使用菜单中的关闭选项。
+
+在 Windows 终端也可以直接调用：
+
+```bat
+.\墨境控制台.bat start
+.\墨境控制台.bat stop
+.\墨境控制台.bat status
+.\墨境控制台.bat start backend
+.\墨境控制台.bat logs frontend -Follow
+```
+
+默认地址为 [http://localhost:3000](http://localhost:3000)，后端为 `127.0.0.1:8080`。macOS/Linux 控制台需要 Python 3.9+，使用标准库；macOS 优先寻找已安装的 Java 17，也可使用 IntelliJ IDEA 自带的 Maven。Windows 请将 Java、Maven 和 Node.js 加入 `PATH`，或在 `.dev.env` 中设置 `JAVA_HOME` 和 `MVN`（指向 `mvn.cmd`）。首次拉取请先在 `frontend-vue/` 执行 `npm ci`；数据库仍按下文准备并运行。
 
 可将 `.dev.env.example` 复制为 `.dev.env`，修改端口、数据库连接或 Java/Maven 路径；终端环境变量优先。配置只支持 `KEY=value`，不执行 shell 表达式。数据库配置默认沿用后端配置文件。前端代理自动指向所选后端端口；如果前端 `.env*` 里已有不同的代理地址，会提示先调整。
 
-日志保存在 `.local-dev/backend.log` 和 `.local-dev/frontend.log`，重新启动会追加记录。启动时先等待后台进程就绪，再检查 HTTP；启动阶段、失败原因及可获得的退出码会写入日志。配置、日志和进程记录均不提交 Git。控制台只管理自己启动的进程，不接管其他已占用端口的程序，也不启停 PostgreSQL。更新脚本后请按 Q 退出并重新打开控制台，已有服务会继续运行。
+macOS/Linux 日志保存在 `.local-dev/backend.log` 和 `.local-dev/frontend.log`，Windows 日志保存在 `.local-dev/windows/backend.log` 和 `.local-dev/windows/frontend.log`，重新启动会追加记录。启动时检查后台进程和 HTTP 是否就绪，失败原因会写入日志。配置、日志和进程记录均不提交 Git。控制台只管理自己启动的进程，不接管其他已占用端口的程序，也不启停 PostgreSQL。一键启动失败时，仅回退本次新启动的服务。更新脚本后退出并重新打开控制台，已有服务会继续运行。
 
 ### 1. 获取项目并准备数据库
 

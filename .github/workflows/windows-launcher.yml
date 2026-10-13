@@ -1,0 +1,29 @@
+name: Windows launcher
+
+on:
+  push:
+    paths:
+      - 'scripts/dev-windows.ps1'
+      - 'scripts/test_dev_windows.ps1'
+      - '墨境控制台.bat'
+      - '.github/workflows/windows-launcher.yml'
+  pull_request:
+    paths:
+      - 'scripts/dev-windows.ps1'
+      - 'scripts/test_dev_windows.ps1'
+      - '墨境控制台.bat'
+      - '.github/workflows/windows-launcher.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise Windows PowerShell 5.1 lifecycle
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test_dev_windows.ps1
