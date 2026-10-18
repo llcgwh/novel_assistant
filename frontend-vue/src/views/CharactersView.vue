@@ -27,7 +27,11 @@
       <div
         v-for="character in charactersStore.filteredCharacters"
         :key="character.id"
-        class="card"
+        class="card editable-card"
+        data-editable-card tabindex="0" role="group" aria-keyshortcuts="Enter"
+        :aria-label="`${character.name}，按 Enter 编辑`"
+        @click="isCardEditEvent($event) && editCharacter(character)"
+        @keydown.enter="isCardEditEvent($event) && editCharacter(character)"
       >
         <div class="card-image">
           <img v-if="character.portraitImage" :src="character.portraitImage" alt="人物肖像" />
@@ -60,15 +64,19 @@
       :submit="saveCharacter"
     >
       <AiAssistantPanel scope="character" :target-id="editingCharacter?.id" :draft="{ ...form, tagIds: formTagIds }" @apply="Object.assign(form, { [$event.field]: $event.value })" />
+      <template #media>
       <div class="form-group">
         <label>📷 人物肖像</label>
         <ImageUpload
+          large
+          :preview-alt="form.name ? `${form.name}的人物肖像` : '人物肖像'"
           v-model="form.portraitImage"
           @uploading="imageUploading = $event"
           image-type="character_portrait"
           placeholder="点击上传人物肖像"
         />
       </div>
+      </template>
       <div class="form-row">
         <div class="form-group form-half">
           <label>姓名 *</label>
@@ -123,6 +131,7 @@
 
 <script setup lang="ts">
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
+import { isCardEditEvent } from '@/utils/editableCard'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'

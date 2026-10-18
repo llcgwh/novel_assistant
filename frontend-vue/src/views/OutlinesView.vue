@@ -29,7 +29,10 @@
     />
 
     <div v-else class="grid-container">
-      <div v-for="outline in outlinesStore.filteredOutlines" :key="outline.id" class="card">
+      <div v-for="outline in outlinesStore.filteredOutlines" :key="outline.id" class="card editable-card" data-editable-card role="group" tabindex="0"
+        :aria-label="(outline.title) + '，按 Enter 编辑'" aria-keyshortcuts="Enter"
+        @click="isCardEditEvent($event) && editOutline(outline)"
+        @keydown.enter="isCardEditEvent($event) && editOutline(outline)">
         <h3>{{ outline.title }}</h3>
         <StatusBadge :status="outline.status" />
         <p v-if="outline.content" style="margin-top: 10px;">{{ outline.content }}</p>
@@ -109,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import { isCardEditEvent } from '@/utils/editableCard'
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'

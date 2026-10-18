@@ -11,6 +11,8 @@ const drafts = await load('utils/modalDraft')
 const dialogs = await load('composables/useDialog')
 const modalDrafts = await load('composables/modalDrafts')
 const aiUtils = await load('utils/ai')
+const imageUtils = await load('utils/imageUpload')
+const cardUtils = await load('utils/editableCard'), worldviewTypes = await load('types/worldview')
 function component(name, dependencies = {}) {
   const source = readFileSync(new URL(`../src/components/common/${name}.vue`, import.meta.url), 'utf8')
   const { descriptor } = parse(source)
@@ -30,6 +32,12 @@ function component(name, dependencies = {}) {
 const DiscardChangesDialog = component('DiscardChangesDialog')
 const BaseModal = component('BaseModal', { './DiscardChangesDialog.vue': { default: DiscardChangesDialog } })
 const NativeModal = component('../settings/BackupCleanupDialog', { '@/components/common/DiscardChangesDialog.vue': { default: DiscardChangesDialog } })
+let uploadImage = async () => ({ id: 99 })
+const ImageUpload = component('ImageUpload', {
+  '@/api/images': { imagesApi: { upload: (...args) => uploadImage(...args), getFileUrl: id => `/api/novels/1/images/${id}/file` } },
+  '@/components/common/StudioIcon.vue': { default: Vue.defineComponent({ render: () => Vue.h('span', '图片') }) },
+  '@/utils/imageUpload': imageUtils,
+})
 let suggestionMeta = {}
 const AiPanel = component('../ai/AiAssistantPanel', {
   'vue-router': { useRoute: () => ({ params: { novelId: 1 } }) },
@@ -57,7 +65,8 @@ async function mount(t, options = {}) {
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { length: 0, key: () => null, getItem: () => null } })
   let body, doc
   const node = (type, text = '') => Vue.markRaw({
-    type, text, children: [], props: {}, parent: null, style: {}, inert: false, value: '', tagName: type.toUpperCase(),
+    type, text, children: [], props: {}, parent: null, style: {}, inert: false, value: '', tagName: type.toUpperCase(), nodeType: type.startsWith('#') ? 3 : 1,
+    get ownerDocument() { return doc }, get parentElement() { return this.parent },
     addEventListener() {}, removeEventListener() {}, showModal() { this.open = true }, close() { this.open = false },
     getBoundingClientRect: () => ({ left: 20, top: 20, right: 700, bottom: 700 }),
     get isConnected() { return this === body || !!this.parent?.isConnected },
@@ -67,13 +76,17 @@ async function mount(t, options = {}) {
         if (selector.includes('[inert]') && (item.inert || item.props.inert)) return item
         if (selector.includes('[disabled]') && item.props.disabled) return item
         if (selector.includes('[role="combobox"]') && item.props.role === 'combobox' && item.props['aria-expanded'] === 'true') return item
+        if (selector.includes('button') && ['button', 'input', 'select', 'textarea', 'label', 'summary'].includes(item.type)) return item
+        if (selector.includes('a[href]') && item.type === 'a' && item.props.href) return item
+        if (selector.includes('[tabindex]') && item.props.tabindex !== undefined) return item
       }
       return null
     },
     getClientRects() { return this.isConnected ? [{}] : [] },
     querySelectorAll() { return this.children.flatMap(child => all(child, item => ['button', 'input', 'textarea', 'select'].includes(item.type) && !item.props.disabled || item.type === 'a' && item.props.href || item.props.tabindex !== undefined && item.props.tabindex !== '-1')) },
-    focus() {
+    focus(options) {
       if (!this.isConnected || this.closest('[inert]')) return
+      this.lastFocusOptions = options
       doc.activeElement = this
       for (let item = this; item; item = item.parent) item.props.onFocusin?.({ target: this })
     },
@@ -82,7 +95,7 @@ async function mount(t, options = {}) {
   const appElement = node('app'), root = node('root'), opener = node('button', '打开编辑')
   body.children.push(appElement, opener); appElement.parent = body; opener.parent = body
   appElement.children.push(root); root.parent = appElement
-  doc = { body, activeElement: opener, getElementById: () => appElement, addEventListener: (type, fn) => { if (type === 'keydown') listeners.add(fn) }, removeEventListener: (_type, fn) => listeners.delete(fn) }
+  doc = { body, activeElement: opener, getSelection: () => null, getElementById: () => appElement, addEventListener: (type, fn) => { if (type === 'keydown') listeners.add(fn) }, removeEventListener: (_type, fn) => listeners.delete(fn) }
   Object.defineProperty(globalThis, 'document', { configurable: true, value: doc })
   const renderer = Vue.createRenderer({
     createElement: node, createText: text => node('#text', text), createComment: text => node('#comment', text),
@@ -99,15 +112,17 @@ async function mount(t, options = {}) {
     remove(element) { if (element.parent) element.parent.children.splice(element.parent.children.indexOf(element), 1); element.parent = null },
   })
   const state = Vue.reactive({ open: true, childShown: true, title: '人物档案', draft: { name: '初名', tags: [1] }, ...options })
-  const app = renderer.createApp({ render: () => state.open ? Vue.h(options.native ? NativeModal : BaseModal, {
-    ...Object.fromEntries(Object.entries(state).filter(([key]) => !['open', 'customActions', 'slot', 'childShown', 'native'].includes(key))),
+  const app = renderer.createApp({ render: () => options.root ? Vue.h(options.root) : state.open ? Vue.h(options.native ? NativeModal : BaseModal, {
+    ...Object.fromEntries(Object.entries(state).filter(([key]) => !['open', 'customActions', 'slot', 'media', 'childShown', 'native'].includes(key))),
     onClose: () => { events.push('close'); state.open = false },
     ...(!options.native ? { onConfirm: () => events.push('confirm') } : {}),
   }, {
     default: () => [Vue.h('input', { value: state.draft?.name, 'data-test': 'name' }), Vue.h('textarea', { 'data-test': 'notes' }), ...(options.slot ? options.slot(state) : [])],
+    ...(options.media ? { media: () => options.media(state) } : {}),
     ...(options.customActions ? { actions: ({ close }) => Vue.h('button', { onClick: close }, '自定义关闭') } : {}),
   }) : null })
   app.component('RouterLink', { render() { return Vue.h('a', {}, this.$slots.default?.()) } })
+  app.component('StudioIcon', { render() { return Vue.h('span') } })
   app.mount(root); await settle()
   t.after(() => {
     app.unmount(); assert.equal(listeners.size, 0); assert.equal(body.style.overflow, 'auto'); assert.equal(appElement.inert, false)
@@ -130,6 +145,118 @@ test('draft comparison includes nested content, ignores key order, and treats re
   const cyclic = {}; cyclic.self = cyclic
   assert.equal(drafts.draftHasChanges(drafts.draftFingerprint(cyclic), cyclic), true)
 })
+
+test('the image pane belongs to the editor dialog and image-only edits share its outside-click and discard guard', async t => {
+  const h = await mount(t, { media: state => Vue.h('button', { onClick: () => { state.draft.image = '/replacement.png' } }, '更换预览图片') })
+  const panel = h.find(node => node.props.role === 'dialog'), pane = h.find(node => node.props.class === 'modal-media modal-fields')
+  assert.ok(panel.contains(pane)); assert.match(panel.props.class, /modal-with-media/)
+  const backdrop = h.find(node => node.props.class === 'modal')
+  backdrop.props.onClick({ target: pane, currentTarget: backdrop }); await settle()
+  assert.deepEqual(h.events, [], 'clicks on the image pane never dismiss the editor')
+  const imageAction = h.button('更换预览图片'); imageAction.focus(); await h.click(imageAction)
+  await h.key('Escape'); assert.ok(h.button('继续编辑')); assert.equal(panel.props.inert, true)
+  await h.click(h.button('继续编辑')); assert.equal(h.state.draft.image, '/replacement.png'); assert.equal(h.doc.activeElement, imageAction)
+  await h.key('Escape'); await h.click(h.button('放弃修改'))
+  assert.deepEqual(h.events, ['close']); assert.equal(h.doc.activeElement, h.opener)
+})
+
+test('uploading from the image pane locks both media and main fields, then keeps the adopted image guarded', async t => {
+  let resolve
+  uploadImage = () => new Promise(yes => { resolve = yes })
+  t.after(() => { uploadImage = async () => ({ id: 99 }) })
+  const h = await mount(t, { draft: { name: '初名', picture: '/original.png' }, media: state => Vue.h(ImageUpload, {
+    large: true, previewAlt: '人物肖像', modelValue: state.draft.picture, imageType: 'character_portrait',
+    'onUpdate:modelValue': value => { state.draft.picture = value }, onUploading: value => { state.busy = value },
+  }) })
+  const original = h.find(node => node.type === 'a' && textOf(node).includes('查看原图'))
+  assert.equal(original.props.href, '/original.png'); assert.equal(original.props.target, '_blank'); assert.match(original.props.rel, /noopener/)
+  const input = h.find(node => node.type === 'input' && node.props.type === 'file')
+  const pending = input.props.onChange({ target: { files: [new File(['png'], 'portrait.png', { type: 'image/png' })], value: 'portrait.png' } })
+  await settle()
+  assert.equal(h.state.busy, true)
+  for (const field of all(h.body, node => node.type === 'fieldset')) assert.equal(field.props.disabled, true)
+  await h.key('Escape'); await h.click(h.button('取消')); assert.deepEqual(h.events, [])
+  assert.equal(h.find(node => node.type === 'a' && textOf(node).includes('查看原图')), undefined)
+  resolve({ id: 99 }); await pending; await settle()
+  assert.equal(h.state.busy, false); assert.equal(h.state.draft.picture, '/api/novels/1/images/99/file')
+  const preview = h.find(node => node.type === 'img'); assert.equal(preview.props.alt, '人物肖像'); assert.equal(preview.props.src, h.state.draft.picture)
+  await h.key('Escape'); assert.ok(h.button('继续编辑')); assert.deepEqual(h.events, [])
+})
+
+test('the original-image link remains in the same modal keyboard loop', async t => {
+  const h = await mount(t, { media: () => Vue.h('a', { href: '/original.png', target: '_blank', rel: 'noopener' }, '查看原图') })
+  const link = h.find(node => node.type === 'a'), last = h.button('确定')
+  link.focus(); await h.key('Tab', true); assert.equal(h.doc.activeElement, last)
+  await h.key('Tab'); assert.equal(h.doc.activeElement, link)
+})
+
+test('media editors initially focus the dialog without scrolling or activating image removal; ordinary dialogs retain their first-field focus', async t => {
+  await t.test('media', async t => {
+    const h = await mount(t, { media: () => Vue.h(ImageUpload, { large: true, modelValue: '/original.png', imageType: 'character_portrait' }) })
+    const panel = h.find(node => node.props.role === 'dialog'), remove = h.find(node => node.props.title === '移除图片')
+    assert.ok(remove); assert.equal(h.doc.activeElement, panel)
+    assert.deepEqual(panel.lastFocusOptions, { preventScroll: true })
+    assert.notEqual(h.doc.activeElement, remove)
+    await h.key('Tab'); assert.equal(h.doc.activeElement, remove, 'explicit Tab keeps the normal media control order')
+    await h.key('Tab', true); assert.equal(h.doc.activeElement, h.button('确定'))
+    await h.key('Escape'); assert.deepEqual(h.events, ['close']); assert.equal(h.doc.activeElement, h.opener)
+  })
+  await t.test('ordinary', async t => {
+    const h = await mount(t)
+    const first = h.find(node => node.props['data-test'] === 'name')
+    assert.equal(h.doc.activeElement, first); assert.equal(first.lastFocusOptions, undefined)
+  })
+})
+
+for (const [view, kind, title, imageField] of [['CharactersView', 'character', '编辑人物', 'portraitImage'], ['ScenesView', 'scene', '编辑场景', 'sceneImage'], ['WorldviewView', 'worldview', '编辑世界观条目', 'entryImage']]) {
+  test(`${view} card image clicks and Enter open the actual populated editor while controls and text selection stay separate`, async t => {
+    const record = { id: 5, name: '回归测试资料', category: 'geography', [imageField]: '/original.png', tags: [], characters: [], scenes: [], mapLocations: [] }
+    const records = [record], noop = async () => {}, Empty = Vue.defineComponent({ render: () => null })
+    const stores = {
+      characters: { characters: records, filteredCharacters: records, fetchCharacters: noop },
+      scenes: { scenes: records, filteredScenes: records, fetchScenes: noop },
+      worldview: { entries: records, filteredEntries: records, fetchEntries: noop },
+      tags: { tags: [], fetchTags: noop }, map: { locations: [], fetchLocations: noop },
+    }
+    const dependencies = {
+      'vue-router': { useRoute: () => ({ params: { novelId: '1' }, query: {} }) },
+      '@/utils/editableCard': cardUtils, '@/types/worldview': worldviewTypes,
+      '@/composables/useFormSave': { useFormSave: () => ({ reset() {}, save: noop }) },
+      '@/composables/useEditQuery': { useEditQuery() {} },
+      '@/components/common/BaseModal.vue': { default: BaseModal }, '@/components/common/ImageUpload.vue': { default: ImageUpload },
+    }
+    for (const [name, store] of Object.entries(stores)) dependencies[`@/stores/${name}`] = { [`use${name[0].toUpperCase() + name.slice(1)}Store`]: () => store }
+    for (const name of ['ai/AiAssistantPanel', 'common/StudioIcon', 'common/BaseSelect', 'common/LoadingState', 'common/EmptyState', 'writing/WritingBacklinks', 'tags/TagSelector', 'tags/TagList', 'story/StoryStatePanel', 'series/SeriesWorkspace']) dependencies[`@/components/${name}.vue`] = { default: Empty }
+    const View = component(`../../views/${view}`, dependencies), h = await mount(t, { root: View })
+    const card = h.find(node => node.props['data-editable-card'] !== undefined), picture = all(card, node => node.type === 'img')[0]
+    assert.equal(card.props.role, 'group'); assert.equal(card.props.tabindex, '0'); assert.match(card.props['aria-label'], /按 Enter 编辑/)
+    const activate = async (target, type = 'click', key = undefined) => {
+      const event = { type, key, button: 0, target, currentTarget: card, preventDefault() {}, stopPropagation() {} }
+      if (type === 'click') card.props.onClick(event); else card.props.onKeydown(event)
+      await settle()
+    }
+    await activate(picture)
+    assert.ok(h.find(node => node.props.role === 'dialog' && node.props['aria-label'] === title))
+    assert.equal(h.find(node => node.type === 'input' && node.props.placeholder?.includes(kind === 'character' ? '人物姓名' : kind === 'scene' ? '场景名称' : '条目名称')).value, record.name)
+    assert.ok(h.find(node => typeof node.props.class === 'string' && node.props.class.includes('image-upload-large')))
+    const pane = h.find(node => node.props.class === 'modal-media modal-fields')
+    assert.ok(pane); assert.equal(all(pane, node => node.type === 'img')[0].props.src, '/original.png')
+    await h.click(h.button('取消')); assert.equal(h.find(node => node.props.role === 'dialog'), undefined)
+    await activate(card, 'keydown', 'Enter'); assert.ok(h.find(node => node.props['aria-label'] === title)); await h.click(h.button('取消'))
+    const text = all(card, node => node.type === 'h3')[0]
+    h.doc.getSelection = () => ({ isCollapsed: false, anchorNode: text, focusNode: text, rangeCount: 0 })
+    await activate(text); assert.equal(h.find(node => node.props.role === 'dialog'), undefined)
+    h.doc.getSelection = () => null
+    for (const [label, dialogTitle] of [['标签', '管理标签'], ['删除', '确认删除']]) {
+      const control = all(card, node => node.type === 'button' && textOf(node) === label)[0]
+      await h.click(control); await activate(control)
+      assert.ok(h.find(node => node.props.role === 'dialog' && node.props['aria-label'] === dialogTitle))
+      assert.equal(h.find(node => node.props['aria-label'] === title), undefined)
+      await h.click(h.button('取消'))
+    }
+    assert.equal(record[imageField], '/original.png'); assert.equal(record.name, '回归测试资料')
+  })
+}
 
 const aiSlot = state => state.childShown ? [Vue.h(AiPanel, { scope: 'character', draft: { name: '原名' }, initiallyOpen: true })] : []
 const aiRequest = h => h.find(node => node.type === 'textarea' && node.props.maxlength === '1500')

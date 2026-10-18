@@ -242,9 +242,12 @@
       @close="closeModal"
       :submit="saveNovel"
     >
-      <div v-if="editingNovel" class="form-group">
+      <template v-if="editingNovel" #media>
+      <div class="form-group">
         <label>封面图片</label>
         <ImageUpload
+          large
+          :preview-alt="form.title ? `《${form.title}》的封面` : '作品封面'"
           v-model="form.coverImage"
           @uploading="imageUploading = $event"
           image-type="novel_cover"
@@ -252,6 +255,7 @@
           placeholder="点击上传小说封面"
         />
       </div>
+      </template>
       <div class="form-group">
         <label>小说标题 *</label>
         <input v-model="form.title" type="text" placeholder="请输入小说标题" />

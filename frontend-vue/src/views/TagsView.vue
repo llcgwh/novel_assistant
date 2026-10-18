@@ -16,7 +16,10 @@
     />
 
     <div v-else class="tags-grid">
-      <div v-for="tag in tagsStore.tags" :key="tag.id" class="tag-card">
+      <div v-for="tag in tagsStore.tags" :key="tag.id" class="tag-card editable-card" data-editable-card role="group" tabindex="0"
+        :aria-label="(tag.name) + '，按 Enter 编辑'" aria-keyshortcuts="Enter"
+        @click="isCardEditEvent($event) && editTag(tag)"
+        @keydown.enter="isCardEditEvent($event) && editTag(tag)">
         <div class="tag-color" :style="{ backgroundColor: tag.color || '#95a5a6' }"></div>
         <span class="tag-name">{{ tag.name }}</span>
         <div class="tag-actions">
@@ -62,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { isCardEditEvent } from '@/utils/editableCard'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted } from 'vue'

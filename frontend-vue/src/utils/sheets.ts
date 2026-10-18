@@ -69,7 +69,7 @@ const sheetProfiles = [
     title: '让一个瞬间，有了形状',
     caption: '场景取景器',
     label: '场景画册',
-    layout: 'wide',
+    layout: 'right',
     tint: '#e2b995',
     motif: 'scenes',
   },

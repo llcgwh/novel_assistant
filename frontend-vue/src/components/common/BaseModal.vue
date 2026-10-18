@@ -1,7 +1,11 @@
 <template>
   <Teleport to="body">
     <div class="modal" @click.self="close">
-      <div ref="panel" class="modal-content" :class="{ 'modal-wide': wide }" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="pending" :aria-hidden="discardOpen || undefined" :inert="discardOpen" tabindex="-1" @focusin="rememberFocus">
+      <div ref="panel" class="modal-content" :class="{ 'modal-wide': wide, 'modal-with-media': !!$slots.media }" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="pending" :aria-hidden="discardOpen || undefined" :inert="discardOpen" tabindex="-1" @focusin="rememberFocus">
+        <fieldset v-if="$slots.media" ref="media" class="modal-media modal-fields" :disabled="pending" :inert="pending">
+          <slot name="media"></slot>
+        </fieldset>
+        <div class="modal-main">
         <h2>{{ title }}</h2>
         <fieldset class="modal-fields" :disabled="pending" :inert="pending">
           <slot></slot>
@@ -13,6 +17,7 @@
           </slot>
         </fieldset>
         <p v-if="submitError" class="modal-error" role="alert">{{ submitError }}</p>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -37,6 +42,7 @@ const props = withDefaults(defineProps<{
 }>(), { busy: false, dirty: undefined })
 const emit = defineEmits<{ close: []; confirm: [] }>()
 const panel = ref<HTMLElement | null>(null)
+const media = ref<HTMLElement | null>(null)
 const submitting = ref(false)
 const submitError = ref('')
 const discardOpen = ref(false)
@@ -76,7 +82,7 @@ async function confirm() {
   } catch { submitError.value = '操作失败，请重试。' }
   finally { submitting.value = false }
 }
-useDialog(panel, () => pending.value, close)
+useDialog(panel, () => pending.value, close, () => media.value ? panel.value : null)
 </script>
 
 <style scoped>
@@ -85,6 +91,22 @@ useDialog(panel, () => pending.value, close)
 .modal-fields:disabled { pointer-events: none; }
 .modal-content:focus { outline: none; }
 .modal-content.modal-wide { width: min(960px, calc(100vw - 32px)); max-width: 960px; }
+.modal-main > h2 { font: 24px/1.6 var(--serif); margin-bottom: 25px; padding-bottom: 17px; border-bottom: 1px solid var(--line); }
+.modal-with-media { position: relative; padding: 0; overflow: visible; max-height: none; border: 0; background: transparent; box-shadow: none; animation: none; }
+.modal-with-media > .modal-main { max-height: calc(100dvh - 48px); overflow-y: auto; padding: 27px; background: var(--panel); border: 1px solid var(--line); border-radius: 17px; box-shadow: 0 35px 100px #0008; }
+.modal-with-media > .modal-media { position: absolute; right: calc(100% + 20px); top: 50%; transform: translateY(-50%); width: clamp(240px, calc((100vw - 600px) / 2 - 44px), 380px); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 20px; border: 1px solid var(--line); border-radius: 17px; background: var(--panel); box-shadow: 0 25px 70px #0006; }
+.modal-media :deep(.form-group) { margin-bottom: 0; }
+.modal-wide.modal-with-media > .modal-media { width: clamp(240px, calc((100vw - 960px) / 2 - 44px), 380px); }
+@media (max-width: 1199px) {
+  .modal-with-media { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); overflow-y: auto; border: 1px solid var(--line); border-radius: 17px; background: var(--panel); box-shadow: 0 35px 100px #0008; }
+  .modal-with-media > .modal-main { flex: none; max-height: none; overflow: visible; border: 0; box-shadow: none; }
+  .modal-with-media > .modal-media { position: static; order: -1; flex: none; transform: none; width: 100%; max-height: none; overflow: visible; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 24px; box-shadow: none; }
+}
+@media (min-width: 1200px) and (max-width: 1559px) {
+  .modal-wide.modal-with-media { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); overflow-y: auto; border: 1px solid var(--line); border-radius: 17px; background: var(--panel); box-shadow: 0 35px 100px #0008; }
+  .modal-wide.modal-with-media > .modal-main { flex: none; max-height: none; overflow: visible; border: 0; box-shadow: none; }
+  .modal-wide.modal-with-media > .modal-media { position: static; order: -1; flex: none; transform: none; width: 100%; max-height: none; overflow: visible; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 24px; box-shadow: none; }
+}
 .modal-content :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .modal-error { color: var(--danger); font-size: 14px; margin-top: 12px; }
 </style>

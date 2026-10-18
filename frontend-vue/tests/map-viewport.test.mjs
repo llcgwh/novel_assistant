@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { computed, effectScope, nextTick, reactive, ref, watch } from 'vue'
 import { compileSources } from './helpers/load-source.mjs'
 
-const load = compileSources(), map = await load('utils/map'), geometry = await load('utils/canvasViewport')
+const load = compileSources(), map = await load('utils/map'), geometry = await load('utils/canvasViewport'), uploadUtils = await load('utils/imageUpload')
 const clone = value => JSON.parse(JSON.stringify(value))
 const transpile = source => ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/^import .* from .*\n/gm, '').replace(/^export /gm, '')
 const viewSource = readFileSync(new URL('../src/views/MapView.vue', import.meta.url), 'utf8')
@@ -16,7 +16,8 @@ const viewportJs = transpile(readFileSync(new URL('../src/composables/useCanvasV
 // decoding and API stores are replaced, so clicks exercise the real handlers.
 function harness({ cssWidth = 800, ratio = 1, locations = [] } = {}) {
   const scope = effectScope(), frames = new Map(), unmount = [], images = [], draws = [], transforms = [], arcs = [], captures = new Set()
-  let nextFrame = 0
+  const route = reactive({ params: { novelId: '6' } })
+  let nextFrame = 0, novelContext = 0
   const requestAnimationFrame = fn => { const id = ++nextFrame; frames.set(id, fn); return id }
   const cancelAnimationFrame = id => frames.delete(id)
   const lifecycle = { onMounted() {}, onBeforeUnmount: fn => unmount.push(fn) }
@@ -29,18 +30,19 @@ function harness({ cssWidth = 800, ratio = 1, locations = [] } = {}) {
     drawImage: image => draws.push(image.src),
   }
   const canvas = { clientWidth: rect.width, clientHeight: rect.height, width: 800, height: 600, isConnected: true, getBoundingClientRect: () => rect, getContext: () => context, focus() {}, setPointerCapture: id => captures.add(id), hasPointerCapture: id => captures.has(id), releasePointerCapture: id => captures.delete(id) }
-  const store = reactive({ locations: clone(locations), backgroundImageUrl: null, loading: false })
+  const store = reactive({ locations: clone(locations), backgroundImageUrl: null, backgroundUploading: false, loading: false })
   const runtime = {
-    ...map, ...lifecycle, ref, reactive, computed, watch, nextTick, useCanvasViewport,
-    useRoute: () => ({ params: { novelId: '6' } }), useStudioStore: () => ({ theme: 'light' }), useMapStore: () => store,
+    ...map, ...uploadUtils, ...lifecycle, ref, reactive, computed, watch, nextTick, useCanvasViewport, getNovelContextVersion: () => novelContext,
+    useRoute: () => route, useStudioStore: () => ({ theme: 'light' }), useMapStore: () => store,
     useFormSave: () => ({ reset() {} }), useTagsStore: () => ({ tags: [] }), useScenesStore: () => ({ scenes: [] }), useEditQuery() {},
     requestAnimationFrame, cancelAnimationFrame, window: { devicePixelRatio: ratio, addEventListener() {}, removeEventListener() {} }, document: { documentElement: {} },
     getComputedStyle: () => ({ getPropertyValue: () => '#888' }),
     Image: class { constructor() { images.push(this) } },
   }
-  const view = scope.run(() => new Function(...Object.keys(runtime), `${viewJs}\nreturn { mapCanvas, viewport, drawMap, scheduleDraw, onCanvasClick, form, showCreateModal, editingLocation, closeModal };`)(...Object.values(runtime)))
+  const view = scope.run(() => new Function(...Object.keys(runtime), `${viewJs}\nreturn { mapCanvas, viewport, drawMap, scheduleDraw, onCanvasClick, form, showCreateModal, editingLocation, closeModal, uploadBackground, clearBackground, backgroundError, backgroundMessage };`)(...Object.values(runtime)))
   view.mapCanvas.value = canvas
   return { ...view, canvas, context, rect, store, images, draws, transforms, arcs, frames,
+    async switchNovel(id) { novelContext++; route.params.novelId = id; await nextTick() },
     flush() { let count = 0; while (frames.size) { assert.ok(++count < 20, 'Drawing must settle'); const pending = [...frames.values()]; frames.clear(); for (const fn of pending) fn() } },
     stop() { for (const fn of unmount) fn(); scope.stop() },
   }
@@ -122,4 +124,42 @@ test('background images are cached across pan/zoom and late older loads cannot d
     await nextTick(); h.flush()
   } finally { h.stop() }
   assert.equal(h.images[0].onload, null); assert.equal(h.images[1].onload, null)
+})
+
+test('map upload handler catches size and transport failures inline and resets the input for a same-file retry', async t => {
+  const h = harness(); t.after(() => h.stop())
+  const file = new File(['png'], 'map.png', { type: 'image/png' }), event = { target: { files: [file], value: 'map.png' } }
+  let sends = 0
+  h.store.backgroundImageUrl = '/old-map.png'
+  h.store.setBackground = async (_file, novelId) => { sends++; assert.equal(novelId, 6); throw { response: { status: 413 } } }
+  await h.uploadBackground({ target: { files: [{ name: 'too-large.png', type: 'image/png', size: uploadUtils.MAX_IMAGE_BYTES + 1 }], value: '' } })
+  assert.match(h.backgroundError.value, /8 MiB/); assert.equal(sends, 0)
+  await h.uploadBackground(event)
+  assert.equal(event.target.value, ''); assert.match(h.backgroundError.value, /8 MiB/); assert.equal(sends, 1)
+  assert.equal(h.store.backgroundImageUrl, '/old-map.png')
+  h.store.setBackground = async () => { sends++; h.store.backgroundImageUrl = '/new-map.png' }
+  await h.uploadBackground(event)
+  assert.equal(sends, 2); assert.equal(h.backgroundError.value, ''); assert.match(h.backgroundMessage.value, /已更新/)
+})
+
+test('map upload and clear handlers ignore repeat actions during the store upload lock', async t => {
+  const h = harness(); t.after(() => h.stop())
+  let sends = 0, clears = 0
+  h.store.backgroundUploading = true
+  h.store.setBackground = async () => { sends++ }; h.store.clearBackground = () => { clears++ }
+  const event = { target: { files: [new File(['png'], 'map.png', { type: 'image/png' })], value: 'map.png' } }
+  await h.uploadBackground(event); h.clearBackground()
+  assert.equal(sends, 0); assert.equal(clears, 0); assert.equal(event.target.value, '')
+})
+
+test('late map upload success and failure never show notices in another novel', async t => {
+  for (const failed of [false, true]) {
+    const h = harness(); t.after(() => h.stop())
+    let release
+    h.store.setBackground = () => new Promise((resolve, reject) => { release = failed ? reject : resolve })
+    const pending = h.uploadBackground({ target: { files: [new File(['png'], 'map.png', { type: 'image/png' })], value: '' } })
+    await h.switchNovel('7'); await h.switchNovel('6')
+    release(failed ? { response: { status: 413 } } : undefined); await pending
+    assert.equal(h.backgroundError.value, ''); assert.equal(h.backgroundMessage.value, '')
+  }
 })

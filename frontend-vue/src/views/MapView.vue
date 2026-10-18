@@ -3,9 +3,9 @@
     <div class="view-header">
       <h2>世界地图</h2>
       <div class="view-actions">
-        <input type="file" ref="bgInput" accept="image/*" style="display: none" @change="uploadBackground" />
-        <button class="btn-secondary" @click="($refs.bgInput as HTMLInputElement).click()">设置背景</button>
-        <button v-if="mapStore.backgroundImageUrl" class="btn-secondary" @click="clearBackground">清除背景</button>
+        <input type="file" ref="bgInput" :accept="IMAGE_ACCEPT" :disabled="mapStore.backgroundUploading" style="display: none" @change="uploadBackground" />
+        <button class="btn-secondary" :disabled="mapStore.backgroundUploading" @click="($refs.bgInput as HTMLInputElement).click()">{{ mapStore.backgroundUploading ? '正在上传背景…' : '设置背景' }}</button>
+        <button v-if="mapStore.backgroundImageUrl" class="btn-secondary" :disabled="mapStore.backgroundUploading" @click="clearBackground">清除背景</button>
         <BaseSelect
           v-model="typeFilter"
           :options="mapTypeOptions"
@@ -23,6 +23,10 @@
         <button class="btn-primary" @click="showCreateModal = true">+ 添加位置</button>
       </div>
     </div>
+    <p class="map-upload-hint">地图背景支持 {{ IMAGE_FORMATS }}，单张最多 {{ imageSizeLimit() }}。</p>
+    <p v-if="mapStore.backgroundUploading" class="map-upload-hint" role="status">正在上传地图背景，完成前保留当前图片。</p>
+    <p v-if="backgroundError" class="map-upload-error" role="alert">{{ backgroundError }}</p>
+    <p v-if="backgroundMessage" class="map-upload-hint" role="status">{{ backgroundMessage }}</p>
 
     <div class="canvas-container">
       <CanvasViewportToolbar :scale="viewport.state.scale" @zoom-in="viewport.zoomBy(1.2)" @zoom-out="viewport.zoomBy(1 / 1.2)" @reset="viewport.reset" />
@@ -57,7 +61,10 @@
     />
 
     <div v-else class="list-container">
-      <div v-for="location in mapStore.locations" :key="location.id" class="list-item">
+      <div v-for="location in mapStore.locations" :key="location.id" class="list-item editable-card" data-editable-card role="group" tabindex="0"
+        :aria-label="(location.name) + '，按 Enter 编辑'" aria-keyshortcuts="Enter"
+        @click="isCardEditEvent($event) && editLocation(location)"
+        @keydown.enter="isCardEditEvent($event) && editLocation(location)">
         <div class="location-info">
           <div>
             <h4>{{ location.name }}</h4>
@@ -149,8 +156,11 @@
 </template>
 
 <script setup lang="ts">
+import { isCardEditEvent } from '@/utils/editableCard'
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { mapWorldPoint, mapContainsPoint, mapMarkerAt } from '@/utils/map'
+import { IMAGE_ACCEPT, IMAGE_FORMATS, imageSizeLimit, validateImageFile, getImageUploadError } from '@/utils/imageUpload'
+import { getNovelContextVersion } from '@/api/request'
 import { onBeforeUnmount } from 'vue'
 import { useCanvasViewport } from '@/composables/useCanvasViewport'
 import { useFormSave } from '@/composables/useFormSave'
@@ -200,6 +210,8 @@ onBeforeUnmount(() => {
   backgroundImages.clear()
 })
 const bgInput = ref<HTMLInputElement | null>(null)
+const backgroundError = ref(''), backgroundMessage = ref('')
+watch(() => route.params.novelId, () => { backgroundError.value = ''; backgroundMessage.value = '' })
 const saving = ref(false)
 const showCreateModal = ref(false)
 const editingLocation = ref<MapLocation | null>(null)
@@ -253,13 +265,15 @@ useEditQuery(() => mapStore.locations, editLocation)
 
 onMounted(async () => {
   const novelId = Number(route.params.novelId)
+  const context = getNovelContextVersion()
   await Promise.all([
     mapStore.fetchLocations(),
     tagsStore.fetchTags(),
     scenesStore.fetchScenes()
   ])
-  if (mapDisposed) return
-  await mapStore.loadBackgroundFromStorage(novelId)
+  if (mapDisposed || context !== getNovelContextVersion() || novelId !== Number(route.params.novelId)) return
+  try { await mapStore.loadBackgroundFromStorage(novelId) }
+  catch (error) { if (!mapDisposed && context === getNovelContextVersion()) backgroundError.value = getImageUploadError(error) }
   nextTick(scheduleDraw)
 })
 
@@ -369,14 +383,25 @@ function onCanvasClick(e: MouseEvent) {
 
 async function uploadBackground(e: Event) {
   const input = e.target as HTMLInputElement
-  if (!input.files?.length) return
-  const novelId = Number(route.params.novelId)
-  await mapStore.setBackground(input.files[0], novelId)
+  const file = input.files?.[0]; input.value = ''
+  if (!file || mapStore.backgroundUploading) return
+  const novelId = Number(route.params.novelId), context = getNovelContextVersion()
+  backgroundError.value = ''; backgroundMessage.value = ''
+  try {
+    validateImageFile(file)
+    await mapStore.setBackground(file, novelId)
+    if (!mapDisposed && context === getNovelContextVersion() && novelId === Number(route.params.novelId)) backgroundMessage.value = '地图背景已更新'
+  } catch (error) {
+    if (!mapDisposed && context === getNovelContextVersion() && novelId === Number(route.params.novelId)) backgroundError.value = getImageUploadError(error)
+  }
 }
 
 function clearBackground() {
+  if (mapStore.backgroundUploading) return
   const novelId = Number(route.params.novelId)
-  mapStore.clearBackground(novelId)
+  backgroundError.value = ''; backgroundMessage.value = ''
+  try { mapStore.clearBackground(novelId); backgroundMessage.value = '地图背景已清除' }
+  catch (error) { backgroundError.value = getImageUploadError(error) }
 }
 
 function editLocation(location: MapLocation) {
@@ -516,6 +541,8 @@ async function deleteLocation() {
 .map-canvas.is-dragging { cursor: grabbing; }
 .map-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .map-canvas-help { margin: 0; padding: 0 14px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.map-upload-hint, .map-upload-error { margin: 0 0 12px; font-size: 12px; line-height: 1.6; }
+.map-upload-hint { color: var(--muted); }.map-upload-error { color: var(--danger); }
 
 .location-info {
   flex: 1;

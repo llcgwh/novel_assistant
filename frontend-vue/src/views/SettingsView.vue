@@ -38,6 +38,8 @@
         <div class="setting-label">背景图片</div>
         <div class="setting-control">
           <ImageUpload
+            large
+            preview-alt="工作室全局背景图片"
             v-model="bgImage"
             image-type="background"
             placeholder="点击上传全局背景图片"

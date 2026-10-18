@@ -23,7 +23,11 @@
     />
 
     <div v-else class="grid-container">
-      <div v-for="scene in scenesStore.filteredScenes" :key="scene.id" class="card">
+      <div v-for="scene in scenesStore.filteredScenes" :key="scene.id" class="card editable-card"
+        data-editable-card tabindex="0" role="group" aria-keyshortcuts="Enter"
+        :aria-label="`${scene.name}，按 Enter 编辑`"
+        @click="isCardEditEvent($event) && editScene(scene)"
+        @keydown.enter="isCardEditEvent($event) && editScene(scene)">
         <div class="card-image">
           <img v-if="scene.sceneImage" :src="scene.sceneImage" alt="场景图片" />
           <div v-else class="no-image-placeholder"><StudioIcon name="scenes"/></div>
@@ -51,15 +55,19 @@
       :submit="saveScene"
     >
       <AiAssistantPanel scope="scene" :target-id="editingScene?.id" :draft="{ ...form, tagIds: formTagIds }" @apply="Object.assign(form, { [$event.field]: $event.value })" />
+      <template #media>
       <div class="form-group">
         <label>📷 场景图片</label>
         <ImageUpload
+          large
+          :preview-alt="form.name ? `${form.name}的场景图片` : '场景图片'"
           v-model="form.sceneImage"
           @uploading="imageUploading = $event"
           image-type="scene_image"
           placeholder="点击上传场景图片"
         />
       </div>
+      </template>
       <div class="form-row">
         <div class="form-group form-half">
           <label>场景名称 *</label>
@@ -110,6 +118,7 @@
 
 <script setup lang="ts">
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
+import { isCardEditEvent } from '@/utils/editableCard'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'

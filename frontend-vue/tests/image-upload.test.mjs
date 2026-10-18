@@ -2,7 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
-import { effectScope, nextTick, reactive, ref, watch } from 'vue'
+import { computed, effectScope, nextTick, reactive, ref, watch } from 'vue'
+import { compileSources } from './helpers/load-source.mjs'
+
+const load = compileSources()
+const imagePolicy = await load('utils/imageUpload')
 
 const source = readFileSync(new URL('../src/components/common/ImageUpload.vue', import.meta.url), 'utf8')
 const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
@@ -12,11 +16,13 @@ const compiled = ts.transpileModule(body, { compilerOptions: { target: ts.Script
 
 function harness(t, options = {}) {
   let resolve, reject, reader, pickerClicks = 0
-  const pending = new Promise((yes, no) => { resolve = yes; reject = no })
+  let pending
+  function resetAttempt() { pending = new Promise((yes, no) => { resolve = yes; reject = no }) }
+  resetAttempt()
   const props = reactive({ modelValue: '/original-image', imageType: options.imageType ?? 'character_portrait', novelId: 6 })
   const events = [], calls = [], alerts = [], revoked = []
   const runtime = {
-    ref, watch, defineProps: () => props,
+    ...imagePolicy, computed, ref, watch, defineProps: () => props,
     defineEmits: () => (name, value) => { events.push([name, value]); if (name === 'update:modelValue') props.modelValue = value },
     imagesApi: {
       upload(...args) { calls.push(args); return pending },
@@ -30,11 +36,12 @@ function harness(t, options = {}) {
     alert: message => alerts.push(message), console: { error() {} },
   }
   const scope = effectScope()
-  const component = scope.run(() => new Function(...Object.keys(runtime), compiled + '; return { handleFileChange, removeImage, triggerUpload, previewUrl, uploading, fileInput }')(...Object.values(runtime)))
+  const component = scope.run(() => new Function(...Object.keys(runtime), compiled + '; return { handleFileChange, removeImage, triggerUpload, previewUrl, uploading, fileInput, errorMessage }')(...Object.values(runtime)))
   component.fileInput.value = { click() { pickerClicks++ } }
   t.after(() => scope.stop())
   const input = { files: [{ name: 'fixture.png', type: 'image/png', size: 128 }], value: 'fixture.png' }
-  return { ...component, props, events, calls, alerts, revoked, input, resolve, reject,
+  return { ...component, props, events, calls, alerts, revoked, input,
+    resolve(value) { resolve(value) }, reject(error) { reject(error) }, resetAttempt,
     upload() { return component.handleFileChange({ target: input }) },
     get reader() { return reader }, get pickerClicks() { return pickerClicks },
   }
@@ -69,7 +76,8 @@ test('a failed upload restores the original image and releases busy without dirt
   assert.equal(h.previewUrl.value, '/original-image')
   assert.equal(h.uploading.value, false)
   assert.equal(h.input.value, '')
-  assert.equal(h.alerts.length, 1)
+  assert.equal(h.alerts.length, 0)
+  assert.equal(h.errorMessage.value, 'fixture upload failure')
   assert.deepEqual(h.revoked, ['blob:preview'])
 })
 
@@ -95,8 +103,10 @@ test('invalid background files leave the original image clean and never upload r
   assert.equal(h.reader, undefined)
   assert.equal(h.props.modelValue, '/original-image')
   assert.equal(h.previewUrl.value, '/original-image')
-  assert.deepEqual(h.events, [['uploading', true], ['uploading', false]])
-  assert.deepEqual(h.revoked, ['blob:preview'])
+  assert.deepEqual(h.events, [])
+  assert.deepEqual(h.revoked, [])
+  assert.match(h.errorMessage.value, /2 MiB/)
+  assert.equal(h.input.value, '')
 })
 
 test('cancelling the file picker does not lock or change the form', async t => {
@@ -106,4 +116,57 @@ test('cancelling the file picker does not lock or change the form', async t => {
   assert.equal(h.uploading.value, false)
   assert.deepEqual(h.events, [])
   assert.equal(h.calls.length, 0)
+})
+
+test('oversized portraits are stopped before preview or network and the same picker can retry', async t => {
+  const h = harness(t)
+  h.input.files[0].size = imagePolicy.MAX_IMAGE_BYTES + 1
+  await h.upload()
+  assert.match(h.errorMessage.value, /8 MiB/)
+  assert.equal(h.previewUrl.value, '/original-image')
+  assert.equal(h.calls.length, 0)
+  assert.deepEqual(h.events, [])
+  assert.equal(h.input.value, '')
+  h.input.files[0].size = imagePolicy.MAX_IMAGE_BYTES
+  const finished = h.upload()
+  assert.equal(h.errorMessage.value, '')
+  assert.equal(h.calls.length, 1)
+  h.resolve({ id: 92 }); await finished
+  assert.equal(h.previewUrl.value, '/novels/6/images/92')
+})
+
+test('server 413 stays inline and a successful retry clears it without losing the original form', async t => {
+  const h = harness(t)
+  const finished = h.upload()
+  h.reject({ response: { status: 413 }, message: 'Request failed with status code 413' })
+  await finished
+  assert.match(h.errorMessage.value, /8 MiB/)
+  assert.doesNotMatch(h.errorMessage.value, /status code/)
+  assert.equal(h.props.modelValue, '/original-image')
+  assert.equal(h.alerts.length, 0)
+  h.resetAttempt()
+  const retry = h.upload()
+  h.resolve({ id: 93 }); await retry
+  assert.equal(h.errorMessage.value, '')
+  assert.equal(h.props.modelValue, '/novels/6/images/93')
+})
+
+test('unsupported files never send a request or mark a draft dirty', async t => {
+  const h = harness(t)
+  h.input.files[0] = { name: 'vector.svg', type: 'image/svg+xml', size: 100 }
+  await h.upload()
+  assert.match(h.errorMessage.value, /PNG/)
+  assert.deepEqual(h.events, [])
+  assert.equal(h.calls.length, 0)
+  assert.equal(h.props.modelValue, '/original-image')
+})
+
+test('a local background read failure is understandable and restores the image', async t => {
+  const h = harness(t, { imageType: 'background' })
+  const finished = h.upload()
+  h.reader.onerror()
+  await finished
+  assert.match(h.errorMessage.value, /无法读取图片/)
+  assert.equal(h.previewUrl.value, '/original-image')
+  assert.equal(h.uploading.value, false)
 })

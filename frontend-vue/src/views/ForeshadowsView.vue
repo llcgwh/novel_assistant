@@ -29,7 +29,10 @@
     />
 
     <div v-else class="grid-container">
-      <div v-for="foreshadow in foreshadowsStore.filteredForeshadows" :key="foreshadow.id" class="card">
+      <div v-for="foreshadow in foreshadowsStore.filteredForeshadows" :key="foreshadow.id" class="card editable-card" data-editable-card role="group" tabindex="0"
+        :aria-label="(foreshadow.title) + '，按 Enter 编辑'" aria-keyshortcuts="Enter"
+        @click="isCardEditEvent($event) && editForeshadow(foreshadow)"
+        @keydown.enter="isCardEditEvent($event) && editForeshadow(foreshadow)">
         <h3>{{ foreshadow.title }}</h3>
         <StatusBadge :status="foreshadow.status" />
         <p v-if="foreshadow.content" style="margin-top: 10px;">{{ foreshadow.content }}</p>
@@ -109,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import { isCardEditEvent } from '@/utils/editableCard'
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'

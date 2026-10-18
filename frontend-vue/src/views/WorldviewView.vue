@@ -35,7 +35,11 @@
       <div
         v-for="entry in worldviewStore.filteredEntries"
         :key="entry.id"
-        class="card"
+        class="card editable-card"
+        data-editable-card tabindex="0" role="group" aria-keyshortcuts="Enter"
+        :aria-label="`${entry.name}，按 Enter 编辑`"
+        @click="isCardEditEvent($event) && editEntry(entry)"
+        @keydown.enter="isCardEditEvent($event) && editEntry(entry)"
       >
         <div class="card-image">
           <img v-if="entry.entryImage" :src="entry.entryImage" alt="条目图片" />
@@ -84,15 +88,19 @@
       :submit="saveEntry"
     >
       <AiAssistantPanel scope="worldview" :target-id="editingEntry?.id" :draft="{ ...form, tagIds: formTagIds, characterIds: formCharacterIds, sceneIds: formSceneIds, mapLocationIds: formLocationIds }" @apply="Object.assign(form, { [$event.field]: $event.value })" />
+      <template #media>
       <div class="form-group">
         <label>🖼️ 图片</label>
         <ImageUpload
+          large
+          :preview-alt="form.name ? `${form.name}的设定图片` : '设定图片'"
           v-model="form.entryImage"
           @uploading="imageUploading = $event"
           image-type="worldview"
           placeholder="点击上传条目图片"
         />
       </div>
+      </template>
       <div class="form-group">
         <label>名称 *</label>
         <input v-model="form.name" type="text" placeholder="请输入条目名称" />
@@ -189,6 +197,7 @@
 
 <script setup lang="ts">
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
+import { isCardEditEvent } from '@/utils/editableCard'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import SeriesWorkspace from '@/components/series/SeriesWorkspace.vue'
 import { useRoute } from 'vue-router'

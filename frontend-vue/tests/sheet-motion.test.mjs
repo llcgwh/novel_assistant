@@ -163,7 +163,7 @@ test('sheet numbering and adjacent modules follow the displayed sidebar order', 
 
 test('same-slot and near-slot destinations hand off without an in-place turn', () => {
   const wide = { left: '280px', top: '104px', width: '940px', height: '248px' }
-  assert.equal(sheetTransition(wide, wide), 'handoff', 'scenes and map share a wide dock')
+  assert.equal(sheetTransition(wide, wide), 'handoff', 'equal rendered docks never spin in place')
   const narrow = { left: '24px', top: '104px', width: '789px', height: '330px' }
   assert.equal(sheetTransition(narrow, narrow), 'handoff', 'left and right docks share their mobile position')
   assert.equal(sheetTransition(narrow, { ...narrow, height: '248px' }), 'handoff', 'small responsive height changes do not look like travel')

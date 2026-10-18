@@ -4,7 +4,7 @@ const dialogs: HTMLElement[] = []
 let previousOverflow = ''
 let previousInert = false
 
-export function useDialog(panel: Ref<HTMLElement | null>, busy: () => boolean, close: () => void) {
+export function useDialog(panel: Ref<HTMLElement | null>, busy: () => boolean, close: () => void, initialFocus?: () => HTMLElement | null) {
   let opener: HTMLElement | null = null
   const focusables = () => Array.from(panel.value?.querySelectorAll<HTMLElement>(
     'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'
@@ -40,7 +40,11 @@ export function useDialog(panel: Ref<HTMLElement | null>, busy: () => boolean, c
     dialogs.push(panel.value!)
     document.addEventListener('keydown', keydown, true)
     await nextTick()
-    if (panel.value && dialogs.at(-1) === panel.value) (focusables()[0] || panel.value).focus()
+    if (panel.value && dialogs.at(-1) === panel.value) {
+      const preferred = initialFocus?.()
+      if (preferred) preferred.focus({ preventScroll: true })
+      else (focusables()[0] || panel.value).focus()
+    }
   })
   onBeforeUnmount(() => {
     const index = dialogs.indexOf(panel.value!)

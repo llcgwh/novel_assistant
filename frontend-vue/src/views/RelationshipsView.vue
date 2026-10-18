@@ -24,7 +24,10 @@
 
         <!-- 关系列表 -->
         <div v-if="relationshipsStore.relationships.length" class="list-container">
-          <div v-for="rel in relationshipsStore.relationships" :key="rel.id" class="list-item">
+          <div v-for="rel in relationshipsStore.relationships" :key="rel.id" class="list-item editable-card" data-editable-card role="group" tabindex="0"
+        :aria-label="(getCharacterName(rel.characterId1) + '与' + getCharacterName(rel.characterId2)) + '，按 Enter 编辑'" aria-keyshortcuts="Enter"
+        @click="isCardEditEvent($event) && editRelationship(rel)"
+        @keydown.enter="isCardEditEvent($event) && editRelationship(rel)">
             <div class="relationship-info">
               <h4>{{ getCharacterName(rel.characterId1) }} ↔ {{ getCharacterName(rel.characterId2) }}</h4>
               <p v-if="rel.relationshipType">关系类型：{{ rel.relationshipType }}</p>
@@ -59,10 +62,13 @@
             class="group-tree-node"
             :style="{ paddingLeft: (group._depth || 0) * 20 + 'px' }"
           >
-            <div class="group-node-header" @click="toggleGroupExpand(group.id)">
-              <span class="group-expand-arrow" :class="{ expanded: expandedGroups.has(group.id) }">
-                {{ group.children?.length ? '▸' : '·' }}
-              </span>
+            <div class="group-node-header editable-card" data-editable-card role="group" tabindex="0"
+              :aria-label="group.name + '关系组，按 Enter 编辑'" aria-keyshortcuts="Enter"
+              @click="isCardEditEvent($event) && editGroup(group)"
+              @keydown.enter="isCardEditEvent($event) && editGroup(group)">
+              <button type="button" class="group-expand-arrow" :class="{ expanded: expandedGroups.has(group.id) }"
+                :aria-expanded="expandedGroups.has(group.id)" :aria-label="(expandedGroups.has(group.id) ? '收起' : '展开') + group.name + '成员'"
+                @click.stop="toggleGroupExpand(group.id)">▸</button>
               <span class="group-name">{{ group.name }}</span>
               <span class="group-count">({{ group.characters?.length || 0 }}人)</span>
               <span class="group-actions">
@@ -77,6 +83,7 @@
                 :key="char.id"
                 class="group-member"
                 @click="goToCharacter(char.id)"
+                role="link" tabindex="0" @keydown.enter="goToCharacter(char.id)"
                 title="点击查看角色详情"
               >
                 {{ char.name }}
@@ -201,6 +208,7 @@
 </template>
 
 <script setup lang="ts">
+import { isCardEditEvent } from '@/utils/editableCard'
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, computed, onMounted } from 'vue'
@@ -531,6 +539,10 @@ function goToCharacter(charId: number) {
 }
 
 .group-expand-arrow {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
   font-size: 12px;
   color: var(--muted);
   transition: transform 0.2s;

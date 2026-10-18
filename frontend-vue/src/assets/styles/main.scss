@@ -1,3 +1,15 @@
 @use './studio';
 @use './spatial';
 @use './writing';
+
+// Keep the card a group so its native action buttons retain their own semantics.
+.editable-card {
+  cursor: pointer;
+}
+.editable-card:hover {
+  border-color: var(--accent);
+}
+.editable-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

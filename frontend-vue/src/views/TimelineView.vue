@@ -26,7 +26,10 @@
       <div
         v-for="event in timelineStore.sortedEvents"
         :key="event.id"
-        class="timeline-item"
+        class="timeline-item editable-card" data-editable-card role="group" tabindex="0"
+        :aria-label="event.title + '，按 Enter 编辑'" aria-keyshortcuts="Enter"
+        @click="isCardEditEvent($event) && editEvent(event)"
+        @keydown.enter="isCardEditEvent($event) && editEvent(event)"
       >
         <h3>{{ event.title }}</h3>
         <div class="meta">
@@ -41,6 +44,7 @@
             :key="'c-' + char.id"
             class="relation-tag character"
             @click.stop="navigateToEdit('characters', char.id)"
+            role="link" tabindex="0" @keydown.enter.stop="navigateToEdit('characters', char.id)"
             title="点击编辑此人物"
           >{{ char.name }}</span>
           <span
@@ -48,6 +52,7 @@
             :key="'s-' + scene.id"
             class="relation-tag scene"
             @click.stop="navigateToEdit('scenes', scene.id)"
+            role="link" tabindex="0" @keydown.enter.stop="navigateToEdit('scenes', scene.id)"
             title="点击编辑此场景"
           >{{ scene.name }}</span>
           <span
@@ -55,6 +60,7 @@
             :key="'f-' + fs.id"
             class="relation-tag foreshadow"
             @click.stop="navigateToEdit('foreshadows', fs.id)"
+            role="link" tabindex="0" @keydown.enter.stop="navigateToEdit('foreshadows', fs.id)"
             title="点击编辑此伏笔"
           >{{ fs.title }}</span>
           <span
@@ -62,6 +68,7 @@
             :key="'o-' + ol.id"
             class="relation-tag outline"
             @click.stop="navigateToEdit('outlines', ol.id)"
+            role="link" tabindex="0" @keydown.enter.stop="navigateToEdit('outlines', ol.id)"
             title="点击编辑此大纲"
           >{{ ol.title }}</span>
         </div>
@@ -180,6 +187,7 @@
 </template>
 
 <script setup lang="ts">
+import { isCardEditEvent } from '@/utils/editableCard'
 import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
