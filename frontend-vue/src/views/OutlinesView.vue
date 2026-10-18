@@ -48,10 +48,12 @@
     <BaseModal
       v-if="showCreateModal || editingOutline"
       :title="editingOutline ? '编辑大纲' : '添加大纲'"
+      :draft="{ ...form, tagIds: [...formTagIds].sort((a, b) => a - b) }"
       @close="closeModal"
       :busy="saving"
       :submit="saveOutline"
     >
+      <AiAssistantPanel scope="outline" :target-id="editingOutline?.id" :draft="{ ...form, tagIds: formTagIds }" />
       <div class="form-group">
         <label>标题 *</label>
         <input v-model="form.title" type="text" placeholder="请输入大纲标题" />
@@ -87,6 +89,7 @@
     <BaseModal
       v-if="taggingOutline"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingOutline = null"
       :submit="saveTags"
     >
@@ -106,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'

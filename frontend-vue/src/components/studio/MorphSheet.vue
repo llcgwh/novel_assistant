@@ -10,6 +10,7 @@
     :data-sheet="displayed"
     :data-destination="sheetId"
     :data-motion="moving ? 'flying' : 'settled'"
+    :data-transition="transition"
     :style="{ '--sheet-tint': sheetFor(displayed).tint }"
     :inert="moving || !placed || studio.bookArrival?.direction === 'open'"
     :aria-hidden="studio.bookArrival?.direction === 'open' || undefined"
@@ -29,6 +30,7 @@ import { useStudioStore } from '@/stores/studio'
 import {
   createSheetFlight,
   sheetFor,
+  sheetTransition,
   sheets,
   type SheetId,
 } from '@/utils/sheets'
@@ -40,7 +42,8 @@ const panel = ref<HTMLElement | null>(null)
 const displayed = ref<SheetId>(props.sheetId),
   reversed = ref(false),
   moving = ref(false),
-  placed = ref(false)
+  placed = ref(false),
+  transition = ref<'handoff' | 'flight' | 'none'>('none')
 const flight = createSheetFlight({
   set: (fn, delay) => window.setTimeout(fn, delay),
   clear: (timer) => window.clearTimeout(timer as number),
@@ -75,6 +78,7 @@ function settle() {
   requested = props.sheetId
   reversed.value = false
   moving.value = false
+  transition.value = 'none'
 }
 async function place() {
   await nextTick()
@@ -103,6 +107,7 @@ async function place() {
     height: style.height,
   }
   const destination = props.sheetId
+  const mode = sheetTransition(from, box)
   const direction =
     sheets.findIndex((item) => item.id === destination) >=
     sheets.findIndex((item) => item.id === requested)
@@ -112,17 +117,23 @@ async function place() {
   flight.cancel()
   reversed.value = false
   moving.value = true
+  transition.value = mode
   requested = destination
   lastTarget = JSON.stringify(box)
   Object.assign(element.style, box)
   clearShine()
-  const duration = window.innerWidth < 680 ? 600 : 820
+  const duration = mode === 'handoff' ? 320 : window.innerWidth < 680 ? 600 : 820
   const geometry = element.animate([from, box], {
     duration,
     easing: 'cubic-bezier(.22,.72,.16,1)',
   })
   const turn = element.animate(
-    [
+    mode === 'handoff' ? [
+      { opacity: 1, transform: 'translateX(0)', offset: 0 },
+      { opacity: 0, transform: `translateX(${-direction * 18}px)`, offset: 0.45 },
+      { opacity: 0, transform: `translateX(${direction * 18}px)`, offset: 0.55 },
+      { opacity: 1, transform: 'translateX(0)', offset: 1 },
+    ] : [
       {
         transform: 'perspective(1300px) rotateY(0deg) rotateZ(0deg)',
         offset: 0,
@@ -140,7 +151,7 @@ async function place() {
     ],
     { duration, easing: 'linear' },
   )
-  // Geometry eases while the turn itself must swap faces precisely at its edge.
+  // Same-slot content changes while hidden; a traveling sheet swaps at its edge.
   flight.run(
     {
       cancel: () => {
@@ -152,7 +163,7 @@ async function place() {
     duration,
     () => {
       displayed.value = destination
-      reversed.value = true
+      reversed.value = mode === 'flight'
     },
     () => {
       displayed.value = destination

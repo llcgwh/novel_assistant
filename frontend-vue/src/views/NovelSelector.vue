@@ -237,6 +237,8 @@
     <BaseModal
       v-if="showCreateModal || editingNovel"
       :title="editingNovel ? '编辑小说' : '创建新小说'"
+      :busy="imageUploading"
+      :draft="form"
       @close="closeModal"
       :submit="saveNovel"
     >
@@ -244,6 +246,7 @@
         <label>封面图片</label>
         <ImageUpload
           v-model="form.coverImage"
+          @uploading="imageUploading = $event"
           image-type="novel_cover"
           :novel-id="editingNovel?.id"
           placeholder="点击上传小说封面"
@@ -370,6 +373,7 @@ const form = reactive({
   description: '',
   coverImage: '',
 })
+const imageUploading = ref(false)
 async function loadNovels() {
   loadError.value = false
   try {
@@ -427,6 +431,7 @@ function closeModal() {
   })
 }
 async function saveNovel() {
+  if (imageUploading.value) return
   if (!form.title.trim()) {
     alert('请输入小说标题')
     return

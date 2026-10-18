@@ -64,6 +64,7 @@
     </div>
 
     <AppearanceTransfer />
+    <AiSettings />
 
     <!-- WebDAV 同步设置 -->
     <div v-if="inNovel" class="settings-section">
@@ -236,6 +237,7 @@
 </template>
 
 <script setup lang="ts">
+import AiSettings from '@/components/settings/AiSettings.vue'
 import AppearanceTransfer from '@/components/settings/AppearanceTransfer.vue'
 import BackupMaintenance from '@/components/settings/BackupMaintenance.vue'
 import { ref, reactive, watch, computed, onBeforeUnmount } from 'vue'

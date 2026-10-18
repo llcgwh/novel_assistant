@@ -24,6 +24,7 @@ function setup(view, entity, storeName) {
   const calls = { create: 0, update: 0, tags: 0, close: 0, alerts: 0 }
   const editing = { value: null }
   const saving = { value: false }
+  const imageUploading = { value: false }
   const record = { id: 42 }
   const store = {
     [`create${entity}`]: async () => { calls.create++; return record },
@@ -36,6 +37,7 @@ function setup(view, entity, storeName) {
       return id ? store[`update${entity}`](id, data) : store[`create${entity}`](data)
     } },
     saving,
+    imageUploading,
     form: { name: 'test', title: 'test' },
     formTagIds: { value: [7] },
     [`editing${entity}`]: editing,
@@ -46,7 +48,22 @@ function setup(view, entity, storeName) {
   })
   const code = ts.transpileModule(handler.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
   vm.runInContext(code, context)
-  return { calls, editing, saving, store, save: context[`save${entity}`], record }
+  return { calls, editing, saving, imageUploading, store, save: context[`save${entity}`], record }
+}
+
+for (const [view, entity, storeName] of modules.filter(([view]) => ['Characters', 'Scenes'].includes(view))) {
+  test(`${view}: an in-flight image upload blocks saving until the final image is available`, async () => {
+    const state = setup(view, entity, storeName)
+    state.imageUploading.value = true
+    await state.save()
+    assert.equal(state.calls.create, 0)
+    assert.equal(state.calls.close, 0)
+    assert.equal(state.saving.value, false)
+    state.imageUploading.value = false
+    await state.save()
+    assert.equal(state.calls.create, 1)
+    assert.equal(state.calls.close, 1)
+  })
 }
 
 for (const [view, entity, storeName] of modules) {

@@ -3,6 +3,8 @@
     :busy="busy"
     :wide="mode === 'stats' || mode === 'history'"
     :title="titles[mode]"
+    :dirty="hasUnsavedChanges"
+    :close-warning="mode === 'import' ? '还有章节尚未导入。离开将丢弃待导入的预览和标题修改，已导入的章节会保留。' : undefined"
     @close="$emit('close')"
   >
     <template v-if="mode === 'export'">
@@ -244,8 +246,8 @@
       </p>
     </template>
     <p v-if="error" class="writer-warning" role="alert">{{ error }}</p>
-    <template #actions
-      ><button class="btn-secondary" :disabled="busy" @click="$emit('close')">
+    <template #actions="{ close }"
+      ><button class="btn-secondary" :disabled="busy" @click="close">
         关闭</button
       ><button
         v-if="['export', 'import', 'history', 'stats'].includes(mode)"
@@ -387,6 +389,11 @@ const dailyGoal = ref(writer.workspace?.preferences.dailyGoal ?? 2000),
   chapters = computed(
     () => writer.workspace?.chapters.filter((c) => !c.deleted) || [],
   )
+const hasUnsavedChanges = computed(() =>
+  props.mode === 'import'
+    ? importedCount.value < imported.value.length
+    : props.mode === 'stats' && Number(dailyGoal.value) !== (writer.workspace?.preferences.dailyGoal ?? 2000),
+)
 const sessions = computed(() => writer.workspace?.sessions || [])
 const todayDate = ref(localDate())
 const todayActivity = computed(() => writer.workspace?.stats?.days.find((day) => day.date === todayDate.value))

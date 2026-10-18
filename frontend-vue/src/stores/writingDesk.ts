@@ -1,6 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { writingDeskApi } from '@/api/writingDesk'
+import { emptyStoryState } from '@/utils/storyState'
+import type { StoryState } from '@/types/storyState'
 import type {
   WritingDesk,
   NextPen,
@@ -103,6 +105,11 @@ export const useWritingDeskStore = defineStore('writingDesk', () => {
     mutate((draft) => {
       draft.nextPen = clone(value)
     })
+  const mutateStoryState = (update: (draft: StoryState) => void) =>
+    mutate((draft) => {
+      draft.storyState ||= emptyStoryState()
+      update(draft.storyState)
+    })
   const saveTask = (task: RevisionTask) =>
     mutate((draft) => {
       const at = draft.tasks.findIndex((row) => row.uid === task.uid)
@@ -156,6 +163,7 @@ export const useWritingDeskStore = defineStore('writingDesk', () => {
     load,
     reload,
     saveNextPen,
+    mutateStoryState,
     saveTask,
     saveRound,
     deleteTask,

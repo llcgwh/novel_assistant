@@ -25,7 +25,7 @@
       <path d="m5 7.5 5 5 5-5" />
     </svg>
   </button>
-  <Teleport to="body">
+  <Teleport :to="menuTarget">
     <ul
       v-if="open"
       :id="menuId"
@@ -87,6 +87,7 @@ const open = ref(false),
   activeIndex = ref(-1)
 const menuId = `ink-select-${useId()}`
 const placement = ref<Record<string, string>>({})
+const menuTarget = ref<string | HTMLElement>('body')
 const selected = computed(() =>
   props.options.find((option) => option.value === props.modelValue),
 )
@@ -108,6 +109,9 @@ async function revealActive() {
 function show(edge?: 'first' | 'last') {
   if (props.disabled || !trigger.value || trigger.value.matches(':disabled'))
     return
+  // Native modal dialogs live above body portals. Keep their menus in the same
+  // top layer while using the existing viewport-relative positioning.
+  menuTarget.value = trigger.value.closest('dialog') || 'body'
   const box = selectMenuBox(
     trigger.value.getBoundingClientRect(),
     window.innerWidth,

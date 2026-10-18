@@ -410,6 +410,7 @@
     <BaseModal
       v-if="createOpen"
       title="把这一笔，收进世界"
+      :draft="{ kind: createKind, title: createTitle, text: createText }"
       :submit="createResource"
       @close="createOpen = false"
       ><label class="writer-context-field"
@@ -434,6 +435,7 @@
     <BaseModal
       v-if="aliasPerson"
       :title="aliasPerson.name + '的别名'"
+      :draft="aliasText"
       :submit="saveAliases"
       @close="aliasPerson = null"
       ><label class="writer-context-field"

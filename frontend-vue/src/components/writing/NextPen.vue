@@ -106,6 +106,9 @@
     v-if="editing"
     title="给下一次落笔"
     :busy="pending"
+    :dirty="formDirty"
+    close-warning="尚未保存到作品，离开会保留本机草稿。"
+    discard-label="保留草稿并离开"
     @close="closeEditor"
   >
     <div class="next-pen-form">
@@ -183,12 +186,12 @@
         {{ formError }}
       </p>
     </div>
-    <template #actions>
+    <template #actions="{ close }">
       <div class="next-pen-form-actions">
         <button type="button" class="btn-secondary" @click="discardDraft">
           丢弃本机草稿
         </button>
-        <button type="button" class="btn-secondary" @click="closeEditor">
+        <button type="button" class="btn-secondary" @click="close">
           稍后再写
         </button>
         <button
@@ -208,11 +211,13 @@
       </div>
     </template>
   </BaseModal>
+  <DiscardChangesDialog v-if="discardOpen" :busy="pending" close-warning="本机草稿尚未保存到作品，丢弃后无法恢复。" discard-label="丢弃本机草稿" @continue="discardOpen = false" @discard="confirmDiscardDraft" />
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
+import DiscardChangesDialog from '@/components/common/DiscardChangesDialog.vue'
 import { useWritingStore } from '@/stores/writing'
 import { useWritingDeskStore } from '@/stores/writingDesk'
 import type { NextPen } from '@/types/writingDesk'
@@ -232,6 +237,7 @@ const writer = useWritingStore()
 const desk = useWritingDeskStore()
 const expanded = ref(false)
 const editing = ref(false)
+const discardOpen = ref(false)
 const working = ref(false)
 const outsideError = ref('')
 const formError = ref('')
@@ -251,6 +257,10 @@ const blank = (): NextPen => ({
 })
 const form = reactive<NextPen>(blank())
 const saved = computed(() => desk.data?.nextPen || null)
+const formDirty = computed(() =>
+  (!!saved.value || nextPenHasContent(form)) &&
+  nextPenSignature(form) !== nextPenSignature(saved.value),
+)
 const pending = computed(() => working.value || desk.saving)
 const unavailable = computed(() => pending.value || desk.loading)
 const canSave = computed(
@@ -350,6 +360,14 @@ function closeEditor() {
 }
 function discardDraft() {
   if (pending.value) return
+  if (formDirty.value || localDraft.value) { discardOpen.value = true; return }
+  editing.value = false
+  removeDraft()
+}
+async function confirmDiscardDraft() {
+  if (pending.value) return
+  discardOpen.value = false
+  await nextTick()
   editing.value = false
   removeDraft()
 }

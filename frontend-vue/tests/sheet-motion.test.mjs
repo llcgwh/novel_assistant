@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { compileSources } from './helpers/load-source.mjs'
 
 const load = compileSources()
-const { createSheetFlight, sheets, adjacentSheet, sheetSerial } =
+const { createSheetFlight, sheets, adjacentSheet, sheetSerial, sheetTransition } =
   await load('utils/sheets')
 const { studioModules, studioGroups, studioNavigation } =
   await load('utils/studio')
@@ -159,4 +159,22 @@ test('sheet numbering and adjacent modules follow the displayed sidebar order', 
   }
   assert.equal(adjacentSheet('writing', -1).id, 'overview')
   assert.equal(adjacentSheet('writing', 1).id, 'outlines')
+})
+
+test('same-slot and near-slot destinations hand off without an in-place turn', () => {
+  const wide = { left: '280px', top: '104px', width: '940px', height: '248px' }
+  assert.equal(sheetTransition(wide, wide), 'handoff', 'scenes and map share a wide dock')
+  const narrow = { left: '24px', top: '104px', width: '789px', height: '330px' }
+  assert.equal(sheetTransition(narrow, narrow), 'handoff', 'left and right docks share their mobile position')
+  assert.equal(sheetTransition(narrow, { ...narrow, height: '248px' }), 'handoff', 'small responsive height changes do not look like travel')
+  assert.equal(sheetTransition(narrow, { ...narrow, top: '106.2px', width: '786px' }), 'handoff', 'scrollbar and subpixel changes do not trigger a spin')
+})
+
+test('distinct rendered positions keep the sheet flight, independent of route layout names', () => {
+  const right = { left: '960px', top: '204px', width: '286px', height: '478px' }
+  const left = { left: '280px', top: '204px', width: '254px', height: '478px' }
+  const wide = { left: '280px', top: '104px', width: '966px', height: '248px' }
+  assert.equal(sheetTransition(right, left), 'flight', 'foreshadows to characters travels to the other side')
+  assert.equal(sheetTransition(left, wide), 'flight', 'characters to relationships travels into the wide dock')
+  assert.equal(sheetTransition(right, { ...right, top: '404px' }), 'flight', 'the same layout can still have a different rendered position')
 })

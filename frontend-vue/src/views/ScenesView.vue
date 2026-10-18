@@ -45,14 +45,17 @@
     <BaseModal
       v-if="showCreateModal || editingScene"
       :title="editingScene ? '编辑场景' : '添加场景'"
+      :draft="{ ...form, tagIds: [...formTagIds].sort((a, b) => a - b) }"
       @close="closeModal"
-      :busy="saving"
+      :busy="saving || imageUploading"
       :submit="saveScene"
     >
+      <AiAssistantPanel scope="scene" :target-id="editingScene?.id" :draft="{ ...form, tagIds: formTagIds }" @apply="Object.assign(form, { [$event.field]: $event.value })" />
       <div class="form-group">
         <label>📷 场景图片</label>
         <ImageUpload
           v-model="form.sceneImage"
+          @uploading="imageUploading = $event"
           image-type="scene_image"
           placeholder="点击上传场景图片"
         />
@@ -86,6 +89,7 @@
     <BaseModal
       v-if="taggingScene"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingScene = null"
       :submit="saveTags"
     >
@@ -105,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
@@ -127,6 +132,7 @@ const route = useRoute()
 
 const searchKeyword = ref('')
 const saving = ref(false)
+const imageUploading = ref(false)
 const showCreateModal = ref(false)
 const editingScene = ref<Scene | null>(null)
 const deletingScene = ref<Scene | null>(null)
@@ -204,7 +210,7 @@ function closeModal() {
 }
 
 async function saveScene() {
-  if (saving.value) return
+  if (saving.value || imageUploading.value) return
   if (!form.name.trim()) { alert('请输入场景名称'); return }
   saving.value = true
   try {

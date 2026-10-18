@@ -78,13 +78,17 @@
     <BaseModal
       v-if="showCreateModal || editingEntry"
       :title="editingEntry ? '编辑世界观条目' : '添加世界观条目'"
+      :busy="imageUploading"
+      :draft="{ ...form, tagIds: [...formTagIds].sort((a, b) => a - b), characterIds: [...formCharacterIds].sort((a, b) => a - b), sceneIds: [...formSceneIds].sort((a, b) => a - b), mapLocationIds: [...formLocationIds].sort((a, b) => a - b) }"
       @close="closeModal"
       :submit="saveEntry"
     >
+      <AiAssistantPanel scope="worldview" :target-id="editingEntry?.id" :draft="{ ...form, tagIds: formTagIds, characterIds: formCharacterIds, sceneIds: formSceneIds, mapLocationIds: formLocationIds }" @apply="Object.assign(form, { [$event.field]: $event.value })" />
       <div class="form-group">
         <label>🖼️ 图片</label>
         <ImageUpload
           v-model="form.entryImage"
+          @uploading="imageUploading = $event"
           image-type="worldview"
           placeholder="点击上传条目图片"
         />
@@ -164,6 +168,7 @@
     <BaseModal
       v-if="taggingEntry"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingEntry = null"
       :submit="saveTags"
     >
@@ -183,6 +188,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import StudioIcon from '@/components/common/StudioIcon.vue'
 import SeriesWorkspace from '@/components/series/SeriesWorkspace.vue'
 import { useRoute } from 'vue-router'
@@ -218,6 +224,7 @@ const mapStore = useMapStore()
 const searchKeyword = ref('')
 const activeCategory = ref('')
 const showCreateModal = ref(false)
+const imageUploading = ref(false)
 const editingEntry = ref<WorldviewEntry | null>(null)
 const deletingEntry = ref<WorldviewEntry | null>(null)
 const taggingEntry = ref<WorldviewEntry | null>(null)
@@ -310,6 +317,7 @@ function hasRelations(entry: WorldviewEntry): boolean {
 }
 
 async function saveEntry() {
+  if (imageUploading.value) return
   if (!form.name.trim()) {
     alert('请输入条目名称')
     return

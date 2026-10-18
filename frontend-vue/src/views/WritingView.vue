@@ -16,6 +16,8 @@
         {{ treeOpen ? '收起' : '展开' }}篇章</button
       ><button @click="tools = 'search'">全书搜索</button
       ><button @click="tools = 'connections'">故事回响</button
+      ><button :disabled="!writer.current || writer.current.deleted || !!writer.recovery || !!writer.conflict" @click="openAi">✦ 灵感</button
+      ><button :disabled="!desk.data" @click="storyStateOpen = true">人物状态与知情账</button
       ><button :disabled="!desk.data" @click="revisionOpen = true">
         修订清单<span v-if="openTasks"> · {{ openTasks }}</span></button
       ><button
@@ -113,13 +115,16 @@
     >
       <aside v-if="treeOpen" class="writer-tree" aria-label="篇章目录">
         <header>
-          <strong>篇章目录</strong
-          ><button aria-label="新建章节" @click="openCreate()">＋</button>
+          <strong>{{ trash ? '章节回收站' : '篇章目录' }}</strong>
+          <small>{{ visibleChapterCount }} 章</small>
         </header>
+        <button class="btn-primary writer-create-chapter" @click="openCreate()">
+          ＋ 新建章节
+        </button>
         <div class="writer-tree-actions">
-          <button @click="openVolume()">＋ 篇卷</button
-          ><button :class="{ active: trash }" @click="trash = !trash">
-            {{ trash ? '返回正文' : '回收站' }}
+          <button class="btn-secondary" @click="openVolume()">新建篇卷</button
+          ><button class="btn-secondary" :aria-pressed="trash" @click="trash = !trash">
+            {{ trash ? '返回目录' : '回收站' }}
           </button>
         </div>
         <input
@@ -127,16 +132,21 @@
           placeholder="查找章节"
           aria-label="查找章节"
         />
+        <p class="writer-tree-hint">选中章节可管理；拖动章节可排序或分卷。</p>
+        <p v-if="!visibleChapterCount" class="writer-tree-empty">
+          {{ treeQuery ? '没有找到匹配章节' : trash ? '回收站暂无章节' : '从「新建章节」开始写作' }}
+        </p>
         <template v-for="volume in volumeGroups" :key="volume.uid">
           <div class="writer-volume">
-            <button @click="collapsed[volume.uid] = !collapsed[volume.uid]">
+            <button :aria-expanded="!collapsed[volume.uid]" @click="collapsed[volume.uid] = !collapsed[volume.uid]">
               {{ collapsed[volume.uid] ? '▸' : '▾' }} {{ volume.title }}</button
             ><button
               v-if="volume.uid"
-              :aria-label="'管理' + volume.title"
+              class="writer-manage-volume"
+              :aria-label="'管理篇卷：' + volume.title"
               @click="openVolume(volume.uid)"
             >
-              •••
+              管理
             </button>
           </div>
           <div
@@ -145,9 +155,12 @@
             @dragover.prevent
             @drop.prevent="dropInto(volume.uid || null)"
           >
-            <button
+            <div
               v-for="chapter in rows(volume.uid)"
               :key="chapter.uid"
+              class="writer-chapter-row"
+            >
+            <button
               class="writer-chapter-item"
               :class="{ active: writer.current?.uid === chapter.uid }"
               draggable="true"
@@ -171,12 +184,22 @@
                 >●</span
               >
             </button>
+            <BaseSelect
+              v-if="writer.current?.uid === chapter.uid"
+              class="writer-chapter-manage"
+              :aria-label="'管理章节：' + chapter.title"
+              :model-value="''"
+              :options="chapterActionOptions"
+              placeholder="管理本章"
+              @change="chapterAction"
+            />
+            </div>
             <button
               v-if="!trash"
               class="writer-new-chapter"
               @click="openCreate(volume.uid || null)"
             >
-              ＋ 在这里落笔
+              ＋ {{ volume.uid ? '在本卷新建章节' : '新建未分卷章节' }}
             </button>
           </div>
         </template>
@@ -274,6 +297,11 @@
       </section>
     </div>
     <WritingTools v-if="tools" :mode="tools" @close="tools = ''" />
+    <StoryStatePanel v-if="storyStateOpen" :key="novelId" :novel-id="novelId" :navigate-chapter="jumpToAnchor" @close="storyStateOpen = false" />
+    <BaseModal v-if="aiOpen && writer.current" title="下一步灵感" wide @close="aiOpen = false">
+      <AiAssistantPanel scope="writing" :draft="aiDraft" :current-draft="writer.current" :chapter-uid="writer.current.uid" :disabled="!!writer.recovery || !!writer.conflict || writer.current.deleted" disabled-reason="请先处理稿件冲突或恢复，再获取灵感。" initially-open />
+      <template #actions="{ close }"><button type="button" class="btn-secondary" @click="close">回到写作</button></template>
+    </BaseModal>
     <RevisionDesk
       v-if="revisionOpen"
       @close="revisionOpen = false"
@@ -292,8 +320,10 @@
               : '新建篇卷'
       "
       :submit="submitDialog"
+      :busy="volumeActionBusy"
+      :draft="{ title: dialogTitle, volume: dialog === 'chapter' ? dialogVolume : undefined }"
       @close="dialog = ''"
-      ><label>标题<input v-model="dialogTitle" maxlength="200" /></label
+      ><label>{{ dialog === 'volume' ? '篇卷名称' : '章节标题' }}<input v-model="dialogTitle" maxlength="200" /></label
       ><label v-if="dialog === 'chapter'"
         >篇卷<BaseSelect
           :model-value="dialogVolume || ''"
@@ -304,18 +334,28 @@
       <p v-if="dialog === 'split'">
         当前段落及之后的内容移入新章，段落关联一起迁移。
       </p>
-      <template v-if="dialog === 'volume' && volumeUid"
-        ><button @click="moveVolume(-1)">篇卷前移</button
-        ><button @click="moveVolume(1)">篇卷后移</button
-        ><button @click="removeVolume">
-          移除篇卷，章节归入未分卷
-        </button></template
-      >
-      <p v-if="dialogError" role="alert">{{ dialogError }}</p></BaseModal
+      <div v-if="dialog === 'volume' && volumeUid" class="writer-volume-tools">
+        <section>
+          <h3>调整顺序</h3>
+          <p>当前第 {{ managedVolumeIndex + 1 }} 卷，共 {{ writer.workspace?.volumes.length }} 卷。移动后立即保存。</p>
+          <div class="writer-volume-moves">
+            <button type="button" class="btn-secondary" :disabled="managedVolumeIndex <= 0" @click="moveVolume(-1)">↑ 篇卷前移</button>
+            <button type="button" class="btn-secondary" :disabled="managedVolumeIndex < 0 || managedVolumeIndex >= (writer.workspace?.volumes.length || 0) - 1" @click="moveVolume(1)">↓ 篇卷后移</button>
+          </div>
+        </section>
+        <section class="writer-volume-remove">
+          <div><h3>移除篇卷</h3><p>本卷章节将归入「未分卷」，正文会保留。</p></div>
+          <button type="button" class="btn-danger" @click="removeVolume">移除篇卷</button>
+        </section>
+      </div>
+      <p v-if="volumeNotice" class="writer-volume-notice" role="status">{{ volumeNotice }}</p>
+      <p v-if="dialogError" class="writer-dialog-error" role="alert">{{ dialogError }}</p></BaseModal
     >
   </div>
 </template>
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
+import StoryStatePanel from '@/components/story/StoryStatePanel.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useWritingStore } from '@/stores/writing'
@@ -344,6 +384,7 @@ const ideas = useIdeasStore()
 const reading = computed(() => route.query.mode === 'read')
 const readerEntry = ref(0)
 let routeFollowTicket = 0
+let anchorNavigation = false
 let activityDayTimer: ReturnType<typeof setInterval> | undefined
 type ReaderPosition = { chapterUid: string; blockId?: string }
 let readerRouteTarget: ReaderPosition | null = null
@@ -399,6 +440,14 @@ async function syncReadingPosition() {
   }
 }
 const revisionOpen = ref(false)
+const aiOpen = ref(false), storyStateOpen = ref(false)
+const aiDraft = computed(() => writer.current ? { title: writer.current.title, summary: writer.current.summary, notes: writer.current.notes, links: writer.current.links, doc: writer.current.doc } : {})
+async function openAi() {
+  await nextTick()
+  if (editorPanel.value?.isComposing()) { app.showToast('请先完成当前输入，再获取灵感', 'info'); return }
+  if (!writer.current || writer.current.deleted || writer.recovery || writer.conflict) return
+  aiOpen.value = true
+}
 function openRevisionHistory() {
   revisionOpen.value = false
   tools.value = 'history'
@@ -447,13 +496,33 @@ async function jumpToAnchor(target: { chapterUid: string; blockId?: string }) {
   )
   if (!chapter || chapter.deleted) {
     app.showToast('来源章节已移除或在回收站中，请先恢复章节', 'info')
-    return
+    return false
   }
-  revisionOpen.value = false
-  await router.replace({
+  if (!active() || anchorNavigation || writer.loading || writer.saving || writer.recovery || writer.conflict) {
+    app.showToast('请先完成正文载入、保存或稿件恢复，再查看来源', 'info')
+    return false
+  }
+  const origin = route.fullPath
+  const destination = {
+    path: `/novel/${novelId}/writing`,
     query: { chapter: target.chapterUid, block: target.blockId || undefined },
-  })
-  await followRoute()
+  }
+  const expected = router.resolve(destination).fullPath
+  // select() also checks IndexedDB drafts after replacing current. Keep the
+  // current/route/editor-ready watchers from starting a second selection then.
+  anchorNavigation = true
+  try {
+    if (!(await writer.select(target.chapterUid)) || !active() || route.fullPath !== origin) return false
+    await router.replace(destination)
+    if (!active() || route.fullPath !== expected) return false
+    revisionOpen.value = false
+    const opened = await followRoute(target.chapterUid)
+    return opened && writer.current?.uid === target.chapterUid && !writer.recovery && !writer.conflict
+  } finally {
+    anchorNavigation = false
+    // A separate navigation while loading still needs to be followed.
+    if (active() && route.path === destination.path && route.fullPath !== origin && route.fullPath !== expected) void followRoute()
+  }
 }
 async function openStats() {
   await editorPanel.value?.flushStats()
@@ -492,6 +561,9 @@ const volumeGroups = computed(() => [
   { uid: '', title: '未分卷' },
   ...(writer.workspace?.volumes || []),
 ])
+const visibleChapterCount = computed(() => volumeGroups.value.reduce((total, volume) => total + rows(volume.uid).length, 0))
+const managedVolumeIndex = computed(() => writer.workspace?.volumes.findIndex((volume) => volume.uid === volumeUid.value) ?? -1)
+const volumeActionBusy = ref(false), volumeNotice = ref('')
 const volumeOptions = computed(() =>
   volumeGroups.value.map((volume) => ({
     value: volume.uid,
@@ -563,6 +635,7 @@ function openCreate(volume: string | null = writer.current?.volumeId || null) {
   dialogTitle.value = ''
   dialogVolume.value = volume
   dialogError.value = ''
+  volumeNotice.value = ''
 }
 function openVolume(uid = '') {
   volumeUid.value = uid
@@ -570,6 +643,7 @@ function openVolume(uid = '') {
   dialogTitle.value =
     writer.workspace?.volumes.find((v) => v.uid === uid)?.title || ''
   dialogError.value = ''
+  volumeNotice.value = ''
 }
 async function submitDialog() {
   if (!dialogTitle.value.trim()) {
@@ -582,6 +656,10 @@ async function submitDialog() {
         uid: dialogUid,
       })
       if (!active()) return
+      treeOpen.value = true
+      trash.value = false
+      treeQuery.value = ''
+      collapsed.value[c.volumeId || ''] = false
       await router.replace({ query: { chapter: c.uid } })
     } else if (dialog.value === 'split') {
       if (!(await writer.flush())) throw Error('请先保存当前章节')
@@ -614,7 +692,7 @@ async function submitDialog() {
   }
 }
 async function removeVolume() {
-  await run(async () => {
+  await runVolumeAction(async () => {
     const volumes = writer.workspace!.volumes.filter(
         (v) => v.uid !== volumeUid.value,
       ),
@@ -627,15 +705,24 @@ async function removeVolume() {
   })
 }
 async function moveVolume(direction: number) {
-  await run(async () => {
+  await runVolumeAction(async () => {
     const list = [...writer.workspace!.volumes],
       from = list.findIndex((v) => v.uid === volumeUid.value),
       to = from + direction
-    if (to < 0 || to >= list.length) return
+    if (from < 0 || to < 0 || to >= list.length) return
     ;[list[from], list[to]] = [list[to], list[from]]
     await writer.structure(list)
-    dialog.value = ''
+    volumeNotice.value = `已移至第 ${to + 1} 卷`
   })
+}
+async function runVolumeAction(action: () => Promise<void>) {
+  if (volumeActionBusy.value) return
+  volumeActionBusy.value = true
+  dialogError.value = ''
+  volumeNotice.value = ''
+  try { await action() }
+  catch (e: any) { dialogError.value = e?.response?.data?.message || e.message || '操作失败，请重试' }
+  finally { volumeActionBusy.value = false }
 }
 async function moveChapter(
   uid: string,
@@ -742,7 +829,8 @@ function emergencyExport() {
       writer.current.title + '.txt',
     )
 }
-async function followRoute() {
+async function followRoute(alreadySelected?: string): Promise<boolean> {
+  if (anchorNavigation && !alreadySelected) return false
   if (route.query.ideas === '1') writer.contextTab = 'notes'
   // Reading can cross chapters without replacing the editor's last saved draft.
   // Only position events from this reader skip selection; external links still load.
@@ -752,21 +840,23 @@ async function followRoute() {
     String(route.query.chapter || '') === readerRouteTarget.chapterUid &&
     String(route.query.block || '') === (readerRouteTarget.blockId || '')
   )
-    return
+    return true
   const ticket = ++routeFollowTicket
   clearReaderPosition()
   readerClosing = reading.value
   const uid = String(route.query.chapter || '')
-  if (uid && !(await writer.select(uid))) {
+  if (alreadySelected && (uid !== alreadySelected || writer.current?.uid !== alreadySelected)) return false
+  if (uid && !alreadySelected && !(await writer.select(uid))) {
     if (ticket === routeFollowTicket) readerClosing = false
-    return
+    return false
   }
-  if (ticket !== routeFollowTicket || !active()) return
+  if (ticket !== routeFollowTicket || !active()) return false
   readerClosing = false
   if (reading.value) readerEntry.value++
-  if (!active() || reading.value) return
+  if (!active() || reading.value) return active()
   if (writer.current && route.query.block) {
     await nextTick()
+    if (ticket !== routeFollowTicket || !active() || String(route.query.chapter || '') !== uid) return false
     const editor = editorPanel.value?.editor
     if (editor) {
       let pos = -1
@@ -785,11 +875,13 @@ async function followRoute() {
   }
   if (route.query.find) {
     await nextTick()
+    if (ticket !== routeFollowTicket || !active() || String(route.query.chapter || '') !== uid) return false
     if (editorPanel.value) {
       editorPanel.value.find = String(route.query.find)
       editorPanel.value.findNext()
     }
   }
+  return ticket === routeFollowTicket && active() && String(route.query.chapter || '') === uid
 }
 function editorReady() {
   if (
@@ -803,6 +895,7 @@ watch(
   (uid) => {
     if (
       uid &&
+      !anchorNavigation &&
       !disposed &&
       !reading.value &&
       route.path.endsWith('/writing') &&

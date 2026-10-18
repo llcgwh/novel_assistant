@@ -94,9 +94,11 @@
     <BaseModal
       v-if="showCreateRelModal || editingRelationship"
       :title="editingRelationship ? '编辑关系' : '添加关系'"
+      :draft="form"
       @close="closeRelModal"
       :submit="saveRelationship"
     >
+      <AiAssistantPanel scope="relationship" :target-id="editingRelationship?.id" :draft="form" />
       <div class="form-group">
         <label>人物1 *</label>
         <BaseSelect
@@ -141,6 +143,7 @@
     <BaseModal
       v-if="showGroupModal"
       :title="editingGroup ? '编辑关系组' : '创建关系组'"
+      :draft="{ ...groupForm, characterIds: [...groupForm.characterIds].sort((a, b) => a - b) }"
       @close="closeGroupModal"
       :submit="saveGroup"
     >
@@ -198,6 +201,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'

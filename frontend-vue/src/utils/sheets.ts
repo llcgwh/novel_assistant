@@ -24,7 +24,7 @@ const sheetProfiles = [
     title: '每个人，都是一个宇宙',
     caption: '人物索引',
     label: '人物档案',
-    layout: 'right',
+    layout: 'left',
     tint: '#bba2ff',
     motif: 'portrait',
   },
@@ -144,6 +144,23 @@ export function adjacentSheet(id: string, direction: number) {
     sheets.findIndex((sheet) => sheet.id === id),
   )
   return sheets[(index + direction + sheets.length) % sheets.length]
+}
+
+type SheetBox = { left: string; top: string; width: string; height: string }
+
+// Responsive layouts can put different modules in the same slot. A turn only
+// reads as travel when the rendered anchors are meaningfully separated.
+export function sheetTransition(from: SheetBox, to: SheetBox) {
+  const size = (box: SheetBox) => ({
+    x: parseFloat(box.left) + parseFloat(box.width) / 2,
+    y: parseFloat(box.top) + parseFloat(box.height) / 2,
+    width: parseFloat(box.width),
+    height: parseFloat(box.height),
+  })
+  const start = size(from), end = size(to)
+  const distance = Math.hypot(end.x - start.x, end.y - start.y)
+  return distance < 64 && Math.abs(end.width - start.width) < 64 &&
+    Math.abs(end.height - start.height) < 128 ? 'handoff' : 'flight'
 }
 
 // All completion paths belong to the latest navigation, including cancelled animations.

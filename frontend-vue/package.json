@@ -25,8 +25,9 @@
   "devDependencies": {
     "@types/node": "^22.20.1",
     "@vitejs/plugin-vue": "^6.0.9",
+    "@vue/devtools-api": "^8.1.2",
     "fake-indexeddb": "^6.2.5",
-    "sass": "^1.83.1",
+    "sass": "^1.69.0",
     "typescript": "~5.6.3",
     "vite": "^7.3.6",
     "vue-tsc": "^2.2.0"

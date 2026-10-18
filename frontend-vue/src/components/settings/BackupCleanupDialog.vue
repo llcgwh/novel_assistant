@@ -1,19 +1,46 @@
 <template>
   <Teleport to="body">
-    <dialog ref="panel" class="modal-content backup-cleanup-dialog" :aria-label="title" :aria-busy="busy" @cancel.prevent="close" @click="backdropClick">
+    <dialog ref="panel" class="modal-content backup-cleanup-dialog" :aria-label="title" :aria-busy="busy" @cancel.prevent="close" @click="backdropClick" @focusin="rememberFocus">
       <h2>{{ title }}</h2>
-      <fieldset class="cleanup-fields" :disabled="busy" :inert="busy"><slot /></fieldset>
-      <fieldset class="modal-actions cleanup-fields" :disabled="busy"><slot name="actions" /></fieldset>
+      <fieldset class="cleanup-fields" :disabled="busy" :inert="busy || discardOpen"><slot /></fieldset>
+      <fieldset class="modal-actions cleanup-fields" :disabled="busy" :inert="discardOpen"><slot name="actions" :close="close" /></fieldset>
     </dialog>
   </Teleport>
+  <DiscardChangesDialog v-if="discardOpen" :teleport-to="panel || 'body'" :busy="busy" :close-warning="closeWarning" :discard-label="discardLabel" @continue="continueEditing" @discard="discardChanges" />
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useDialog } from '@/composables/useDialog'
-const props = withDefaults(defineProps<{ title: string; busy?: boolean }>(), { busy: false })
+import { provideModalDrafts } from '@/composables/modalDrafts'
+import { draftFingerprint, draftHasChanges } from '@/utils/modalDraft'
+import DiscardChangesDialog from '@/components/common/DiscardChangesDialog.vue'
+const props = withDefaults(defineProps<{ title: string; busy?: boolean; draft?: unknown; dirty?: boolean; closeWarning?: string; discardLabel?: string }>(), { busy: false, dirty: undefined })
 const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLDialogElement | null>(null)
-function close() { if (!props.busy) emit('close') }
+const discardOpen = ref(false)
+const initialDraft = draftFingerprint(props.draft)
+const childChanges = provideModalDrafts()
+const hasChanges = computed(() => draftHasChanges(initialDraft, props.draft, props.dirty) || childChanges.value)
+let editorFocus: HTMLElement | null = null
+function rememberFocus(event: FocusEvent) { if (!discardOpen.value) editorFocus = event.target as HTMLElement }
+function close() {
+  if (props.busy || discardOpen.value) return
+  if (hasChanges.value) discardOpen.value = true
+  else emit('close')
+}
+async function continueEditing() {
+  if (props.busy) return
+  discardOpen.value = false
+  await nextTick()
+  if (editorFocus?.isConnected && !editorFocus.closest('[inert]')) editorFocus.focus()
+  else panel.value?.focus()
+}
+async function discardChanges() {
+  if (props.busy || !discardOpen.value) return
+  discardOpen.value = false
+  await nextTick()
+  emit('close')
+}
 function backdropClick(event: MouseEvent) {
   const dialog = panel.value
   if (!dialog || event.target !== dialog) return

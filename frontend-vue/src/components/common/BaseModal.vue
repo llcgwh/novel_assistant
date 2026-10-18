@@ -1,13 +1,13 @@
 <template>
   <Teleport to="body">
     <div class="modal" @click.self="close">
-      <div ref="panel" class="modal-content" :class="{ 'modal-wide': wide }" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="pending" tabindex="-1">
+      <div ref="panel" class="modal-content" :class="{ 'modal-wide': wide }" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="pending" :aria-hidden="discardOpen || undefined" :inert="discardOpen" tabindex="-1" @focusin="rememberFocus">
         <h2>{{ title }}</h2>
         <fieldset class="modal-fields" :disabled="pending" :inert="pending">
           <slot></slot>
         </fieldset>
         <fieldset class="modal-actions modal-fields" :disabled="pending">
-          <slot name="actions" :busy="pending">
+          <slot name="actions" :busy="pending" :close="close">
             <button type="button" class="btn-secondary" :disabled="pending" @click="close">取消</button>
             <button type="button" class="btn-primary" :disabled="pending" @click="confirm">{{ pending ? '处理中…' : '确定' }}</button>
           </slot>
@@ -16,25 +16,58 @@
       </div>
     </div>
   </Teleport>
+  <DiscardChangesDialog v-if="discardOpen" :busy="pending" :close-warning="closeWarning" :discard-label="discardLabel" @continue="continueEditing" @discard="discardChanges" />
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useDialog } from '@/composables/useDialog'
+import { provideModalDrafts } from '@/composables/modalDrafts'
+import { draftFingerprint, draftHasChanges } from '@/utils/modalDraft'
+import DiscardChangesDialog from './DiscardChangesDialog.vue'
 const props = withDefaults(defineProps<{
   title: string
   wide?: boolean
   busy?: boolean
   submit?: () => unknown | Promise<unknown>
-}>(), { busy: false })
+  draft?: unknown
+  dirty?: boolean
+  closeWarning?: string
+  discardLabel?: string
+}>(), { busy: false, dirty: undefined })
 const emit = defineEmits<{ close: []; confirm: [] }>()
 const panel = ref<HTMLElement | null>(null)
 const submitting = ref(false)
 const submitError = ref('')
+const discardOpen = ref(false)
+const initialDraft = draftFingerprint(props.draft)
+const childChanges = provideModalDrafts()
+const hasChanges = computed(() => draftHasChanges(initialDraft, props.draft, props.dirty) || childChanges.value)
+let editorFocus: HTMLElement | null = null
 const pending = computed(() => props.busy || submitting.value)
-function close() { if (!pending.value) emit('close') }
-async function confirm() {
+function rememberFocus(event: FocusEvent) { editorFocus = event.target as HTMLElement }
+function close() {
+  if (pending.value || discardOpen.value) return
+  if (hasChanges.value) discardOpen.value = true
+  else emit('close')
+}
+async function continueEditing() {
   if (pending.value) return
+  discardOpen.value = false
+  await nextTick()
+  if (editorFocus?.isConnected && !editorFocus.closest('[inert]')) editorFocus.focus()
+  else panel.value?.focus()
+}
+async function discardChanges() {
+  if (pending.value || !discardOpen.value) return
+  discardOpen.value = false
+  // Remove the nested dialog first so the editor becomes the top dialog again
+  // and its normal unmount restores the original page opener.
+  await nextTick()
+  if (!pending.value) emit('close')
+}
+async function confirm() {
+  if (pending.value || discardOpen.value) return
   submitting.value = true
   submitError.value = ''
   try {

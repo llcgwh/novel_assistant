@@ -1,14 +1,25 @@
 <template>
         <div class="canvas-container" id="relationship-canvas-container">
+          <CanvasViewportToolbar label="人物关系图" :scale="viewport.state.scale" @zoom-in="viewport.zoomBy(1.2)" @zoom-out="viewport.zoomBy(1 / 1.2)" @reset="viewport.reset" />
+          <div class="canvas-surface">
           <canvas
             ref="relationshipCanvas"
             id="relationship-canvas"
             width="800"
             height="600"
+            tabindex="0"
+            aria-label="人物关系图。滚轮缩放，拖动平移，方向键移动，按加减键缩放，Home 复位。点击人物可编辑。"
+            :class="{ 'is-panning': viewport.dragging.value }"
             @click="onCanvasClick"
-            @mousemove="onCanvasMouseMove"
-            @mouseleave="hoveredNode = null"
-            title="点击人物节点可编辑"
+            @wheel.prevent="viewport.onWheel"
+            @pointerdown="hoveredNode = null; viewport.onPointerDown($event)"
+            @pointermove="onCanvasPointerMove"
+            @pointerup="viewport.onPointerUp"
+            @pointercancel="viewport.onPointerCancel"
+            @lostpointercapture="viewport.onLostPointerCapture"
+            @pointerleave="hoveredNode = null"
+            @keydown="viewport.onKeydown"
+            title="滚轮缩放、拖动画板；点击人物节点可编辑"
           ></canvas>
           <!-- Hover tooltip overlay -->
           <div
@@ -34,24 +45,31 @@
               暂无关系和关系组
             </div>
           </div>
+          </div>
         </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import type { Character } from '@/types/character'
 import type { Relationship, RelationshipGroup } from '@/types/relationship'
 import { useStudioStore } from '@/stores/studio'
+import { useCanvasViewport } from '@/composables/useCanvasViewport'
+import CanvasViewportToolbar from '@/components/common/CanvasViewportToolbar.vue'
 const studio = useStudioStore()
-watch(() => studio.theme, () => nextTick(drawGraph))
+watch(() => studio.theme, scheduleDraw)
 const props = defineProps<{ characters: Character[]; relationships: Relationship[]; groups: RelationshipGroup[] }>()
 const emit = defineEmits<{ openCharacter: [id: number] }>()
 let observer: ResizeObserver | undefined
+let drawFrame = 0
+function scheduleDraw() {
+  if (!drawFrame) drawFrame = requestAnimationFrame(() => { drawFrame = 0; drawGraph() })
+}
 onMounted(() => {
-  observer = new ResizeObserver(drawGraph)
+  observer = new ResizeObserver(scheduleDraw)
   if (relationshipCanvas.value) observer.observe(relationshipCanvas.value)
   drawGraph()
 })
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => { observer?.disconnect(); cancelAnimationFrame(drawFrame) })
 // ========== Canvas refs & state ==========
 const relationshipCanvas = ref<HTMLCanvasElement | null>(null)
 const nodePositions = ref<Record<number, { x: number; y: number }>>({})
@@ -59,6 +77,8 @@ const nodePositions = ref<Record<number, { x: number; y: number }>>({})
 // ========== Hover tooltip state ==========
 const hoveredNode = ref<{ id: number; name: string } | null>(null)
 const tooltipStyle = ref({ left: '0px', top: '0px' })
+const viewport = useCanvasViewport(relationshipCanvas, () => { hoveredNode.value = null; drawGraph() })
+let layoutKey = ''
 
 // Hover 角色时计算的关系
 const hoveredNodeRelations = computed(() => {
@@ -82,7 +102,7 @@ const hoveredNodeGroups = computed(() => {
 })
 
 watch(() => [props.relationships, props.characters, props.groups], () => {
-  nextTick(() => drawGraph())
+  scheduleDraw()
 }, { deep: true })
 
 // ========== Canvas 绘制 ==========
@@ -100,10 +120,11 @@ function drawGraph() {
   if (!width) return
   const height = Math.max(240, width * .75)
   const ratio = window.devicePixelRatio || 1
-  canvas.style.height = `${height}px`
-  canvas.width = Math.round(width * ratio)
-  canvas.height = Math.round(height * ratio)
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+  if (canvas.style.height !== `${height}px`) canvas.style.height = `${height}px`
+  const pixelWidth = Math.round(width * ratio), pixelHeight = Math.round(height * ratio)
+  if (canvas.width !== pixelWidth) canvas.width = pixelWidth
+  if (canvas.height !== pixelHeight) canvas.height = pixelHeight
+  ctx.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0)
   ctx.clearRect(0, 0, width, height)
   const palette = getComputedStyle(document.documentElement)
   const surface = palette.getPropertyValue('--panel').trim()
@@ -116,24 +137,23 @@ function drawGraph() {
   for (let x = 18; x < width; x += 24) for (let y = 18; y < height; y += 24) { ctx.beginPath(); ctx.arc(x, y, .7, 0, Math.PI * 2); ctx.fill() }
 
   const characters = props.characters
-  nodePositions.value = {}
-  if (characters.length === 0) return
-
-  // 圆形布局
-  const centerX = width / 2
-  const centerY = height / 2
-  const radius = Math.max(35, Math.min(centerX, centerY) - 38)
-
-  const positions: Record<number, { x: number; y: number }> = {}
-  characters.forEach((char, i) => {
-    const angle = (2 * Math.PI * i) / characters.length - Math.PI / 2
-    positions[char.id] = {
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle)
-    }
-  })
-
-  nodePositions.value = positions
+  // Layout belongs to the data and available space, not to each pointer move.
+  const nextLayoutKey = `${width}:${height}:${characters.map(character => character.id).join(',')}`
+  if (layoutKey !== nextLayoutKey) {
+    const centerX = width / 2, centerY = height / 2
+    const radius = Math.max(35, Math.min(centerX, centerY) - 38)
+    const positions: Record<number, { x: number; y: number }> = {}
+    characters.forEach((char, i) => {
+      const angle = (2 * Math.PI * i) / characters.length - Math.PI / 2
+      positions[char.id] = { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) }
+    })
+    nodePositions.value = positions
+    layoutKey = nextLayoutKey
+  }
+  if (!characters.length) return
+  const positions = nodePositions.value
+  ctx.translate(viewport.state.x, viewport.state.y)
+  ctx.scale(viewport.state.scale, viewport.state.scale)
 
   // 绘制关系连线
   props.relationships.forEach(rel => {
@@ -194,13 +214,16 @@ function getRelationColor(type?: string) {
 
 // ========== Canvas 交互 ==========
 function onCanvasClick(e: MouseEvent) {
+  if (viewport.consumeClick()) return
   const node = hitTest(e)
   if (node) {
     emit('openCharacter', node.id)
   }
 }
 
-function onCanvasMouseMove(e: MouseEvent) {
+function onCanvasPointerMove(e: PointerEvent) {
+  viewport.onPointerMove(e)
+  if (viewport.dragging.value || e.pointerType === 'touch') { hoveredNode.value = null; return }
   const node = hitTest(e)
   if (node) {
     hoveredNode.value = node
@@ -210,7 +233,7 @@ function onCanvasMouseMove(e: MouseEvent) {
     const y = e.clientY - rect.top
     tooltipStyle.value = {
       left: Math.max(0, Math.min(x + 15, rect.width - 210)) + 'px',
-      top: Math.max(0, y - 10) + 'px'
+      top: Math.max(0, Math.min(y - 10, rect.height - 100)) + 'px'
     }
   } else {
     hoveredNode.value = null
@@ -220,9 +243,7 @@ function onCanvasMouseMove(e: MouseEvent) {
 function hitTest(e: MouseEvent): { id: number; name: string } | null {
   const canvas = relationshipCanvas.value
   if (!canvas) return null
-  const rect = canvas.getBoundingClientRect()
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
+  const { x, y } = viewport.toWorld(e)
 
   for (const [id, pos] of Object.entries(nodePositions.value)) {
     const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2)
@@ -245,12 +266,17 @@ function hitTest(e: MouseEvent): { id: number; name: string } | null {
   border: 1px solid var(--line);
   margin-bottom: 16px;
 }
+.canvas-surface { position: relative; }
 
 #relationship-canvas {
   display: block;
   width: 100%;
   height: auto;
+  touch-action: none;
+  cursor: grab;
 }
+#relationship-canvas.is-panning { cursor: grabbing; }
+#relationship-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 
 .canvas-tooltip {
   position: absolute;

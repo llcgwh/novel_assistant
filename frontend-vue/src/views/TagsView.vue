@@ -30,6 +30,7 @@
     <BaseModal
       v-if="showCreateModal || editingTag"
       :title="editingTag ? '编辑标签' : '添加标签'"
+      :draft="form"
       @close="closeModal"
       :submit="saveTag"
     >

@@ -30,7 +30,7 @@
         <div class="idea-card-heading"><strong>{{ idea.title || idea.body.split(/\r?\n/).find(line => line.trim())?.slice(0, 80) || '未命名灵感' }}</strong><small>{{ ideaCategoryLabel(idea.category) }}</small></div>
         <p class="idea-body">{{ idea.body }}</p>
         <p v-if="idea.chapterUids.length" class="idea-caption">关联：{{ idea.chapterUids.map(chapterTitle).join('、') }}</p>
-        <small v-if="idea.sourceKey" class="idea-caption">来源：本机旧便笺</small>
+        <small v-if="idea.sourceKey" class="idea-caption">来源：{{ idea.sourceKey.startsWith('ai:') ? 'AI 灵感候选' : '本机旧便笺' }}</small>
         <div class="idea-toolbar">
           <button class="btn-secondary" type="button" :disabled="busy || !!inbox.draft" @click="openIdea(idea)">编辑</button>
           <button class="btn-secondary" v-if="compact" type="button" :disabled="busy || !canInsert" @click="emit('insert', idea)">放入当前创作卡</button>
@@ -41,7 +41,7 @@
     <p v-if="compact && filtered.length" class="idea-caption">拖到上方“创作便笺”，或用“放入当前创作卡”按钮。来源灵感会保留。</p>
   </section>
 
-  <BaseModal v-if="editing && inbox.draft" title="记下灵感" :busy="busy" @close="closeEditor">
+  <BaseModal v-if="editing && inbox.draft" title="记下灵感" :busy="busy" :dirty="draftDirty" close-warning="尚未保存到作品，离开会保留本机草稿。" discard-label="保留草稿并离开" @close="closeEditor">
     <div class="idea-form">
       <label>标题<input v-model="inbox.draft.idea.title" maxlength="200" /></label>
       <label>分类<BaseSelect v-model="inbox.draft.idea.category" aria-label="灵感分类" :options="[...ideaCategories]" /></label>
@@ -62,10 +62,10 @@
       <button class="btn-secondary" v-if="inbox.pending" type="button" :disabled="busy" @click="run(() => inbox.retryPending())">重试上次保存</button>
       <button class="btn-secondary" v-if="inbox.pending" type="button" :disabled="busy" @click="run(() => inbox.reload())">读取最新版本</button>
     </div>
-    <template #actions><div class="idea-toolbar">
+    <template #actions="{ close }"><div class="idea-toolbar">
       <button type="button" class="btn-secondary" :disabled="busy || !!inbox.pending" @click="discard">丢弃本机草稿</button>
       <button type="button" class="btn-secondary" @click="download">导出含草稿的灵感</button>
-      <button type="button" class="btn-secondary" @click="closeEditor">稍后再写</button>
+      <button type="button" class="btn-secondary" @click="close">稍后再写</button>
       <button type="button" class="btn-primary" :disabled="busy || !inbox.data || !!inbox.pending || !inbox.draft.idea.body.trim() || (inbox.conflicted && !inbox.compared)" @click="save">{{ inbox.conflicted ? '用此草稿更新灵感' : '保存灵感' }}</button>
     </div></template>
   </BaseModal>
@@ -93,13 +93,19 @@ import StudioIcon from '@/components/common/StudioIcon.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import { useIdeasStore } from '@/stores/ideas'
-import { ideaCategories, ideaCategoryLabel, markdownIdeas, IDEA_DRAG_MIME } from '@/utils/ideas'
+import { ideaCategories, ideaCategoryLabel, ideaSignature, markdownIdeas, IDEA_DRAG_MIME } from '@/utils/ideas'
 import type { Idea } from '@/types/writingDesk'
 const props = withDefaults(defineProps<{ novelId: number; compact?: boolean; canInsert?: boolean }>(), { compact: false, canInsert: false })
 const emit = defineEmits<{ insert: [idea: Idea] }>()
 const inbox = useIdeasStore()
 const editing = ref(false), migrationOpen = ref(false), category = ref('all'), displayError = ref('')
 const busy = computed(() => inbox.loading || inbox.saving)
+const draftDirty = computed(() => {
+  const idea = inbox.draft?.idea
+  if (!idea) return false
+  if (inbox.latestIdea) return ideaSignature(idea) !== ideaSignature(inbox.latestIdea)
+  return !!(idea.title || idea.body || idea.category !== 'other' || idea.chapterUids.length)
+})
 const filtered = computed(() => inbox.ideas.filter(idea => category.value === 'all' || idea.category === category.value))
 const exportable = computed(() => inbox.ideas.length || inbox.draft || inbox.legacyText)
 const availableChapters = computed(() => inbox.chapters.filter(row => !row.deleted || inbox.draft?.idea.chapterUids.includes(row.uid)))

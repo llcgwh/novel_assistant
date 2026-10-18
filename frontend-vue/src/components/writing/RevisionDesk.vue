@@ -117,18 +117,6 @@
       {{ desk.error || error }}
     </p>
     <p v-if="notice" class="revision-notice" role="status">{{ notice }}</p>
-    <div v-if="discardAction" class="revision-discard" role="alert">
-      <span>当前编辑有尚未保存的改动。</span
-      ><button
-        type="button"
-        class="btn-secondary"
-        @click="discardAction = null"
-      >
-        继续编辑</button
-      ><button type="button" class="btn-secondary" @click="confirmDiscard">
-        放弃改动
-      </button>
-    </div>
     <section
       v-if="roundDraft"
       class="revision-composer"
@@ -411,11 +399,13 @@
       </button></template
     >
   </BaseModal>
+  <DiscardChangesDialog v-if="discardAction" :busy="pending" @continue="discardAction = null" @discard="confirmDiscard" />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import BaseModal from '@/components/common/BaseModal.vue'
+import DiscardChangesDialog from '@/components/common/DiscardChangesDialog.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
 import { useWritingStore } from '@/stores/writing'
 import { useWritingDeskStore } from '@/stores/writingDesk'
@@ -570,9 +560,10 @@ function guarded(action: () => void) {
   if (draftDirty.value || roundDraftDirty.value) discardAction.value = action
   else action()
 }
-function confirmDiscard() {
+async function confirmDiscard() {
   const action = discardAction.value
   discardAction.value = null
+  await nextTick()
   action?.()
 }
 function requestClose() {

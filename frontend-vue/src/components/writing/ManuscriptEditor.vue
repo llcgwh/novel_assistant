@@ -517,7 +517,7 @@ onBeforeUnmount(() => {
   clearInterval(interval)
   void persistMeter()
 })
-defineExpose({ editor, findNext, find, flushStats: persistMeter })
+defineExpose({ editor, findNext, find, flushStats: persistMeter, isComposing: () => composing })
 </script>
 <style scoped>
 .manuscript-paper :deep(.tiptap) {

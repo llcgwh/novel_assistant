@@ -48,10 +48,12 @@
     <BaseModal
       v-if="showCreateModal || editingForeshadow"
       :title="editingForeshadow ? '编辑伏笔' : '添加伏笔'"
+      :draft="{ ...form, tagIds: [...formTagIds].sort((a, b) => a - b) }"
       @close="closeModal"
       :busy="saving"
       :submit="saveForeshadow"
     >
+      <AiAssistantPanel scope="foreshadow" :target-id="editingForeshadow?.id" :draft="{ ...form, tagIds: formTagIds }" />
       <div class="form-group">
         <label>标题 *</label>
         <input v-model="form.title" type="text" placeholder="请输入伏笔标题" />
@@ -87,6 +89,7 @@
     <BaseModal
       v-if="taggingForeshadow"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingForeshadow = null"
       :submit="saveTags"
     >
@@ -106,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'

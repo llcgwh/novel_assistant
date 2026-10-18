@@ -81,10 +81,12 @@
     <BaseModal
       v-if="showCreateModal || editingEvent"
       :title="editingEvent ? '编辑事件' : '添加事件'"
+      :draft="{ ...form, tagIds: [...formTagIds].sort((a, b) => a - b) }"
       @close="closeModal"
       :busy="saving"
       :submit="saveEvent"
     >
+      <AiAssistantPanel scope="timeline" :target-id="editingEvent?.id" :draft="{ ...form, tagIds: formTagIds }" />
       <div class="form-group">
         <label>事件标题 *</label>
         <input v-model="form.title" type="text" placeholder="请输入事件标题" />
@@ -111,6 +113,7 @@
     <!-- 关联管理模态框 -->
     <BaseModal
       v-if="relatingEvent"
+      :draft="{ characterIds: [...relations.characterIds].sort((a, b) => a - b), sceneIds: [...relations.sceneIds].sort((a, b) => a - b), foreshadowIds: [...relations.foreshadowIds].sort((a, b) => a - b), outlineIds: [...relations.outlineIds].sort((a, b) => a - b) }"
       title="管理关联"
       @close="relatingEvent = null"
       :submit="saveRelations"
@@ -157,6 +160,7 @@
     <BaseModal
       v-if="taggingEvent"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingEvent = null"
       :submit="saveTags"
     >
@@ -176,6 +180,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, onMounted } from 'vue'

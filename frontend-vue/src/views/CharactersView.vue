@@ -3,6 +3,7 @@
     <div class="view-header">
       <h2>人物档案</h2>
       <div class="view-actions">
+        <button class="btn-secondary" type="button" @click="storyStateCharacter = undefined; storyStateOpen = true">状态与知情账</button>
         <input
           v-model="searchKeyword"
           type="text"
@@ -40,24 +41,30 @@
         <TagList :tags="character.tags" />
         <div class="actions">
           <button class="btn-secondary" @click="editCharacter(character)">编辑</button>
+          <button class="btn-small" type="button" @click="storyStateCharacter = character.id; storyStateOpen = true">动态状态</button>
           <button class="btn-small" @click="manageTags(character)">标签</button>
           <button class="btn-danger" @click="confirmDelete(character)">删除</button>
         </div>
       </div>
     </div>
 
+    <StoryStatePanel v-if="storyStateOpen" :key="Number(route.params.novelId)" :novel-id="Number(route.params.novelId)" :initial-character-id="storyStateCharacter" @close="storyStateOpen = false" />
+
     <!-- 创建/编辑模态框 -->
     <BaseModal
       v-if="showCreateModal || editingCharacter"
       :title="editingCharacter ? '编辑人物' : '添加人物'"
+      :draft="{ ...form, tagIds: [...formTagIds].sort((a, b) => a - b) }"
       @close="closeModal"
-      :busy="saving"
+      :busy="saving || imageUploading"
       :submit="saveCharacter"
     >
+      <AiAssistantPanel scope="character" :target-id="editingCharacter?.id" :draft="{ ...form, tagIds: formTagIds }" @apply="Object.assign(form, { [$event.field]: $event.value })" />
       <div class="form-group">
         <label>📷 人物肖像</label>
         <ImageUpload
           v-model="form.portraitImage"
+          @uploading="imageUploading = $event"
           image-type="character_portrait"
           placeholder="点击上传人物肖像"
         />
@@ -95,6 +102,7 @@
     <BaseModal
       v-if="taggingCharacter"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingCharacter = null"
       :submit="saveTags"
     >
@@ -114,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
 import { useFormSave } from '@/composables/useFormSave'
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -127,14 +136,18 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
+import StoryStatePanel from '@/components/story/StoryStatePanel.vue'
 
 const charactersStore = useCharactersStore()
 const formSaver = useFormSave('characters', () => charactersStore.characters)
 const tagsStore = useTagsStore()
 const route = useRoute()
+const storyStateOpen = ref(false)
+const storyStateCharacter = ref<number | undefined>()
 
 const searchKeyword = ref('')
 const saving = ref(false)
+const imageUploading = ref(false)
 const showCreateModal = ref(false)
 const editingCharacter = ref<Character | null>(null)
 const deletingCharacter = ref<Character | null>(null)
@@ -221,7 +234,7 @@ function resetForm() {
 }
 
 async function saveCharacter() {
-  if (saving.value) return
+  if (saving.value || imageUploading.value) return
   if (!form.name.trim()) {
     alert('请输入人物姓名')
     return

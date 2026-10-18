@@ -8,7 +8,21 @@ export function compileSources() {
   // Compile the actual router/store/API modules; only HTTP transport and browser storage are replaced.
   const root = fileURLToPath(new URL('../../src/', import.meta.url))
   const output = mkdtempSync(fileURLToPath(new URL('../.runtime-', import.meta.url)))
-  after(() => rmSync(output, { recursive: true, force: true }))
+  let cleaned = false
+  function cleanup() {
+    if (cleaned) return
+    rmSync(output, { recursive: true, force: true })
+    cleaned = true
+    process.removeListener('exit', cleanup)
+    process.removeListener('uncaughtExceptionMonitor', cleanup)
+  }
+  after(cleanup)
+  // A top-level import/setup failure can end a test file before node:test runs
+  // its after hooks. Synchronous exit cleanup also covers that failure path.
+  process.once('exit', cleanup)
+  // node:test may rethrow a module setup error from its own uncaught handler,
+  // which skips the ordinary exit event. The monitor runs before that handler.
+  process.once('uncaughtExceptionMonitor', cleanup)
   function compile(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const source = join(directory, entry.name)
@@ -27,7 +41,8 @@ export function compileSources() {
       writeFileSync(target, code)
     }
   }
-  compile(root)
+  try { compile(root) }
+  catch (error) { cleanup(); throw error }
   const load = path => import(pathToFileURL(join(output, path + '.mjs')).href)
   return load
 }

@@ -1,3 +1,4 @@
+import type { StoryState } from './storyState'
 export interface ChapterAnchor {
   chapterUid: string
   blockId: string
@@ -56,5 +57,6 @@ export interface WritingDesk {
   rounds?: RevisionRound[]
   bookmarks: ReaderBookmark[]
   ideas?: Idea[]
+  storyState?: StoryState
   mutationId?: string
 }

@@ -25,11 +25,25 @@
     </div>
 
     <div class="canvas-container">
+      <CanvasViewportToolbar :scale="viewport.state.scale" @zoom-in="viewport.zoomBy(1.2)" @zoom-out="viewport.zoomBy(1 / 1.2)" @reset="viewport.reset" />
+      <p id="map-canvas-help" class="map-canvas-help">点击标记编辑，点击地图空白添加位置。</p>
       <canvas
         ref="mapCanvas"
         class="map-canvas"
+        :class="{ 'is-dragging': dragging }"
         width="800"
         height="600"
+        tabindex="0"
+        role="application"
+        aria-label="世界地图画板"
+        aria-describedby="map-canvas-help"
+        @wheel.prevent="viewport.onWheel"
+        @pointerdown="viewport.onPointerDown"
+        @pointermove="viewport.onPointerMove"
+        @pointerup="viewport.onPointerUp"
+        @pointercancel="viewport.onPointerCancel"
+        @lostpointercapture="viewport.onLostPointerCapture"
+        @keydown="viewport.onKeydown"
         @click="onCanvasClick"
       ></canvas>
     </div>
@@ -65,10 +79,12 @@
     <BaseModal
       v-if="showCreateModal || editingLocation"
       :title="editingLocation ? '编辑位置' : '添加位置'"
+      :draft="{ ...form, linkedSceneId }"
       @close="closeModal"
       :busy="saving"
       :submit="saveLocation"
     >
+      <AiAssistantPanel scope="location" :target-id="editingLocation?.id" :draft="form" @apply="Object.assign(form, { [$event.field]: $event.value })" />
       <div class="form-group">
         <label>位置名称 *</label>
         <input v-model="form.name" type="text" placeholder="请输入位置名称" />
@@ -113,6 +129,7 @@
     <BaseModal
       v-if="taggingLocation"
       title="管理标签"
+      :draft="[...selectedTagIds].sort((a, b) => a - b)"
       @close="taggingLocation = null"
       :submit="saveTags"
     >
@@ -132,8 +149,10 @@
 </template>
 
 <script setup lang="ts">
-import { mapPoint } from '@/utils/map'
+import AiAssistantPanel from '@/components/ai/AiAssistantPanel.vue'
+import { mapWorldPoint, mapContainsPoint, mapMarkerAt } from '@/utils/map'
 import { onBeforeUnmount } from 'vue'
+import { useCanvasViewport } from '@/composables/useCanvasViewport'
 import { useFormSave } from '@/composables/useFormSave'
 import { useEditQuery } from '@/composables/useEditQuery'
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
@@ -150,10 +169,11 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import TagSelector from '@/components/tags/TagSelector.vue'
 import TagList from '@/components/tags/TagList.vue'
 import BaseSelect from '@/components/common/BaseSelect.vue'
+import CanvasViewportToolbar from '@/components/common/CanvasViewportToolbar.vue'
 
 const route = useRoute()
 const studio = useStudioStore()
-watch(() => studio.theme, () => nextTick(drawMap))
+watch(() => studio.theme, () => nextTick(scheduleDraw))
 const mapStore = useMapStore()
 const formSaver = useFormSave('map-locations', () => mapStore.locations)
 const tagsStore = useTagsStore()
@@ -161,12 +181,24 @@ const scenesStore = useScenesStore()
 
 const mapCanvas = ref<HTMLCanvasElement | null>(null)
 const mapWidth = 800, mapHeight = 600
+const viewport = useCanvasViewport(mapCanvas, scheduleDraw)
+const { dragging } = viewport
+let drawFrame = 0, mapDisposed = false
+const backgroundImages = new Map<string, { image: HTMLImageElement; ready: boolean }>()
 let mapResizeObserver: ResizeObserver | undefined
 onMounted(() => {
-  mapResizeObserver = new ResizeObserver(drawMap)
+  mapResizeObserver = new ResizeObserver(scheduleDraw)
   if (mapCanvas.value) mapResizeObserver.observe(mapCanvas.value)
+  window.addEventListener('resize', scheduleDraw)
 })
-onBeforeUnmount(() => mapResizeObserver?.disconnect())
+onBeforeUnmount(() => {
+  mapDisposed = true
+  mapResizeObserver?.disconnect()
+  window.removeEventListener('resize', scheduleDraw)
+  cancelAnimationFrame(drawFrame)
+  for (const entry of backgroundImages.values()) { entry.image.onload = null; entry.image.onerror = null }
+  backgroundImages.clear()
+})
 const bgInput = ref<HTMLInputElement | null>(null)
 const saving = ref(false)
 const showCreateModal = ref(false)
@@ -226,57 +258,79 @@ onMounted(async () => {
     tagsStore.fetchTags(),
     scenesStore.fetchScenes()
   ])
+  if (mapDisposed) return
   await mapStore.loadBackgroundFromStorage(novelId)
-  nextTick(() => drawMap())
+  nextTick(scheduleDraw)
 })
 
 watch(() => [mapStore.locations, mapStore.backgroundImageUrl], () => {
-  nextTick(() => drawMap())
+  nextTick(scheduleDraw)
 }, { deep: true })
 
-let mapDrawVersion = 0
+function scheduleDraw() {
+  if (mapDisposed || drawFrame) return
+  drawFrame = requestAnimationFrame(() => { drawFrame = 0; drawMap() })
+}
+function backgroundImage(url: string | null) {
+  if (!url) return null
+  const existing = backgroundImages.get(url)
+  if (existing) return existing.ready ? existing.image : null
+  const image = new Image()
+  const entry = { image, ready: false }
+  backgroundImages.set(url, entry)
+  image.onload = () => {
+    entry.ready = true
+    if (!mapDisposed && mapStore.backgroundImageUrl === url) scheduleDraw()
+  }
+  // Failed images remain cached too; panning must not retry the same request.
+  image.onerror = () => { entry.ready = false }
+  image.src = url
+  return null
+}
 function drawMap() {
-  const version = ++mapDrawVersion
+  if (mapDisposed) return
   const canvas = mapCanvas.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-
-  const cssWidth = canvas.clientWidth
-  if (!cssWidth) return
+  const cssWidth = canvas.clientWidth, cssHeight = canvas.clientHeight
+  if (!cssWidth || !cssHeight) return
   const pixelRatio = window.devicePixelRatio || 1
-  canvas.width = Math.round(cssWidth * pixelRatio)
-  canvas.height = Math.round(cssWidth * mapHeight / mapWidth * pixelRatio)
-  ctx.setTransform(canvas.width / mapWidth, 0, 0, canvas.height / mapHeight, 0, 0)
-  ctx.clearRect(0, 0, mapWidth, mapHeight)
-  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim()
-  ctx.fillRect(0, 0, mapWidth, mapHeight)
-  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--line').trim()
+  const width = Math.round(cssWidth * pixelRatio), height = Math.round(cssHeight * pixelRatio)
+  if (canvas.width !== width) canvas.width = width
+  if (canvas.height !== height) canvas.height = height
+  const palette = getComputedStyle(document.documentElement)
+  const surface = palette.getPropertyValue('--panel').trim()
+  const line = palette.getPropertyValue('--line').trim()
+  ctx.setTransform(canvas.width / cssWidth, 0, 0, canvas.height / cssHeight, 0, 0)
+  ctx.clearRect(0, 0, cssWidth, cssHeight)
+  ctx.fillStyle = surface
+  ctx.fillRect(0, 0, cssWidth, cssHeight)
+  ctx.save()
+  ctx.translate(viewport.state.x, viewport.state.y)
+  ctx.scale(viewport.state.scale * cssWidth / mapWidth, viewport.state.scale * cssHeight / mapHeight)
+  ctx.beginPath()
+  ctx.rect(0, 0, mapWidth, mapHeight)
+  ctx.clip()
+  ctx.fillStyle = line
   for (let x = 20; x < mapWidth; x += 30) for (let y = 20; y < mapHeight; y += 30) { ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill() }
+  const image = backgroundImage(mapStore.backgroundImageUrl)
+  if (image) ctx.drawImage(image, 0, 0, mapWidth, mapHeight)
   drawLocations(ctx)
-
-  // Draw background if exists
-  if (mapStore.backgroundImageUrl) {
-    const img = new Image()
-    img.onload = () => {
-      if (version !== mapDrawVersion || !canvas.isConnected) return
-      ctx.drawImage(img, 0, 0, mapWidth, mapHeight)
-      drawLocations(ctx)
-    }
-    img.src = mapStore.backgroundImageUrl
-  }
+  ctx.restore()
 }
 
 function drawLocations(ctx: CanvasRenderingContext2D) {
-  const scale = mapWidth / (mapCanvas.value?.clientWidth || mapWidth)
+  const scale = mapWidth / ((mapCanvas.value?.clientWidth || mapWidth) * viewport.state.scale)
   const palette = getComputedStyle(document.documentElement)
   const accent = palette.getPropertyValue('--accent').trim()
   const surface = palette.getPropertyValue('--panel').trim()
   const text = palette.getPropertyValue('--text').trim()
   mapStore.locations.forEach(loc => {
-    if (loc.positionX !== undefined && loc.positionY !== undefined) {
+    if (Number.isFinite(loc.positionX) && Number.isFinite(loc.positionY)) {
+      const x = loc.positionX!, y = loc.positionY!
       ctx.beginPath()
-      ctx.arc(loc.positionX, loc.positionY, 5 * scale, 0, Math.PI * 2)
+      ctx.arc(x, y, 5 * scale, 0, Math.PI * 2)
       ctx.fillStyle = accent
       ctx.fill()
       ctx.strokeStyle = surface
@@ -288,8 +342,8 @@ function drawLocations(ctx: CanvasRenderingContext2D) {
       ctx.textBaseline = 'middle'
       const title = loc.name.length > 12 ? loc.name.slice(0, 12) + '…' : loc.name
       const labelWidth = ctx.measureText(title).width + 12 * scale
-      const labelX = Math.max(labelWidth / 2, Math.min(mapWidth - labelWidth / 2, loc.positionX))
-      const labelY = Math.max(14 * scale, loc.positionY - 20 * scale)
+      const labelX = Math.max(labelWidth / 2, Math.min(mapWidth - labelWidth / 2, x))
+      const labelY = Math.max(14 * scale, y - 20 * scale)
       ctx.fillStyle = surface
       ctx.fillRect(labelX - labelWidth / 2, labelY - 11 * scale, labelWidth, 22 * scale)
       ctx.fillStyle = text
@@ -299,13 +353,17 @@ function drawLocations(ctx: CanvasRenderingContext2D) {
 }
 
 function onCanvasClick(e: MouseEvent) {
+  if (viewport.consumeClick()) return
   const canvas = mapCanvas.value
   if (!canvas) return
   const rect = canvas.getBoundingClientRect()
-  const { x, y } = mapPoint(e.clientX, e.clientY, rect, mapWidth, mapHeight)
-  clickedPosition.value = { x, y }
-  form.positionX = Math.round(x)
-  form.positionY = Math.round(y)
+  const point = mapWorldPoint(viewport.toWorld(e), rect, mapWidth, mapHeight)
+  if (!point || !mapContainsPoint(point, mapWidth, mapHeight)) return
+  const marker = mapMarkerAt(mapStore.locations, point, 12 * mapWidth / (rect.width * viewport.state.scale), 12 * mapHeight / (rect.height * viewport.state.scale))
+  if (marker) { editLocation(marker); return }
+  clickedPosition.value = point
+  form.positionX = Math.round(point.x)
+  form.positionY = Math.round(point.y)
   showCreateModal.value = true
 }
 
@@ -450,7 +508,14 @@ async function deleteLocation() {
 .map-canvas {
   max-width: 100%;
   height: auto;
+  aspect-ratio: 4 / 3;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
 }
+.map-canvas.is-dragging { cursor: grabbing; }
+.map-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.map-canvas-help { margin: 0; padding: 0 14px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 
 .location-info {
   flex: 1;

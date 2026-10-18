@@ -14,6 +14,7 @@
       ref="fileInput"
       type="file"
       accept="image/*"
+      :disabled="uploading"
       style="display: none"
       @change="handleFileChange"
     />
@@ -35,6 +36,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  uploading: [value: boolean]
 }>()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -46,6 +48,7 @@ watch(() => props.modelValue, (val) => {
 })
 
 function triggerUpload() {
+  if (uploading.value) return
   fileInput.value?.click()
 }
 
@@ -59,6 +62,7 @@ async function handleFileChange(event: Event) {
   previewUrl.value = localPreview
 
   uploading.value = true
+  emit('uploading', true)
   try {
     let fileUrl: string
     if (props.imageType === 'background') {
@@ -79,12 +83,14 @@ async function handleFileChange(event: Event) {
   } finally {
     URL.revokeObjectURL(localPreview)
     uploading.value = false
+    emit('uploading', false)
     // 清理 input
     if (input) input.value = ''
   }
 }
 
 function removeImage() {
+  if (uploading.value) return
   previewUrl.value = ''
   emit('update:modelValue', '')
 }
