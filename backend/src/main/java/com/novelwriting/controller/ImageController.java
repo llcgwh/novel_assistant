@@ -2,6 +2,8 @@ package com.novelwriting.controller;
 
 import com.novelwriting.entity.Image;
 import com.novelwriting.service.ImageService;
+import com.novelwriting.service.ImageUploadProblem;
+import com.novelwriting.service.ImageStoragePaths;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -16,7 +18,6 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 @RestController
@@ -56,7 +57,7 @@ public class ImageController {
             Image image = imageService.uploadImage(novelId, file, imageType);
             return ResponseEntity.ok(image);
         } catch (IOException e) {
-            return ResponseEntity.internalServerError().build();
+            throw new ImageUploadProblem(500, "IMAGE_STORAGE_FAILED", "图片保存失败，请检查本机存储空间和上传目录权限后重试。");
         }
     }
 
@@ -77,12 +78,7 @@ public class ImageController {
                     .orElseThrow(() -> new RuntimeException("Image not found"));
 
             // 验证文件路径安全性，防止路径遍历
-            Path filePath = Paths.get(image.getFilePath()).toAbsolutePath().normalize();
-            Path uploadDirPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-            
-            if (!filePath.startsWith(uploadDirPath)) {
-                return ResponseEntity.badRequest().build();
-            }
+            Path filePath = ImageStoragePaths.resolveInside(uploadDir, image.getFilePath());
             
             Resource resource = new UrlResource(filePath.toUri());
 

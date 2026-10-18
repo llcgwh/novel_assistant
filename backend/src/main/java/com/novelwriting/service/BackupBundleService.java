@@ -22,7 +22,7 @@ import java.util.regex.*;
 @Service
 public class BackupBundleService {
     public static final int MAX_BACKUP_BYTES = 48 * 1024 * 1024;
-    private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_IMAGE_BYTES = ImageUploadPolicy.MAX_IMAGE_BYTES;
     private static final int MAX_TOTAL_BYTES = 32 * 1024 * 1024;
     private static final String FORMAT = "novel-assistant-images-v1";
     private static final Map<String, String> EXTENSIONS = Map.of("image/png", ".png", "image/jpeg", ".jpg",
