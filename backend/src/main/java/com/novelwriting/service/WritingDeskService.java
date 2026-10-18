@@ -32,6 +32,9 @@ public class WritingDeskService {
   public ObjectNode save(Long novelId, JsonNode input) {
     WritingBook book = writing.book(novelId);
     ObjectNode current = read(book);
+    if (input != null && input.isObject() && !input.has("storyState") && StoryStateDocuments.hasData(current)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "此客户端未包含人物状态和知情账。请刷新后重试，避免清除历史。");
+    }
     if (
       input != null && input.isObject() && !input.has("ideas") &&
       !current.path("ideas").isEmpty()
@@ -66,6 +69,7 @@ public class WritingDeskService {
       next.path("version").asLong() != version
     ) throw WritingService.conflict();
     validateOwnership(novelId, current, next);
+    StoryStateDocuments.validateChange(novelId, current.path("storyState"), next.path("storyState"), em);
     replace(book, next);
     next.put("mutationId", mutation);
     book.setDeskData(stringify(next));

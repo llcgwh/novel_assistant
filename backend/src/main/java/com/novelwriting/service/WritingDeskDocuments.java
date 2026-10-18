@@ -32,6 +32,7 @@ public final class WritingDeskDocuments {
     desk.putArray("bookmarks");
     desk.putArray("rounds");
     desk.putArray("ideas");
+    desk.set("storyState", StoryStateDocuments.empty());
     return desk;
   }
 
@@ -41,6 +42,8 @@ public final class WritingDeskDocuments {
       : (ObjectNode) parse(book.getDeskData());
     if (!desk.has("rounds")) desk.putArray("rounds");
     if (!desk.has("ideas")) desk.putArray("ideas");
+    if (!desk.has("storyState")) desk.set("storyState", StoryStateDocuments.empty());
+    StoryStateDocuments.normalize(desk.path("storyState"));
     return desk.put("version", desk.path("version").asLong());
   }
 
@@ -57,7 +60,7 @@ public final class WritingDeskDocuments {
     }
     keys(
       input,
-      Set.of("version", "nextPen", "tasks", "bookmarks", "rounds", "ideas", "mutationId")
+      Set.of("version", "nextPen", "tasks", "bookmarks", "rounds", "ideas", "storyState", "mutationId")
     );
     JsonNode version = input.path("version");
     if (
@@ -185,6 +188,9 @@ public final class WritingDeskDocuments {
       }
     }
     ObjectNode result = input.deepCopy();
+    if (input.has("storyState")) StoryStateDocuments.validate(input.path("storyState"));
+    else result.set("storyState", StoryStateDocuments.empty());
+    StoryStateDocuments.normalize(result.path("storyState"));
     if (!result.has("rounds")) result.putArray("rounds");
     if (!result.has("ideas")) result.putArray("ideas");
     return result;
@@ -255,6 +261,7 @@ public final class WritingDeskDocuments {
     if (desk.path("nextPen").isObject()) rows.add(desk.path("nextPen"));
     desk.path("tasks").forEach(rows::add);
     desk.path("bookmarks").forEach(rows::add);
+    rows.addAll(StoryStateDocuments.sources(desk));
     return rows;
   }
 

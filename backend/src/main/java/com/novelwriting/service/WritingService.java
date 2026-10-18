@@ -818,6 +818,9 @@ public class WritingService {
 
   private void protectLegacyDeskRestore(WritingBook book, JsonNode input) {
     JsonNode desk = WritingDeskDocuments.read(book);
+    if (!input.path("desk").has("storyState") && StoryStateDocuments.hasData(desk)) throw bad(
+      "这个旧备份不含人物状态和知情账。请恢复到新建作品，避免清除现有历史。"
+    );
     if (
       !input.path("desk").has("ideas") && !desk.path("ideas").isEmpty()
     ) throw bad(
@@ -889,7 +892,7 @@ public class WritingService {
     WritingDeskDocuments.replace(
       b,
       input.has("desk")
-        ? WritingDeskDocuments.validateDesk(input.path("desk"), false)
+        ? StoryStateDocuments.remap(WritingDeskDocuments.validateDesk(input.path("desk"), false), ids)
         : WritingDeskDocuments.emptyDesk()
     );
     b.setVolumes(stringify(input.path("volumes")));
